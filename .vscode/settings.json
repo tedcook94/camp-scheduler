@@ -1,0 +1,14 @@
+{
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "camp-scheduler-local",
+            "database": "camp_scheduler",
+            "password": "p@ss123",
+            "username": "camp_scheduler"
+        }
+    ]
+}

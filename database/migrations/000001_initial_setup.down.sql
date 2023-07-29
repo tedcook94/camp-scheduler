@@ -1,0 +1,14 @@
+BEGIN;
+
+DROP TABLE IF EXISTS counselors;
+DROP TABLE IF EXISTS session_age_group_cabins;
+DROP TABLE IF EXISTS session_age_groups;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS seasons;
+DROP TABLE IF EXISTS cabins;
+DROP TABLE IF EXISTS age_groups;
+DROP TABLE IF EXISTS camps;
+
+DROP EXTENSION IF EXISTS "uuid-ossp";
+
+COMMIT;

@@ -1,0 +1,224 @@
+_type: export
+__export_format: 4
+__export_date: 2023-07-29T22:36:40.711Z
+__export_source: insomnia.desktop.app:v2023.4.0
+resources:
+  - _id: req_fc01a34325c548fca617f2c1f180c134
+    parentId: fld_99ab89ec48f24d83b1c68c5e4ad6260b
+    modified: 1690667918292
+    created: 1690666857694
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Get
+    description: ""
+    method: GET
+    body: {}
+    parameters:
+      - id: pair_4c7ad06b77464ba2a160dbf59a9be025
+        name: ""
+        value: ""
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690666857649.8594
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: fld_99ab89ec48f24d83b1c68c5e4ad6260b
+    parentId: fld_0165b0f3641045a88246e473a724a706
+    modified: 1690667893935
+    created: 1690666707017
+    name: camps
+    description: ""
+    environment:
+      cs-endpoint: camps
+    environmentPropertyOrder:
+      "&":
+        - cs-endpoint
+    metaSortKey: -1690666707017
+    _type: request_group
+  - _id: fld_0165b0f3641045a88246e473a724a706
+    parentId: wrk_8335f34c06324aa6888c93fbe4e6e58e
+    modified: 1690667872758
+    created: 1690667822566
+    name: camp-scheduler
+    description: ""
+    environment:
+      cs-api-version: v1
+    environmentPropertyOrder:
+      "&":
+        - cs-api-version
+    metaSortKey: -1690667822566
+    _type: request_group
+  - _id: wrk_8335f34c06324aa6888c93fbe4e6e58e
+    parentId: null
+    modified: 1690669589166
+    created: 1690669589166
+    name: camp-scheduler
+    description: ""
+    scope: collection
+    _type: workspace
+  - _id: req_9bb8866f3607434fbf40a1113ef0c15d
+    parentId: fld_99ab89ec48f24d83b1c68c5e4ad6260b
+    modified: 1690667914430
+    created: 1690667393563
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Get By ID
+    description: ""
+    method: GET
+    body: {}
+    parameters:
+      - id: pair_4c7ad06b77464ba2a160dbf59a9be025
+        name: id
+        value: "{{ _['cs-test-camp'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690666857644
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_996527107dab4a2ea9cee4291770f0a9
+    parentId: fld_99ab89ec48f24d83b1c68c5e4ad6260b
+    modified: 1690667926299
+    created: 1690667497661
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Create
+    description: ""
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"name": "Camp Cosby"
+        }
+    parameters:
+      - id: pair_4c7ad06b77464ba2a160dbf59a9be025
+        name: ""
+        value: ""
+        description: ""
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690666857655.7188
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_ee54291a3e1c4cadb3fb7ad7c704662c
+    parentId: fld_99ab89ec48f24d83b1c68c5e4ad6260b
+    modified: 1690668261117
+    created: 1690667605309
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Update
+    description: ""
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"id": "{{ _['cs-test-camp'] }}",
+        	"name": "Camp Cosby",
+        	"location": "Alpine, AL",
+        	"enabled": true
+        }
+    parameters:
+      - id: pair_4c7ad06b77464ba2a160dbf59a9be025
+        name: ""
+        value: ""
+        description: ""
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690666857594
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_d07eb0480ac940e5be3a513c107eff27
+    parentId: fld_99ab89ec48f24d83b1c68c5e4ad6260b
+    modified: 1690667939960
+    created: 1690667669596
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Delete
+    description: ""
+    method: DELETE
+    body: {}
+    parameters:
+      - id: pair_4c7ad06b77464ba2a160dbf59a9be025
+        name: id
+        value: "{{ _['cs-test-camp'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690666857544
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: env_e91cde096b4a48a0bc9cc4a609f73ea7
+    parentId: wrk_8335f34c06324aa6888c93fbe4e6e58e
+    modified: 1690666916375
+    created: 1690666697862
+    name: Base Environment
+    data: {}
+    dataPropertyOrder: {}
+    color: null
+    isPrivate: false
+    metaSortKey: 1690666697862
+    _type: environment
+  - _id: jar_a1ecce66fc8c43208d24f58217e1d5a0
+    parentId: wrk_8335f34c06324aa6888c93fbe4e6e58e
+    modified: 1690666697863
+    created: 1690666697863
+    name: Default Jar
+    cookies: []
+    _type: cookie_jar
+  - _id: env_931c8859938842a9af9330631419ddf1
+    parentId: env_e91cde096b4a48a0bc9cc4a609f73ea7
+    modified: 1690668150160
+    created: 1690666718229
+    name: local
+    data:
+      cs-protocol: http
+      cs-host: 10.0.4.14
+      cs-port: "9100"
+      cs-test-camp: c25973b5-9723-440f-b1fb-eabb3b4a5ba9
+    dataPropertyOrder:
+      "&":
+        - cs-protocol
+        - cs-host
+        - cs-port
+        - cs-test-camp
+    color: null
+    isPrivate: false
+    metaSortKey: 1690666718229
+    _type: environment

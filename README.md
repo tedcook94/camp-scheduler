@@ -126,17 +126,19 @@ constraints -- the director can see what trade-offs exist between options.
 
 ### Phase 0: Foundation Refresh
 
-- [ ] Upgrade to Go 1.24+
-- [ ] Replace Bun ORM with sqlc
-- [ ] Replace Gin with stdlib `net/http` router
-- [ ] Replace `pkg/errors` with stdlib errors (Go 1.13+ wrapping)
-- [ ] Update project structure for sqlc conventions (`sql/queries/`, `sql/schema/`)
-- [ ] Re-implement Camp CRUD with new stack
-- [ ] Set up basic test infrastructure
+- [x] Upgrade to Go 1.24+
+- [x] Replace Bun ORM with sqlc
+- [x] Replace Gin with stdlib `net/http` router
+- [x] Replace `pkg/errors` with stdlib errors (Go 1.13+ wrapping)
+- [x] Replace logrus with `log/slog`
+- [x] Update project structure (`cmd/server/`, `internal/`, `database/queries/`)
+- [x] Re-implement Camp CRUD with new stack
+- [x] Set up basic test infrastructure
 
 ### Phase 1: Counselor-to-Cabin Solver (MVP)
 
 - [ ] Implement CRUD for all existing entities (age groups, cabins, seasons, sessions, counselors)
+- [ ] Determine delete behavior for entities with FK dependencies (block, cascade, reassign, etc.)
 - [ ] Add counselor preference tables + CRUD
 - [ ] Add counselor session history tracking
 - [ ] Implement the constraint solver engine

@@ -1,13 +1,37 @@
 # camp-scheduler Database
 
-## Development
-
-- First, run `make deps` to install golang-migrate.
-- Create a new migration with `make migration name=migration_name`.
-- Run a migration with `make migrate`. Ensure your `.env` file is configured with the proper URL and target version.
-
 ## Local Setup
 
-To set up a local database, `cd` into the `local-setup` directory and run the `local-setup.sh` script. Then you can `cd` back to this directory and follow the migration steps above to get the latest schema.
+To set up a local database, run the setup script from the `local-setup`
+directory:
 
-You can also remove the database and roles with `local-drop.sh`.
+```sh
+cd database/local-setup && ./local-setup.sh
+```
+
+To tear it down:
+
+```sh
+cd database/local-setup && ./local-drop.sh
+```
+
+## Migrations
+
+Migrations are managed with [golang-migrate](https://github.com/golang-migrate/migrate).
+Migration files live in `database/migrations/`.
+
+From the project root (requires `DATABASE_URL` and `VERSION` env vars):
+
+```sh
+# Run migrations to a specific version
+make migrate
+
+# Create a new migration
+make migration name=add_camper_table
+```
+
+The `DATABASE_URL` should be a Postgres connection string, e.g.:
+
+```
+postgres://camp_scheduler:p@ss123@localhost:5432/camp_scheduler?sslmode=disable
+```

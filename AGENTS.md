@@ -14,7 +14,7 @@ a constraint satisfaction solver. See `README.md` for the full project plan.
 
 - Layered domain-driven: Handler -> Service -> sqlc queries -> PostgreSQL
 - Constraint solver reads state via sqlc, produces ranked solutions with explanations
-- Project structure: `server/` (Go app), `database/` (migrations), `sql/` (sqlc queries/schema)
+- Project structure: `cmd/server/` (entrypoint), `internal/` (app code), `database/` (migrations, sqlc queries)
 
 ## Code Style
 
@@ -47,3 +47,9 @@ a constraint satisfaction solver. See `README.md` for the full project plan.
 - Unit tests on every function just for coverage numbers
 - Heavy mocking -- prefer integration tests with a real test database
 - Over-abstraction -- keep things simple until complexity is proven necessary
+
+## Documentation
+
+- Keep `README.md`, `database/README.md`, and other docs up to date when making
+  changes that affect project structure, setup steps, or developer workflows.
+- Keep `insomnia/` API definitions in sync with endpoint changes.

@@ -127,7 +127,7 @@ resources:
     modified: 1690668261117
     created: 1690667605309
     url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
-      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
     name: Update
     description: ""
     method: PUT
@@ -135,15 +135,14 @@ resources:
       mimeType: application/json
       text: |-
         {
-        	"id": "{{ _['cs-test-camp'] }}",
         	"name": "Camp Cosby",
         	"location": "Alpine, AL",
         	"enabled": true
         }
     parameters:
       - id: pair_4c7ad06b77464ba2a160dbf59a9be025
-        name: ""
-        value: ""
+        name: id
+        value: "{{ _['cs-test-camp'] }}"
         description: ""
     headers:
       - name: Content-Type

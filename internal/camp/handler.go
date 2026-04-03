@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"camp-scheduler/internal/api"
+
 	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgx/v5"
 )
@@ -56,7 +58,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, camps)
+	api.WriteJSON(w, http.StatusOK, camps)
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +75,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, camp)
+	api.WriteJSON(w, http.StatusOK, camp)
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +97,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, camp)
+	api.WriteJSON(w, http.StatusCreated, camp)
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
@@ -123,7 +125,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, camp)
+	api.WriteJSON(w, http.StatusOK, camp)
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -141,12 +143,4 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-}
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(v); err != nil {
-		slog.Error("writing json response", "error", err)
-	}
 }

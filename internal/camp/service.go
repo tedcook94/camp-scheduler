@@ -5,9 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 var ErrNotFound = errors.New("camp not found")
@@ -34,7 +33,7 @@ func (s *Service) List(ctx context.Context) ([]CampResponse, error) {
 }
 
 func (s *Service) GetByID(ctx context.Context, id string) (CampResponse, error) {
-	uid, err := parseUUID(id)
+	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return CampResponse{}, err
 	}
@@ -50,7 +49,7 @@ func (s *Service) GetByID(ctx context.Context, id string) (CampResponse, error) 
 func (s *Service) Create(ctx context.Context, req CreateCampRequest) (CampResponse, error) {
 	camp, err := s.queries.CreateCamp(ctx, db.CreateCampParams{
 		CampName:     req.Name,
-		CampLocation: toPgText(req.Location),
+		CampLocation: api.ToPgText(req.Location),
 	})
 	if err != nil {
 		return CampResponse{}, fmt.Errorf("creating camp: %w", err)
@@ -60,7 +59,7 @@ func (s *Service) Create(ctx context.Context, req CreateCampRequest) (CampRespon
 }
 
 func (s *Service) Update(ctx context.Context, id string, req UpdateCampRequest) (CampResponse, error) {
-	uid, err := parseUUID(id)
+	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return CampResponse{}, err
 	}
@@ -68,7 +67,7 @@ func (s *Service) Update(ctx context.Context, id string, req UpdateCampRequest) 
 	camp, err := s.queries.UpdateCamp(ctx, db.UpdateCampParams{
 		ID:           uid,
 		CampName:     req.Name,
-		CampLocation: toPgText(req.Location),
+		CampLocation: api.ToPgText(req.Location),
 		CampEnabled:  req.Enabled,
 	})
 	if err != nil {
@@ -79,7 +78,7 @@ func (s *Service) Update(ctx context.Context, id string, req UpdateCampRequest) 
 }
 
 func (s *Service) Delete(ctx context.Context, id string) error {
-	uid, err := parseUUID(id)
+	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return err
 	}
@@ -97,7 +96,7 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 
 func toCampResponse(c db.Camp) CampResponse {
 	resp := CampResponse{
-		ID:      uuidToString(c.ID),
+		ID:      api.UUIDToString(c.ID),
 		Name:    c.CampName,
 		Enabled: c.CampEnabled,
 	}
@@ -105,26 +104,4 @@ func toCampResponse(c db.Camp) CampResponse {
 		resp.Location = &c.CampLocation.String
 	}
 	return resp
-}
-
-func parseUUID(s string) (pgtype.UUID, error) {
-	var uid pgtype.UUID
-	if err := uid.Scan(s); err != nil {
-		return uid, fmt.Errorf("invalid uuid %q: %w", s, err)
-	}
-	return uid, nil
-}
-
-func uuidToString(u pgtype.UUID) string {
-	if !u.Valid {
-		return ""
-	}
-	return fmt.Sprintf("%x-%x-%x-%x-%x", u.Bytes[0:4], u.Bytes[4:6], u.Bytes[6:8], u.Bytes[8:10], u.Bytes[10:16])
-}
-
-func toPgText(s *string) pgtype.Text {
-	if s == nil {
-		return pgtype.Text{}
-	}
-	return pgtype.Text{String: *s, Valid: true}
 }

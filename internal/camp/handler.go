@@ -2,6 +2,7 @@ package camp
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -45,6 +46,7 @@ type CampResponse struct {
 func (h *Handler) List(c *gin.Context) {
 	camps, err := h.svc.List(c.Request.Context())
 	if err != nil {
+		slog.With("error", err).Error("error listing camps")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -61,6 +63,10 @@ func (h *Handler) Get(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "camp not found"})
 			return
 		}
+		slog.
+			With("id", id).
+			With("error", err).
+			Error("error getting camp")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -77,6 +83,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 	camp, err := h.svc.Create(c.Request.Context(), req)
 	if err != nil {
+		slog.With("error", err).Error("error creating camp")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -99,6 +106,10 @@ func (h *Handler) Update(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "camp not found"})
 			return
 		}
+		slog.
+			With("id", id).
+			With("error", err).
+			Error("error updating camp")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -115,6 +126,10 @@ func (h *Handler) Delete(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "camp not found"})
 			return
 		}
+		slog.
+			With("id", id).
+			With("error", err).
+			Error("error deleting camp")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}

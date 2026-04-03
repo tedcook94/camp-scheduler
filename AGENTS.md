@@ -25,6 +25,22 @@ a constraint satisfaction solver. See `README.md` for the full project plan.
   third-party error libraries.
 - **Naming:** Follow Go conventions. Exported names get brief doc comments only
   when the name alone isn't sufficient.
+- **Logging:** Use `log/slog` with the `slog.With()` chaining style for
+  attaching context fields to log calls. Prefer this over inline variadic args
+  for readability. When chaining multiple `With()` calls, place each on its own
+  line to minimize diffs. Place `"error"` as the last `With()` in the chain.
+  Error-level log messages should start with "error" (e.g.,
+  `"error loading config"`).
+  ```go
+  // single field
+  slog.With("error", err).Error("error loading config")
+
+  // multiple fields -- context first, error last, one per line
+  slog.
+      With("id", id).
+      With("error", err).
+      Error("error getting camp")
+  ```
 
 ## Testing
 

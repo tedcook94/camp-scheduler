@@ -16,7 +16,7 @@ import (
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		slog.Error("loading config", "error", err)
+		slog.With("error", err).Error("error loading config")
 		os.Exit(1)
 	}
 
@@ -24,7 +24,7 @@ func main() {
 
 	srv, err := server.New(cfg)
 	if err != nil {
-		slog.Error("initializing server", "error", err)
+		slog.With("error", err).Error("error initializing server")
 		os.Exit(1)
 	}
 
@@ -41,9 +41,9 @@ func main() {
 	signal.Notify(done, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		slog.Info("starting server", "addr", httpServer.Addr)
+		slog.With("addr", httpServer.Addr).Info("starting server")
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("server error", "error", err)
+			slog.With("error", err).Error("error starting server")
 			os.Exit(1)
 		}
 	}()
@@ -55,7 +55,7 @@ func main() {
 	defer cancel()
 
 	if err := httpServer.Shutdown(ctx); err != nil {
-		slog.Error("server shutdown error", "error", err)
+		slog.With("error", err).Error("error shutting down server")
 	}
 	srv.Shutdown()
 

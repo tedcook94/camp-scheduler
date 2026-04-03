@@ -107,6 +107,9 @@ func initDB(cfg config.Config) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("pinging database: %w", err)
 	}
 
-	slog.Info("connected to database", "host", cfg.Database.Host, "name", cfg.Database.Name)
+	slog.
+		With("host", cfg.Database.Host).
+		With("name", cfg.Database.Name).
+		Info("connected to database")
 	return pool, nil
 }

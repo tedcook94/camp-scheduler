@@ -2,6 +2,7 @@ package agegroup
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -44,6 +45,10 @@ func (h *Handler) List(c *gin.Context) {
 
 	groups, err := h.svc.List(c.Request.Context(), campID)
 	if err != nil {
+		slog.
+			With("camp_id", campID).
+			With("error", err).
+			Error("error listing age groups")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -60,6 +65,10 @@ func (h *Handler) Get(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "age group not found"})
 			return
 		}
+		slog.
+			With("id", id).
+			With("error", err).
+			Error("error getting age group")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -78,6 +87,10 @@ func (h *Handler) Create(c *gin.Context) {
 
 	group, err := h.svc.Create(c.Request.Context(), campID, req)
 	if err != nil {
+		slog.
+			With("camp_id", campID).
+			With("error", err).
+			Error("error creating age group")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -100,6 +113,10 @@ func (h *Handler) Update(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "age group not found"})
 			return
 		}
+		slog.
+			With("id", id).
+			With("error", err).
+			Error("error updating age group")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -116,6 +133,10 @@ func (h *Handler) Delete(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "age group not found"})
 			return
 		}
+		slog.
+			With("id", id).
+			With("error", err).
+			Error("error deleting age group")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}

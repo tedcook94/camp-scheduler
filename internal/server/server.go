@@ -10,6 +10,7 @@ import (
 	"camp-scheduler/internal/cabin"
 	"camp-scheduler/internal/camp"
 	"camp-scheduler/internal/config"
+	"camp-scheduler/internal/counselor"
 	"camp-scheduler/internal/db"
 	"camp-scheduler/internal/season"
 	"camp-scheduler/internal/session"
@@ -93,6 +94,10 @@ func (s *Server) routes() {
 	sessionService := session.NewService(queries)
 	sessionHandler := session.NewHandler(sessionService)
 	sessionHandler.RegisterRoutes(camps)
+
+	counselorService := counselor.NewService(queries)
+	counselorHandler := counselor.NewHandler(counselorService)
+	counselorHandler.RegisterRoutes(camps)
 }
 
 func initDB(cfg config.Config) (*pgxpool.Pool, error) {

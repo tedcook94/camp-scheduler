@@ -137,7 +137,7 @@ constraints -- the director can see what trade-offs exist between options.
 
 ### Phase 1: Counselor-to-Cabin Solver (MVP)
 
-- [ ] Implement CRUD for all existing entities (age groups, cabins, seasons, sessions, counselors)
+- [x] Implement CRUD for all existing entities (age groups, cabins, seasons, sessions, counselors)
 - [ ] Determine delete behavior for entities with FK dependencies (block, cascade, reassign, etc.)
 - [ ] Add camp_id scoping to Get/Update/Delete queries for camp-owned entities
   - Ensures entities can only be accessed within their owning camp

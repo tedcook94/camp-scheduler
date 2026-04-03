@@ -483,6 +483,155 @@ resources:
     settingRebuildPath: true
     settingFollowRedirects: global
     _type: request
+  - _id: fld_seasons_01
+    parentId: fld_0165b0f3641045a88246e473a724a706
+    modified: 1690672000000
+    created: 1690672000000
+    name: seasons
+    description: ""
+    environment:
+      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/seasons"
+    environmentPropertyOrder:
+      "&":
+        - cs-endpoint
+    metaSortKey: -1690666705000
+    _type: request_group
+  - _id: req_seasons_list
+    parentId: fld_seasons_01
+    modified: 1690672000001
+    created: 1690672000001
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Get
+    description: ""
+    method: GET
+    body: {}
+    parameters: []
+    headers: []
+    authentication: {}
+    metaSortKey: -1690672000005
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_seasons_get
+    parentId: fld_seasons_01
+    modified: 1690672000002
+    created: 1690672000002
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Get By ID
+    description: ""
+    method: GET
+    body: {}
+    parameters:
+      - id: pair_seasons_get_id
+        name: id
+        value: "{{ _['cs-test-season'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690672000004
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_seasons_create
+    parentId: fld_seasons_01
+    modified: 1690672000003
+    created: 1690672000003
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Create
+    description: ""
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"name": "Summer 2026"
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690672000003
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_seasons_update
+    parentId: fld_seasons_01
+    modified: 1690672000004
+    created: 1690672000004
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Update
+    description: ""
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"name": "Summer 2027"
+        }
+    parameters:
+      - id: pair_seasons_update_id
+        name: id
+        value: "{{ _['cs-test-season'] }}"
+        description: ""
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690672000002
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_seasons_delete
+    parentId: fld_seasons_01
+    modified: 1690672000005
+    created: 1690672000005
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Delete
+    description: ""
+    method: DELETE
+    body: {}
+    parameters:
+      - id: pair_seasons_delete_id
+        name: id
+        value: "{{ _['cs-test-season'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690672000001
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
   - _id: env_e91cde096b4a48a0bc9cc4a609f73ea7
     parentId: wrk_8335f34c06324aa6888c93fbe4e6e58e
     modified: 1690666916375
@@ -513,6 +662,7 @@ resources:
       cs-test-camp: c25973b5-9723-440f-b1fb-eabb3b4a5ba9
       cs-test-age-group: ""
       cs-test-cabin: ""
+      cs-test-season: ""
     dataPropertyOrder:
       "&":
         - cs-protocol
@@ -521,6 +671,7 @@ resources:
         - cs-test-camp
         - cs-test-age-group
         - cs-test-cabin
+        - cs-test-season
     color: null
     isPrivate: false
     metaSortKey: 1690666718229

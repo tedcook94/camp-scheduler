@@ -1,44 +1,36 @@
 package camp
 
 import (
-	"encoding/json"
 	"errors"
-	"log/slog"
 	"net/http"
 
-	"camp-scheduler/internal/api"
-
-	"github.com/go-playground/validator/v10"
+	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 )
 
 type Handler struct {
-	svc      *Service
-	validate *validator.Validate
+	svc *Service
 }
 
 func NewHandler(svc *Service) *Handler {
-	return &Handler{
-		svc:      svc,
-		validate: validator.New(),
-	}
+	return &Handler{svc: svc}
 }
 
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v1/camps", h.List)
-	mux.HandleFunc("GET /api/v1/camps/{id}", h.Get)
-	mux.HandleFunc("POST /api/v1/camps", h.Create)
-	mux.HandleFunc("PUT /api/v1/camps/{id}", h.Update)
-	mux.HandleFunc("DELETE /api/v1/camps/{id}", h.Delete)
+func (h *Handler) RegisterRoutes(camps *gin.RouterGroup) {
+	camps.GET("", h.List)
+	camps.GET("/:id", h.Get)
+	camps.POST("", h.Create)
+	camps.PUT("/:id", h.Update)
+	camps.DELETE("/:id", h.Delete)
 }
 
 type CreateCampRequest struct {
-	Name     string  `json:"name" validate:"required"`
+	Name     string  `json:"name" binding:"required"`
 	Location *string `json:"location"`
 }
 
 type UpdateCampRequest struct {
-	Name     string  `json:"name" validate:"required"`
+	Name     string  `json:"name" binding:"required"`
 	Location *string `json:"location"`
 	Enabled  bool    `json:"enabled"`
 }
@@ -50,97 +42,82 @@ type CampResponse struct {
 	Enabled  bool    `json:"enabled"`
 }
 
-func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	camps, err := h.svc.List(r.Context())
+func (h *Handler) List(c *gin.Context) {
+	camps, err := h.svc.List(c.Request.Context())
 	if err != nil {
-		slog.Error("listing camps", "error", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	api.WriteJSON(w, http.StatusOK, camps)
+	c.JSON(http.StatusOK, camps)
 }
 
-func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+func (h *Handler) Get(c *gin.Context) {
+	id := c.Param("id")
 
-	camp, err := h.svc.GetByID(r.Context(), id)
+	camp, err := h.svc.GetByID(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			http.Error(w, "camp not found", http.StatusNotFound)
+			c.JSON(http.StatusNotFound, gin.H{"error": "camp not found"})
 			return
 		}
-		slog.Error("getting camp", "error", err, "id", id)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	api.WriteJSON(w, http.StatusOK, camp)
+	c.JSON(http.StatusOK, camp)
 }
 
-func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Create(c *gin.Context) {
 	var req CreateCampRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := h.validate.Struct(req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	camp, err := h.svc.Create(r.Context(), req)
+	camp, err := h.svc.Create(c.Request.Context(), req)
 	if err != nil {
-		slog.Error("creating camp", "error", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	api.WriteJSON(w, http.StatusCreated, camp)
+	c.JSON(http.StatusCreated, camp)
 }
 
-func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+func (h *Handler) Update(c *gin.Context) {
+	id := c.Param("id")
 
 	var req UpdateCampRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := h.validate.Struct(req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	camp, err := h.svc.Update(r.Context(), id, req)
+	camp, err := h.svc.Update(c.Request.Context(), id, req)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			http.Error(w, "camp not found", http.StatusNotFound)
+			c.JSON(http.StatusNotFound, gin.H{"error": "camp not found"})
 			return
 		}
-		slog.Error("updating camp", "error", err, "id", id)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	api.WriteJSON(w, http.StatusOK, camp)
+	c.JSON(http.StatusOK, camp)
 }
 
-func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+func (h *Handler) Delete(c *gin.Context) {
+	id := c.Param("id")
 
-	err := h.svc.Delete(r.Context(), id)
+	err := h.svc.Delete(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			http.Error(w, "camp not found", http.StatusNotFound)
+			c.JSON(http.StatusNotFound, gin.H{"error": "camp not found"})
 			return
 		}
-		slog.Error("deleting camp", "error", err, "id", id)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	c.Status(http.StatusOK)
 }

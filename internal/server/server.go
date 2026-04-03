@@ -11,25 +11,35 @@ import (
 	"camp-scheduler/internal/config"
 	"camp-scheduler/internal/db"
 
+	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Server struct {
-	cfg  config.Config
-	pool *pgxpool.Pool
-	mux  *http.ServeMux
+	cfg    config.Config
+	pool   *pgxpool.Pool
+	router *gin.Engine
 }
 
 func New(cfg config.Config) (*Server, error) {
+	if cfg.Server.Mode != "local" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	pool, err := initDB(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to database: %w", err)
 	}
 
 	s := &Server{
-		cfg:  cfg,
-		pool: pool,
-		mux:  http.NewServeMux(),
+		cfg:    cfg,
+		pool:   pool,
+		router: gin.New(),
+	}
+
+	s.router.Use(gin.Recovery())
+	if cfg.Server.Mode == "local" {
+		s.router.Use(gin.Logger())
 	}
 
 	s.routes()
@@ -37,7 +47,7 @@ func New(cfg config.Config) (*Server, error) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.mux.ServeHTTP(w, r)
+	s.router.ServeHTTP(w, r)
 }
 
 func (s *Server) Shutdown() {
@@ -51,20 +61,23 @@ func (s *Server) Addr() string {
 func (s *Server) routes() {
 	queries := db.New(s.pool)
 
+	s.router.GET("/health", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+	s.router.GET("/ready", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	v1 := s.router.Group("/api/v1")
+
+	camps := v1.Group("/camps")
 	campService := camp.NewService(queries)
 	campHandler := camp.NewHandler(campService)
-	campHandler.RegisterRoutes(s.mux)
+	campHandler.RegisterRoutes(camps)
 
 	ageGroupService := agegroup.NewService(queries)
 	ageGroupHandler := agegroup.NewHandler(ageGroupService)
-	ageGroupHandler.RegisterRoutes(s.mux)
-
-	s.mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-	s.mux.HandleFunc("GET /ready", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
+	ageGroupHandler.RegisterRoutes(camps)
 }
 
 func initDB(cfg config.Config) (*pgxpool.Pool, error) {

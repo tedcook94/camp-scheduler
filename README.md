@@ -10,7 +10,7 @@ solutions that respect hard constraints and optimize soft preferences.
 | Layer      | Technology                                  |
 | ---------- | ------------------------------------------- |
 | Language   | Go 1.24+                                    |
-| HTTP       | stdlib `net/http` (Go 1.22+ enhanced router)|
+| HTTP       | Gin                                         |
 | Database   | PostgreSQL                                  |
 | Query Layer| sqlc (type-safe SQL code generation)        |
 | Migrations | golang-migrate                              |
@@ -22,7 +22,7 @@ solutions that respect hard constraints and optimize soft preferences.
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │   Web UI    │────>│  REST API   │────>│ PostgreSQL  │
-│  (future)   │     │ (Go/stdlib) │     │             │
+│  (future)   │     │  (Go/Gin)   │     │             │
 └─────────────┘     └──────┬──────┘     └──────┬──────┘
                            │                    │
                     ┌──────▼──────┐      ┌──────▼──────┐
@@ -128,7 +128,7 @@ constraints -- the director can see what trade-offs exist between options.
 
 - [x] Upgrade to Go 1.24+
 - [x] Replace Bun ORM with sqlc
-- [x] Replace Gin with stdlib `net/http` router
+- [x] Switch HTTP framework to Gin
 - [x] Replace `pkg/errors` with stdlib errors (Go 1.13+ wrapping)
 - [x] Replace logrus with `log/slog`
 - [x] Update project structure (`cmd/server/`, `internal/`, `database/queries/`)

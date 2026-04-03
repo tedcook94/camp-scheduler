@@ -1,43 +1,36 @@
 package agegroup
 
 import (
-	"encoding/json"
 	"errors"
-	"log/slog"
 	"net/http"
 
-	"camp-scheduler/internal/api"
-
-	"github.com/go-playground/validator/v10"
+	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 )
 
 type Handler struct {
-	svc      *Service
-	validate *validator.Validate
+	svc *Service
 }
 
 func NewHandler(svc *Service) *Handler {
-	return &Handler{
-		svc:      svc,
-		validate: validator.New(),
-	}
+	return &Handler{svc: svc}
 }
 
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v1/camps/{campId}/age-groups", h.List)
-	mux.HandleFunc("GET /api/v1/camps/{campId}/age-groups/{id}", h.Get)
-	mux.HandleFunc("POST /api/v1/camps/{campId}/age-groups", h.Create)
-	mux.HandleFunc("PUT /api/v1/camps/{campId}/age-groups/{id}", h.Update)
-	mux.HandleFunc("DELETE /api/v1/camps/{campId}/age-groups/{id}", h.Delete)
+func (h *Handler) RegisterRoutes(camps *gin.RouterGroup) {
+	ageGroups := camps.Group("/:campId/age-groups")
+	ageGroups.GET("", h.List)
+	ageGroups.GET("/:id", h.Get)
+	ageGroups.POST("", h.Create)
+	ageGroups.PUT("/:id", h.Update)
+	ageGroups.DELETE("/:id", h.Delete)
 }
 
 type CreateAgeGroupRequest struct {
-	Name string `json:"name" validate:"required"`
+	Name string `json:"name" binding:"required"`
 }
 
 type UpdateAgeGroupRequest struct {
-	Name string `json:"name" validate:"required"`
+	Name string `json:"name" binding:"required"`
 }
 
 type AgeGroupResponse struct {
@@ -46,101 +39,86 @@ type AgeGroupResponse struct {
 	Name   string `json:"name"`
 }
 
-func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	campID := r.PathValue("campId")
+func (h *Handler) List(c *gin.Context) {
+	campID := c.Param("campId")
 
-	groups, err := h.svc.List(r.Context(), campID)
+	groups, err := h.svc.List(c.Request.Context(), campID)
 	if err != nil {
-		slog.Error("listing age groups", "error", err, "camp_id", campID)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	api.WriteJSON(w, http.StatusOK, groups)
+	c.JSON(http.StatusOK, groups)
 }
 
-func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+func (h *Handler) Get(c *gin.Context) {
+	id := c.Param("id")
 
-	group, err := h.svc.GetByID(r.Context(), id)
+	group, err := h.svc.GetByID(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			http.Error(w, "age group not found", http.StatusNotFound)
+			c.JSON(http.StatusNotFound, gin.H{"error": "age group not found"})
 			return
 		}
-		slog.Error("getting age group", "error", err, "id", id)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	api.WriteJSON(w, http.StatusOK, group)
+	c.JSON(http.StatusOK, group)
 }
 
-func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	campID := r.PathValue("campId")
+func (h *Handler) Create(c *gin.Context) {
+	campID := c.Param("campId")
 
 	var req CreateAgeGroupRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := h.validate.Struct(req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	group, err := h.svc.Create(r.Context(), campID, req)
+	group, err := h.svc.Create(c.Request.Context(), campID, req)
 	if err != nil {
-		slog.Error("creating age group", "error", err, "camp_id", campID)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	api.WriteJSON(w, http.StatusCreated, group)
+	c.JSON(http.StatusCreated, group)
 }
 
-func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+func (h *Handler) Update(c *gin.Context) {
+	id := c.Param("id")
 
 	var req UpdateAgeGroupRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := h.validate.Struct(req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	group, err := h.svc.Update(r.Context(), id, req)
+	group, err := h.svc.Update(c.Request.Context(), id, req)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			http.Error(w, "age group not found", http.StatusNotFound)
+			c.JSON(http.StatusNotFound, gin.H{"error": "age group not found"})
 			return
 		}
-		slog.Error("updating age group", "error", err, "id", id)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	api.WriteJSON(w, http.StatusOK, group)
+	c.JSON(http.StatusOK, group)
 }
 
-func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+func (h *Handler) Delete(c *gin.Context) {
+	id := c.Param("id")
 
-	err := h.svc.Delete(r.Context(), id)
+	err := h.svc.Delete(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			http.Error(w, "age group not found", http.StatusNotFound)
+			c.JSON(http.StatusNotFound, gin.H{"error": "age group not found"})
 			return
 		}
-		slog.Error("deleting age group", "error", err, "id", id)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	c.Status(http.StatusOK)
 }

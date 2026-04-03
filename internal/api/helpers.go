@@ -1,21 +1,10 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
-	"log/slog"
-	"net/http"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
-
-func WriteJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(v); err != nil {
-		slog.Error("writing json response", "error", err)
-	}
-}
 
 func ParseUUID(s string) (pgtype.UUID, error) {
 	var uid pgtype.UUID

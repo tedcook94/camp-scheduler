@@ -8,7 +8,7 @@ a constraint satisfaction solver. See `README.md` for the full project plan.
 
 ## Tech Stack
 
-- Go 1.24+, stdlib `net/http` router, sqlc, PostgreSQL, golang-migrate
+- Go 1.24+, Gin, sqlc, PostgreSQL, golang-migrate
 
 ## Architecture
 

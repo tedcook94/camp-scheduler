@@ -27,3 +27,18 @@ func ToPgText(s *string) pgtype.Text {
 	}
 	return pgtype.Text{String: *s, Valid: true}
 }
+
+func ToPgUUID(s *string) (pgtype.UUID, error) {
+	if s == nil {
+		return pgtype.UUID{}, nil
+	}
+	return ParseUUID(*s)
+}
+
+func UUIDToStringPtr(u pgtype.UUID) *string {
+	if !u.Valid {
+		return nil
+	}
+	s := UUIDToString(u)
+	return &s
+}

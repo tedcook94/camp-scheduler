@@ -12,6 +12,7 @@ import (
 	"camp-scheduler/internal/config"
 	"camp-scheduler/internal/db"
 	"camp-scheduler/internal/season"
+	"camp-scheduler/internal/session"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -88,6 +89,10 @@ func (s *Server) routes() {
 	seasonService := season.NewService(queries)
 	seasonHandler := season.NewHandler(seasonService)
 	seasonHandler.RegisterRoutes(camps)
+
+	sessionService := session.NewService(queries)
+	sessionHandler := session.NewHandler(sessionService)
+	sessionHandler.RegisterRoutes(camps)
 }
 
 func initDB(cfg config.Config) (*pgxpool.Pool, error) {

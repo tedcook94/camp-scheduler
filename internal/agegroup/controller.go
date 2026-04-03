@@ -1,4 +1,4 @@
-package season
+package agegroup
 
 import (
 	"errors"
@@ -9,134 +9,134 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type Handler struct {
+type Controller struct {
 	svc *Service
 }
 
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+func NewController(svc *Service) *Controller {
+	return &Controller{svc: svc}
 }
 
-func (h *Handler) RegisterRoutes(camps *gin.RouterGroup) {
-	seasons := camps.Group("/:campId/seasons")
-	seasons.GET("", h.List)
-	seasons.GET("/:id", h.Get)
-	seasons.POST("", h.Create)
-	seasons.PUT("/:id", h.Update)
-	seasons.DELETE("/:id", h.Delete)
+func (ctrl *Controller) RegisterRoutes(camps *gin.RouterGroup) {
+	ageGroups := camps.Group("/:campId/age-groups")
+	ageGroups.GET("", ctrl.List)
+	ageGroups.GET("/:id", ctrl.Get)
+	ageGroups.POST("", ctrl.Create)
+	ageGroups.PUT("/:id", ctrl.Update)
+	ageGroups.DELETE("/:id", ctrl.Delete)
 }
 
-type CreateSeasonRequest struct {
+type CreateAgeGroupRequest struct {
 	Name string `json:"name" binding:"required"`
 }
 
-type UpdateSeasonRequest struct {
+type UpdateAgeGroupRequest struct {
 	Name string `json:"name" binding:"required"`
 }
 
-type SeasonResponse struct {
+type AgeGroupResponse struct {
 	ID     string `json:"id"`
 	CampID string `json:"camp_id"`
 	Name   string `json:"name"`
 }
 
-func (h *Handler) List(c *gin.Context) {
+func (ctrl *Controller) List(c *gin.Context) {
 	campID := c.Param("campId")
 
-	seasons, err := h.svc.List(c.Request.Context(), campID)
+	groups, err := ctrl.svc.List(c.Request.Context(), campID)
 	if err != nil {
 		slog.
 			With("camp_id", campID).
 			With("error", err).
-			Error("error listing seasons")
+			Error("error listing age groups")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	c.JSON(http.StatusOK, seasons)
+	c.JSON(http.StatusOK, groups)
 }
 
-func (h *Handler) Get(c *gin.Context) {
+func (ctrl *Controller) Get(c *gin.Context) {
 	id := c.Param("id")
 
-	season, err := h.svc.GetByID(c.Request.Context(), id)
+	group, err := ctrl.svc.GetByID(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "season not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "age group not found"})
 			return
 		}
 		slog.
 			With("id", id).
 			With("error", err).
-			Error("error getting season")
+			Error("error getting age group")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	c.JSON(http.StatusOK, season)
+	c.JSON(http.StatusOK, group)
 }
 
-func (h *Handler) Create(c *gin.Context) {
+func (ctrl *Controller) Create(c *gin.Context) {
 	campID := c.Param("campId")
 
-	var req CreateSeasonRequest
+	var req CreateAgeGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	season, err := h.svc.Create(c.Request.Context(), campID, req)
+	group, err := ctrl.svc.Create(c.Request.Context(), campID, req)
 	if err != nil {
 		slog.
 			With("camp_id", campID).
 			With("error", err).
-			Error("error creating season")
+			Error("error creating age group")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	c.JSON(http.StatusCreated, season)
+	c.JSON(http.StatusCreated, group)
 }
 
-func (h *Handler) Update(c *gin.Context) {
+func (ctrl *Controller) Update(c *gin.Context) {
 	id := c.Param("id")
 
-	var req UpdateSeasonRequest
+	var req UpdateAgeGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	season, err := h.svc.Update(c.Request.Context(), id, req)
+	group, err := ctrl.svc.Update(c.Request.Context(), id, req)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "season not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "age group not found"})
 			return
 		}
 		slog.
 			With("id", id).
 			With("error", err).
-			Error("error updating season")
+			Error("error updating age group")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	c.JSON(http.StatusOK, season)
+	c.JSON(http.StatusOK, group)
 }
 
-func (h *Handler) Delete(c *gin.Context) {
+func (ctrl *Controller) Delete(c *gin.Context) {
 	id := c.Param("id")
 
-	err := h.svc.Delete(c.Request.Context(), id)
+	err := ctrl.svc.Delete(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "season not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "age group not found"})
 			return
 		}
 		slog.
 			With("id", id).
 			With("error", err).
-			Error("error deleting season")
+			Error("error deleting age group")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}

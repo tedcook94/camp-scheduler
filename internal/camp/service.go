@@ -19,8 +19,8 @@ func NewService(queries *db.Queries) *Service {
 	return &Service{queries: queries}
 }
 
-func (s *Service) List(ctx context.Context) ([]CampResponse, error) {
-	camps, err := s.queries.ListCamps(ctx)
+func (svc *Service) List(ctx context.Context) ([]CampResponse, error) {
+	camps, err := svc.queries.ListCamps(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("listing camps: %w", err)
 	}
@@ -32,13 +32,13 @@ func (s *Service) List(ctx context.Context) ([]CampResponse, error) {
 	return result, nil
 }
 
-func (s *Service) GetByID(ctx context.Context, id string) (CampResponse, error) {
+func (svc *Service) GetByID(ctx context.Context, id string) (CampResponse, error) {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return CampResponse{}, err
 	}
 
-	camp, err := s.queries.GetCamp(ctx, uid)
+	camp, err := svc.queries.GetCamp(ctx, uid)
 	if err != nil {
 		return CampResponse{}, fmt.Errorf("getting camp %s: %w", id, err)
 	}
@@ -46,8 +46,8 @@ func (s *Service) GetByID(ctx context.Context, id string) (CampResponse, error) 
 	return toCampResponse(camp), nil
 }
 
-func (s *Service) Create(ctx context.Context, req CreateCampRequest) (CampResponse, error) {
-	camp, err := s.queries.CreateCamp(ctx, db.CreateCampParams{
+func (svc *Service) Create(ctx context.Context, req CreateCampRequest) (CampResponse, error) {
+	camp, err := svc.queries.CreateCamp(ctx, db.CreateCampParams{
 		CampName:     req.Name,
 		CampLocation: api.ToPgText(req.Location),
 	})
@@ -58,13 +58,13 @@ func (s *Service) Create(ctx context.Context, req CreateCampRequest) (CampRespon
 	return toCampResponse(camp), nil
 }
 
-func (s *Service) Update(ctx context.Context, id string, req UpdateCampRequest) (CampResponse, error) {
+func (svc *Service) Update(ctx context.Context, id string, req UpdateCampRequest) (CampResponse, error) {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return CampResponse{}, err
 	}
 
-	camp, err := s.queries.UpdateCamp(ctx, db.UpdateCampParams{
+	camp, err := svc.queries.UpdateCamp(ctx, db.UpdateCampParams{
 		ID:           uid,
 		CampName:     req.Name,
 		CampLocation: api.ToPgText(req.Location),
@@ -77,13 +77,13 @@ func (s *Service) Update(ctx context.Context, id string, req UpdateCampRequest) 
 	return toCampResponse(camp), nil
 }
 
-func (s *Service) Delete(ctx context.Context, id string) error {
+func (svc *Service) Delete(ctx context.Context, id string) error {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return err
 	}
 
-	rows, err := s.queries.DeleteCamp(ctx, uid)
+	rows, err := svc.queries.DeleteCamp(ctx, uid)
 	if err != nil {
 		return fmt.Errorf("deleting camp %s: %w", id, err)
 	}

@@ -37,7 +37,7 @@ solutions that respect hard constraints and optimize soft preferences.
                     └─────────────┘
 ```
 
-**Request flow:** API handler -> Service -> sqlc queries -> PostgreSQL
+**Request flow:** API controller -> Service -> sqlc queries -> PostgreSQL
 
 **Solver flow:** Solver reads a snapshot of current state via sqlc, runs
 constraint satisfaction, produces ranked solutions with explanations, stores

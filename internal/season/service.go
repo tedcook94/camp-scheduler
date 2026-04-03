@@ -19,13 +19,13 @@ func NewService(queries *db.Queries) *Service {
 	return &Service{queries: queries}
 }
 
-func (s *Service) List(ctx context.Context, campID string) ([]SeasonResponse, error) {
+func (svc *Service) List(ctx context.Context, campID string) ([]SeasonResponse, error) {
 	uid, err := api.ParseUUID(campID)
 	if err != nil {
 		return nil, err
 	}
 
-	seasons, err := s.queries.ListSeasons(ctx, uid)
+	seasons, err := svc.queries.ListSeasons(ctx, uid)
 	if err != nil {
 		return nil, fmt.Errorf("listing seasons: %w", err)
 	}
@@ -37,13 +37,13 @@ func (s *Service) List(ctx context.Context, campID string) ([]SeasonResponse, er
 	return result, nil
 }
 
-func (s *Service) GetByID(ctx context.Context, id string) (SeasonResponse, error) {
+func (svc *Service) GetByID(ctx context.Context, id string) (SeasonResponse, error) {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return SeasonResponse{}, err
 	}
 
-	season, err := s.queries.GetSeason(ctx, uid)
+	season, err := svc.queries.GetSeason(ctx, uid)
 	if err != nil {
 		return SeasonResponse{}, fmt.Errorf("getting season %s: %w", id, err)
 	}
@@ -51,13 +51,13 @@ func (s *Service) GetByID(ctx context.Context, id string) (SeasonResponse, error
 	return toSeasonResponse(season), nil
 }
 
-func (s *Service) Create(ctx context.Context, campID string, req CreateSeasonRequest) (SeasonResponse, error) {
+func (svc *Service) Create(ctx context.Context, campID string, req CreateSeasonRequest) (SeasonResponse, error) {
 	uid, err := api.ParseUUID(campID)
 	if err != nil {
 		return SeasonResponse{}, err
 	}
 
-	season, err := s.queries.CreateSeason(ctx, db.CreateSeasonParams{
+	season, err := svc.queries.CreateSeason(ctx, db.CreateSeasonParams{
 		CampID:     uid,
 		SeasonName: req.Name,
 	})
@@ -68,13 +68,13 @@ func (s *Service) Create(ctx context.Context, campID string, req CreateSeasonReq
 	return toSeasonResponse(season), nil
 }
 
-func (s *Service) Update(ctx context.Context, id string, req UpdateSeasonRequest) (SeasonResponse, error) {
+func (svc *Service) Update(ctx context.Context, id string, req UpdateSeasonRequest) (SeasonResponse, error) {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return SeasonResponse{}, err
 	}
 
-	season, err := s.queries.UpdateSeason(ctx, db.UpdateSeasonParams{
+	season, err := svc.queries.UpdateSeason(ctx, db.UpdateSeasonParams{
 		ID:         uid,
 		SeasonName: req.Name,
 	})
@@ -85,13 +85,13 @@ func (s *Service) Update(ctx context.Context, id string, req UpdateSeasonRequest
 	return toSeasonResponse(season), nil
 }
 
-func (s *Service) Delete(ctx context.Context, id string) error {
+func (svc *Service) Delete(ctx context.Context, id string) error {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return err
 	}
 
-	rows, err := s.queries.DeleteSeason(ctx, uid)
+	rows, err := svc.queries.DeleteSeason(ctx, uid)
 	if err != nil {
 		return fmt.Errorf("deleting season %s: %w", id, err)
 	}

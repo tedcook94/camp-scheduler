@@ -19,13 +19,13 @@ func NewService(queries *db.Queries) *Service {
 	return &Service{queries: queries}
 }
 
-func (s *Service) List(ctx context.Context, campID string) ([]AgeGroupResponse, error) {
+func (svc *Service) List(ctx context.Context, campID string) ([]AgeGroupResponse, error) {
 	uid, err := api.ParseUUID(campID)
 	if err != nil {
 		return nil, err
 	}
 
-	groups, err := s.queries.ListAgeGroups(ctx, uid)
+	groups, err := svc.queries.ListAgeGroups(ctx, uid)
 	if err != nil {
 		return nil, fmt.Errorf("listing age groups: %w", err)
 	}
@@ -37,13 +37,13 @@ func (s *Service) List(ctx context.Context, campID string) ([]AgeGroupResponse, 
 	return result, nil
 }
 
-func (s *Service) GetByID(ctx context.Context, id string) (AgeGroupResponse, error) {
+func (svc *Service) GetByID(ctx context.Context, id string) (AgeGroupResponse, error) {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return AgeGroupResponse{}, err
 	}
 
-	group, err := s.queries.GetAgeGroup(ctx, uid)
+	group, err := svc.queries.GetAgeGroup(ctx, uid)
 	if err != nil {
 		return AgeGroupResponse{}, fmt.Errorf("getting age group %s: %w", id, err)
 	}
@@ -51,13 +51,13 @@ func (s *Service) GetByID(ctx context.Context, id string) (AgeGroupResponse, err
 	return toAgeGroupResponse(group), nil
 }
 
-func (s *Service) Create(ctx context.Context, campID string, req CreateAgeGroupRequest) (AgeGroupResponse, error) {
+func (svc *Service) Create(ctx context.Context, campID string, req CreateAgeGroupRequest) (AgeGroupResponse, error) {
 	uid, err := api.ParseUUID(campID)
 	if err != nil {
 		return AgeGroupResponse{}, err
 	}
 
-	group, err := s.queries.CreateAgeGroup(ctx, db.CreateAgeGroupParams{
+	group, err := svc.queries.CreateAgeGroup(ctx, db.CreateAgeGroupParams{
 		CampID:       uid,
 		AgeGroupName: req.Name,
 	})
@@ -68,13 +68,13 @@ func (s *Service) Create(ctx context.Context, campID string, req CreateAgeGroupR
 	return toAgeGroupResponse(group), nil
 }
 
-func (s *Service) Update(ctx context.Context, id string, req UpdateAgeGroupRequest) (AgeGroupResponse, error) {
+func (svc *Service) Update(ctx context.Context, id string, req UpdateAgeGroupRequest) (AgeGroupResponse, error) {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return AgeGroupResponse{}, err
 	}
 
-	group, err := s.queries.UpdateAgeGroup(ctx, db.UpdateAgeGroupParams{
+	group, err := svc.queries.UpdateAgeGroup(ctx, db.UpdateAgeGroupParams{
 		ID:           uid,
 		AgeGroupName: req.Name,
 	})
@@ -85,13 +85,13 @@ func (s *Service) Update(ctx context.Context, id string, req UpdateAgeGroupReque
 	return toAgeGroupResponse(group), nil
 }
 
-func (s *Service) Delete(ctx context.Context, id string) error {
+func (svc *Service) Delete(ctx context.Context, id string) error {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return err
 	}
 
-	rows, err := s.queries.DeleteAgeGroup(ctx, uid)
+	rows, err := svc.queries.DeleteAgeGroup(ctx, uid)
 	if err != nil {
 		return fmt.Errorf("deleting age group %s: %w", id, err)
 	}

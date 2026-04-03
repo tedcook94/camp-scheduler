@@ -12,7 +12,7 @@ a constraint satisfaction solver. See `README.md` for the full project plan.
 
 ## Architecture
 
-- Layered domain-driven: Handler -> Service -> sqlc queries -> PostgreSQL
+- Layered domain-driven: Controller -> Service -> sqlc queries -> PostgreSQL
 - Constraint solver reads state via sqlc, produces ranked solutions with explanations
 - Project structure: `cmd/server/` (entrypoint), `internal/` (app code), `database/` (migrations, sqlc queries)
 

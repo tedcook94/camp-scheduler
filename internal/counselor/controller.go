@@ -9,21 +9,21 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type Handler struct {
+type Controller struct {
 	svc *Service
 }
 
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+func NewController(svc *Service) *Controller {
+	return &Controller{svc: svc}
 }
 
-func (h *Handler) RegisterRoutes(camps *gin.RouterGroup) {
+func (ctrl *Controller) RegisterRoutes(camps *gin.RouterGroup) {
 	counselors := camps.Group("/:campId/counselors")
-	counselors.GET("", h.List)
-	counselors.GET("/:id", h.Get)
-	counselors.POST("", h.Create)
-	counselors.PUT("/:id", h.Update)
-	counselors.DELETE("/:id", h.Delete)
+	counselors.GET("", ctrl.List)
+	counselors.GET("/:id", ctrl.Get)
+	counselors.POST("", ctrl.Create)
+	counselors.PUT("/:id", ctrl.Update)
+	counselors.DELETE("/:id", ctrl.Delete)
 }
 
 type CreateCounselorRequest struct {
@@ -45,10 +45,10 @@ type CounselorResponse struct {
 	Enabled         bool   `json:"enabled"`
 }
 
-func (h *Handler) List(c *gin.Context) {
+func (ctrl *Controller) List(c *gin.Context) {
 	campID := c.Param("campId")
 
-	counselors, err := h.svc.List(c.Request.Context(), campID)
+	counselors, err := ctrl.svc.List(c.Request.Context(), campID)
 	if err != nil {
 		slog.
 			With("camp_id", campID).
@@ -61,10 +61,10 @@ func (h *Handler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, counselors)
 }
 
-func (h *Handler) Get(c *gin.Context) {
+func (ctrl *Controller) Get(c *gin.Context) {
 	id := c.Param("id")
 
-	counselor, err := h.svc.GetByID(c.Request.Context(), id)
+	counselor, err := ctrl.svc.GetByID(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "counselor not found"})
@@ -81,7 +81,7 @@ func (h *Handler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, counselor)
 }
 
-func (h *Handler) Create(c *gin.Context) {
+func (ctrl *Controller) Create(c *gin.Context) {
 	campID := c.Param("campId")
 
 	var req CreateCounselorRequest
@@ -90,7 +90,7 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	counselor, err := h.svc.Create(c.Request.Context(), campID, req)
+	counselor, err := ctrl.svc.Create(c.Request.Context(), campID, req)
 	if err != nil {
 		slog.
 			With("camp_id", campID).
@@ -103,7 +103,7 @@ func (h *Handler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, counselor)
 }
 
-func (h *Handler) Update(c *gin.Context) {
+func (ctrl *Controller) Update(c *gin.Context) {
 	id := c.Param("id")
 
 	var req UpdateCounselorRequest
@@ -112,7 +112,7 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 
-	counselor, err := h.svc.Update(c.Request.Context(), id, req)
+	counselor, err := ctrl.svc.Update(c.Request.Context(), id, req)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "counselor not found"})
@@ -129,10 +129,10 @@ func (h *Handler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, counselor)
 }
 
-func (h *Handler) Delete(c *gin.Context) {
+func (ctrl *Controller) Delete(c *gin.Context) {
 	id := c.Param("id")
 
-	err := h.svc.Delete(c.Request.Context(), id)
+	err := ctrl.svc.Delete(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "counselor not found"})

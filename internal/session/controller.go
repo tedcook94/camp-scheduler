@@ -9,21 +9,21 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type Handler struct {
+type Controller struct {
 	svc *Service
 }
 
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+func NewController(svc *Service) *Controller {
+	return &Controller{svc: svc}
 }
 
-func (h *Handler) RegisterRoutes(camps *gin.RouterGroup) {
+func (ctrl *Controller) RegisterRoutes(camps *gin.RouterGroup) {
 	sessions := camps.Group("/:campId/sessions")
-	sessions.GET("", h.List)
-	sessions.GET("/:id", h.Get)
-	sessions.POST("", h.Create)
-	sessions.PUT("/:id", h.Update)
-	sessions.DELETE("/:id", h.Delete)
+	sessions.GET("", ctrl.List)
+	sessions.GET("/:id", ctrl.Get)
+	sessions.POST("", ctrl.Create)
+	sessions.PUT("/:id", ctrl.Update)
+	sessions.DELETE("/:id", ctrl.Delete)
 }
 
 type CreateSessionRequest struct {
@@ -46,10 +46,10 @@ type SessionResponse struct {
 	PreviousSessionID *string `json:"previous_session_id"`
 }
 
-func (h *Handler) List(c *gin.Context) {
+func (ctrl *Controller) List(c *gin.Context) {
 	campID := c.Param("campId")
 
-	sessions, err := h.svc.List(c.Request.Context(), campID)
+	sessions, err := ctrl.svc.List(c.Request.Context(), campID)
 	if err != nil {
 		slog.
 			With("camp_id", campID).
@@ -62,10 +62,10 @@ func (h *Handler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, sessions)
 }
 
-func (h *Handler) Get(c *gin.Context) {
+func (ctrl *Controller) Get(c *gin.Context) {
 	id := c.Param("id")
 
-	session, err := h.svc.GetByID(c.Request.Context(), id)
+	session, err := ctrl.svc.GetByID(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
@@ -82,7 +82,7 @@ func (h *Handler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, session)
 }
 
-func (h *Handler) Create(c *gin.Context) {
+func (ctrl *Controller) Create(c *gin.Context) {
 	campID := c.Param("campId")
 
 	var req CreateSessionRequest
@@ -91,7 +91,7 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	session, err := h.svc.Create(c.Request.Context(), campID, req)
+	session, err := ctrl.svc.Create(c.Request.Context(), campID, req)
 	if err != nil {
 		slog.
 			With("camp_id", campID).
@@ -104,7 +104,7 @@ func (h *Handler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, session)
 }
 
-func (h *Handler) Update(c *gin.Context) {
+func (ctrl *Controller) Update(c *gin.Context) {
 	id := c.Param("id")
 
 	var req UpdateSessionRequest
@@ -113,7 +113,7 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 
-	session, err := h.svc.Update(c.Request.Context(), id, req)
+	session, err := ctrl.svc.Update(c.Request.Context(), id, req)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
@@ -130,10 +130,10 @@ func (h *Handler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, session)
 }
 
-func (h *Handler) Delete(c *gin.Context) {
+func (ctrl *Controller) Delete(c *gin.Context) {
 	id := c.Param("id")
 
-	err := h.svc.Delete(c.Request.Context(), id)
+	err := ctrl.svc.Delete(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})

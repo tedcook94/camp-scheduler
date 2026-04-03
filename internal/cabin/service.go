@@ -19,13 +19,13 @@ func NewService(queries *db.Queries) *Service {
 	return &Service{queries: queries}
 }
 
-func (s *Service) List(ctx context.Context, campID string) ([]CabinResponse, error) {
+func (svc *Service) List(ctx context.Context, campID string) ([]CabinResponse, error) {
 	uid, err := api.ParseUUID(campID)
 	if err != nil {
 		return nil, err
 	}
 
-	cabins, err := s.queries.ListCabins(ctx, uid)
+	cabins, err := svc.queries.ListCabins(ctx, uid)
 	if err != nil {
 		return nil, fmt.Errorf("listing cabins: %w", err)
 	}
@@ -37,13 +37,13 @@ func (s *Service) List(ctx context.Context, campID string) ([]CabinResponse, err
 	return result, nil
 }
 
-func (s *Service) GetByID(ctx context.Context, id string) (CabinResponse, error) {
+func (svc *Service) GetByID(ctx context.Context, id string) (CabinResponse, error) {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return CabinResponse{}, err
 	}
 
-	cabin, err := s.queries.GetCabin(ctx, uid)
+	cabin, err := svc.queries.GetCabin(ctx, uid)
 	if err != nil {
 		return CabinResponse{}, fmt.Errorf("getting cabin %s: %w", id, err)
 	}
@@ -51,7 +51,7 @@ func (s *Service) GetByID(ctx context.Context, id string) (CabinResponse, error)
 	return toCabinResponse(cabin), nil
 }
 
-func (s *Service) Create(ctx context.Context, campID string, req CreateCabinRequest) (CabinResponse, error) {
+func (svc *Service) Create(ctx context.Context, campID string, req CreateCabinRequest) (CabinResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {
 		return CabinResponse{}, err
@@ -62,7 +62,7 @@ func (s *Service) Create(ctx context.Context, campID string, req CreateCabinRequ
 		return CabinResponse{}, err
 	}
 
-	cabin, err := s.queries.CreateCabin(ctx, db.CreateCabinParams{
+	cabin, err := svc.queries.CreateCabin(ctx, db.CreateCabinParams{
 		CampID:     campUUID,
 		AgeGroupID: ageGroupUUID,
 		CabinName:  req.Name,
@@ -74,7 +74,7 @@ func (s *Service) Create(ctx context.Context, campID string, req CreateCabinRequ
 	return toCabinResponse(cabin), nil
 }
 
-func (s *Service) Update(ctx context.Context, id string, req UpdateCabinRequest) (CabinResponse, error) {
+func (svc *Service) Update(ctx context.Context, id string, req UpdateCabinRequest) (CabinResponse, error) {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return CabinResponse{}, err
@@ -85,7 +85,7 @@ func (s *Service) Update(ctx context.Context, id string, req UpdateCabinRequest)
 		return CabinResponse{}, err
 	}
 
-	cabin, err := s.queries.UpdateCabin(ctx, db.UpdateCabinParams{
+	cabin, err := svc.queries.UpdateCabin(ctx, db.UpdateCabinParams{
 		ID:         uid,
 		AgeGroupID: ageGroupUUID,
 		CabinName:  req.Name,
@@ -97,13 +97,13 @@ func (s *Service) Update(ctx context.Context, id string, req UpdateCabinRequest)
 	return toCabinResponse(cabin), nil
 }
 
-func (s *Service) Delete(ctx context.Context, id string) error {
+func (svc *Service) Delete(ctx context.Context, id string) error {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return err
 	}
 
-	rows, err := s.queries.DeleteCabin(ctx, uid)
+	rows, err := svc.queries.DeleteCabin(ctx, uid)
 	if err != nil {
 		return fmt.Errorf("deleting cabin %s: %w", id, err)
 	}

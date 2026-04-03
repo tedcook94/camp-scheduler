@@ -76,28 +76,28 @@ func (s *Server) routes() {
 
 	camps := v1.Group("/camps")
 	campService := camp.NewService(queries)
-	campHandler := camp.NewHandler(campService)
-	campHandler.RegisterRoutes(camps)
+	campController := camp.NewController(campService)
+	campController.RegisterRoutes(camps)
 
 	ageGroupService := agegroup.NewService(queries)
-	ageGroupHandler := agegroup.NewHandler(ageGroupService)
-	ageGroupHandler.RegisterRoutes(camps)
+	ageGroupController := agegroup.NewController(ageGroupService)
+	ageGroupController.RegisterRoutes(camps)
 
 	cabinService := cabin.NewService(queries)
-	cabinHandler := cabin.NewHandler(cabinService)
-	cabinHandler.RegisterRoutes(camps)
+	cabinController := cabin.NewController(cabinService)
+	cabinController.RegisterRoutes(camps)
 
 	seasonService := season.NewService(queries)
-	seasonHandler := season.NewHandler(seasonService)
-	seasonHandler.RegisterRoutes(camps)
+	seasonController := season.NewController(seasonService)
+	seasonController.RegisterRoutes(camps)
 
 	sessionService := session.NewService(queries)
-	sessionHandler := session.NewHandler(sessionService)
-	sessionHandler.RegisterRoutes(camps)
+	sessionController := session.NewController(sessionService)
+	sessionController.RegisterRoutes(camps)
 
 	counselorService := counselor.NewService(queries)
-	counselorHandler := counselor.NewHandler(counselorService)
-	counselorHandler.RegisterRoutes(camps)
+	counselorController := counselor.NewController(counselorService)
+	counselorController.RegisterRoutes(camps)
 }
 
 func initDB(cfg config.Config) (*pgxpool.Pool, error) {

@@ -19,13 +19,13 @@ func NewService(queries *db.Queries) *Service {
 	return &Service{queries: queries}
 }
 
-func (s *Service) List(ctx context.Context, campID string) ([]SessionResponse, error) {
+func (svc *Service) List(ctx context.Context, campID string) ([]SessionResponse, error) {
 	uid, err := api.ParseUUID(campID)
 	if err != nil {
 		return nil, err
 	}
 
-	sessions, err := s.queries.ListSessions(ctx, uid)
+	sessions, err := svc.queries.ListSessions(ctx, uid)
 	if err != nil {
 		return nil, fmt.Errorf("listing sessions: %w", err)
 	}
@@ -37,13 +37,13 @@ func (s *Service) List(ctx context.Context, campID string) ([]SessionResponse, e
 	return result, nil
 }
 
-func (s *Service) GetByID(ctx context.Context, id string) (SessionResponse, error) {
+func (svc *Service) GetByID(ctx context.Context, id string) (SessionResponse, error) {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return SessionResponse{}, err
 	}
 
-	session, err := s.queries.GetSession(ctx, uid)
+	session, err := svc.queries.GetSession(ctx, uid)
 	if err != nil {
 		return SessionResponse{}, fmt.Errorf("getting session %s: %w", id, err)
 	}
@@ -51,7 +51,7 @@ func (s *Service) GetByID(ctx context.Context, id string) (SessionResponse, erro
 	return toSessionResponse(session), nil
 }
 
-func (s *Service) Create(ctx context.Context, campID string, req CreateSessionRequest) (SessionResponse, error) {
+func (svc *Service) Create(ctx context.Context, campID string, req CreateSessionRequest) (SessionResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {
 		return SessionResponse{}, err
@@ -67,7 +67,7 @@ func (s *Service) Create(ctx context.Context, campID string, req CreateSessionRe
 		return SessionResponse{}, err
 	}
 
-	session, err := s.queries.CreateSession(ctx, db.CreateSessionParams{
+	session, err := svc.queries.CreateSession(ctx, db.CreateSessionParams{
 		CampID:          campUUID,
 		SeasonID:        seasonUUID,
 		SessionName:     req.Name,
@@ -80,7 +80,7 @@ func (s *Service) Create(ctx context.Context, campID string, req CreateSessionRe
 	return toSessionResponse(session), nil
 }
 
-func (s *Service) Update(ctx context.Context, id string, req UpdateSessionRequest) (SessionResponse, error) {
+func (svc *Service) Update(ctx context.Context, id string, req UpdateSessionRequest) (SessionResponse, error) {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return SessionResponse{}, err
@@ -96,7 +96,7 @@ func (s *Service) Update(ctx context.Context, id string, req UpdateSessionReques
 		return SessionResponse{}, err
 	}
 
-	session, err := s.queries.UpdateSession(ctx, db.UpdateSessionParams{
+	session, err := svc.queries.UpdateSession(ctx, db.UpdateSessionParams{
 		ID:              uid,
 		SeasonID:        seasonUUID,
 		SessionName:     req.Name,
@@ -109,13 +109,13 @@ func (s *Service) Update(ctx context.Context, id string, req UpdateSessionReques
 	return toSessionResponse(session), nil
 }
 
-func (s *Service) Delete(ctx context.Context, id string) error {
+func (svc *Service) Delete(ctx context.Context, id string) error {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return err
 	}
 
-	rows, err := s.queries.DeleteSession(ctx, uid)
+	rows, err := svc.queries.DeleteSession(ctx, uid)
 	if err != nil {
 		return fmt.Errorf("deleting session %s: %w", id, err)
 	}

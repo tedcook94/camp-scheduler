@@ -19,13 +19,13 @@ func NewService(queries *db.Queries) *Service {
 	return &Service{queries: queries}
 }
 
-func (s *Service) List(ctx context.Context, campID string) ([]CounselorResponse, error) {
+func (svc *Service) List(ctx context.Context, campID string) ([]CounselorResponse, error) {
 	uid, err := api.ParseUUID(campID)
 	if err != nil {
 		return nil, err
 	}
 
-	counselors, err := s.queries.ListCounselors(ctx, uid)
+	counselors, err := svc.queries.ListCounselors(ctx, uid)
 	if err != nil {
 		return nil, fmt.Errorf("listing counselors: %w", err)
 	}
@@ -37,13 +37,13 @@ func (s *Service) List(ctx context.Context, campID string) ([]CounselorResponse,
 	return result, nil
 }
 
-func (s *Service) GetByID(ctx context.Context, id string) (CounselorResponse, error) {
+func (svc *Service) GetByID(ctx context.Context, id string) (CounselorResponse, error) {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return CounselorResponse{}, err
 	}
 
-	counselor, err := s.queries.GetCounselor(ctx, uid)
+	counselor, err := svc.queries.GetCounselor(ctx, uid)
 	if err != nil {
 		return CounselorResponse{}, fmt.Errorf("getting counselor %s: %w", id, err)
 	}
@@ -51,13 +51,13 @@ func (s *Service) GetByID(ctx context.Context, id string) (CounselorResponse, er
 	return toCounselorResponse(counselor), nil
 }
 
-func (s *Service) Create(ctx context.Context, campID string, req CreateCounselorRequest) (CounselorResponse, error) {
+func (svc *Service) Create(ctx context.Context, campID string, req CreateCounselorRequest) (CounselorResponse, error) {
 	uid, err := api.ParseUUID(campID)
 	if err != nil {
 		return CounselorResponse{}, err
 	}
 
-	counselor, err := s.queries.CreateCounselor(ctx, db.CreateCounselorParams{
+	counselor, err := svc.queries.CreateCounselor(ctx, db.CreateCounselorParams{
 		CampID:          uid,
 		CounselorName:   req.Name,
 		JuniorCounselor: req.JuniorCounselor,
@@ -69,13 +69,13 @@ func (s *Service) Create(ctx context.Context, campID string, req CreateCounselor
 	return toCounselorResponse(counselor), nil
 }
 
-func (s *Service) Update(ctx context.Context, id string, req UpdateCounselorRequest) (CounselorResponse, error) {
+func (svc *Service) Update(ctx context.Context, id string, req UpdateCounselorRequest) (CounselorResponse, error) {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return CounselorResponse{}, err
 	}
 
-	counselor, err := s.queries.UpdateCounselor(ctx, db.UpdateCounselorParams{
+	counselor, err := svc.queries.UpdateCounselor(ctx, db.UpdateCounselorParams{
 		ID:               uid,
 		CounselorName:    req.Name,
 		JuniorCounselor:  req.JuniorCounselor,
@@ -88,13 +88,13 @@ func (s *Service) Update(ctx context.Context, id string, req UpdateCounselorRequ
 	return toCounselorResponse(counselor), nil
 }
 
-func (s *Service) Delete(ctx context.Context, id string) error {
+func (svc *Service) Delete(ctx context.Context, id string) error {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return err
 	}
 
-	rows, err := s.queries.DeleteCounselor(ctx, uid)
+	rows, err := svc.queries.DeleteCounselor(ctx, uid)
 	if err != nil {
 		return fmt.Errorf("deleting counselor %s: %w", id, err)
 	}

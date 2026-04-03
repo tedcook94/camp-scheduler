@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"camp-scheduler/internal/agegroup"
 	"camp-scheduler/internal/camp"
 	"camp-scheduler/internal/config"
 	"camp-scheduler/internal/db"
@@ -53,6 +54,10 @@ func (s *Server) routes() {
 	campService := camp.NewService(queries)
 	campHandler := camp.NewHandler(campService)
 	campHandler.RegisterRoutes(s.mux)
+
+	ageGroupService := agegroup.NewService(queries)
+	ageGroupHandler := agegroup.NewHandler(ageGroupService)
+	ageGroupHandler.RegisterRoutes(s.mux)
 
 	s.mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

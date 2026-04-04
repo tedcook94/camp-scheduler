@@ -54,6 +54,15 @@ type CounselorCocounselorPreference struct {
 	Rank                 int32
 }
 
+type CounselorSessionHistory struct {
+	ID          pgtype.UUID
+	CampID      pgtype.UUID
+	CounselorID pgtype.UUID
+	SessionID   pgtype.UUID
+	AgeGroupID  pgtype.UUID
+	CabinID     pgtype.UUID
+}
+
 type Season struct {
 	ID         pgtype.UUID
 	CampID     pgtype.UUID

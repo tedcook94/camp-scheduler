@@ -36,6 +36,24 @@ type Counselor struct {
 	CounselorEnabled bool
 }
 
+type CounselorAgeGroupPreference struct {
+	ID          pgtype.UUID
+	CampID      pgtype.UUID
+	CounselorID pgtype.UUID
+	SessionID   pgtype.UUID
+	AgeGroupID  pgtype.UUID
+	Rank        int32
+}
+
+type CounselorCocounselorPreference struct {
+	ID                   pgtype.UUID
+	CampID               pgtype.UUID
+	CounselorID          pgtype.UUID
+	SessionID            pgtype.UUID
+	PreferredCounselorID pgtype.UUID
+	Rank                 int32
+}
+
 type Season struct {
 	ID         pgtype.UUID
 	CampID     pgtype.UUID

@@ -103,6 +103,10 @@ func (s *Server) routes() {
 	ageGroupPrefService := preferences.NewAgeGroupService(queries)
 	ageGroupPrefController := preferences.NewAgeGroupController(ageGroupPrefService)
 	ageGroupPrefController.RegisterRoutes(camps)
+
+	cocounselorPrefService := preferences.NewCocounselorService(queries)
+	cocounselorPrefController := preferences.NewCocounselorController(cocounselorPrefService)
+	cocounselorPrefController.RegisterRoutes(camps)
 }
 
 func initDB(cfg config.Config) (*pgxpool.Pool, error) {

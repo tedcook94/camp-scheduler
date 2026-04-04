@@ -12,6 +12,7 @@ import (
 	"camp-scheduler/internal/config"
 	"camp-scheduler/internal/counselor"
 	"camp-scheduler/internal/db"
+	"camp-scheduler/internal/history"
 	"camp-scheduler/internal/preferences"
 	"camp-scheduler/internal/season"
 	"camp-scheduler/internal/session"
@@ -107,6 +108,10 @@ func (s *Server) routes() {
 	cocounselorPrefService := preferences.NewCocounselorService(queries)
 	cocounselorPrefController := preferences.NewCocounselorController(cocounselorPrefService)
 	cocounselorPrefController.RegisterRoutes(camps)
+
+	historyService := history.NewService(queries)
+	historyController := history.NewController(historyService)
+	historyController.RegisterRoutes(camps)
 }
 
 func initDB(cfg config.Config) (*pgxpool.Pool, error) {

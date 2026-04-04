@@ -111,6 +111,39 @@ func (q *Queries) ListCounselors(ctx context.Context, campID pgtype.UUID) ([]Cou
 	return items, nil
 }
 
+const listEnabledCounselors = `-- name: ListEnabledCounselors :many
+SELECT id, camp_id, counselor_name, junior_counselor, counselor_enabled
+FROM counselors
+WHERE camp_id = $1 AND counselor_enabled = true
+ORDER BY counselor_name
+`
+
+func (q *Queries) ListEnabledCounselors(ctx context.Context, campID pgtype.UUID) ([]Counselor, error) {
+	rows, err := q.db.Query(ctx, listEnabledCounselors, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Counselor
+	for rows.Next() {
+		var i Counselor
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.CounselorName,
+			&i.JuniorCounselor,
+			&i.CounselorEnabled,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateCounselor = `-- name: UpdateCounselor :one
 UPDATE counselors
 SET counselor_name = $3,

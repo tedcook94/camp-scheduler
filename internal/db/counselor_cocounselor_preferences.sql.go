@@ -128,6 +128,44 @@ func (q *Queries) ListCounselorCocounselorPreferences(ctx context.Context, arg L
 	return items, nil
 }
 
+const listSessionCocounselorPreferences = `-- name: ListSessionCocounselorPreferences :many
+SELECT counselor_id, preferred_counselor_id, rank
+FROM counselor_cocounselor_preferences
+WHERE session_id = $1 AND camp_id = $2
+ORDER BY counselor_id, rank
+`
+
+type ListSessionCocounselorPreferencesParams struct {
+	SessionID pgtype.UUID
+	CampID    pgtype.UUID
+}
+
+type ListSessionCocounselorPreferencesRow struct {
+	CounselorID          pgtype.UUID
+	PreferredCounselorID pgtype.UUID
+	Rank                 int32
+}
+
+func (q *Queries) ListSessionCocounselorPreferences(ctx context.Context, arg ListSessionCocounselorPreferencesParams) ([]ListSessionCocounselorPreferencesRow, error) {
+	rows, err := q.db.Query(ctx, listSessionCocounselorPreferences, arg.SessionID, arg.CampID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSessionCocounselorPreferencesRow
+	for rows.Next() {
+		var i ListSessionCocounselorPreferencesRow
+		if err := rows.Scan(&i.CounselorID, &i.PreferredCounselorID, &i.Rank); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateCounselorCocounselorPreference = `-- name: UpdateCounselorCocounselorPreference :one
 UPDATE counselor_cocounselor_preferences
 SET preferred_counselor_id = $3,

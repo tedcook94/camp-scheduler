@@ -188,6 +188,43 @@ func (q *Queries) ListCounselorSessionHistory(ctx context.Context, arg ListCouns
 	return items, nil
 }
 
+const listSessionHistory = `-- name: ListSessionHistory :many
+SELECT counselor_id, age_group_id, cabin_id
+FROM counselor_session_history
+WHERE session_id = $1 AND camp_id = $2
+`
+
+type ListSessionHistoryParams struct {
+	SessionID pgtype.UUID
+	CampID    pgtype.UUID
+}
+
+type ListSessionHistoryRow struct {
+	CounselorID pgtype.UUID
+	AgeGroupID  pgtype.UUID
+	CabinID     pgtype.UUID
+}
+
+func (q *Queries) ListSessionHistory(ctx context.Context, arg ListSessionHistoryParams) ([]ListSessionHistoryRow, error) {
+	rows, err := q.db.Query(ctx, listSessionHistory, arg.SessionID, arg.CampID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSessionHistoryRow
+	for rows.Next() {
+		var i ListSessionHistoryRow
+		if err := rows.Scan(&i.CounselorID, &i.AgeGroupID, &i.CabinID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateCounselorSessionHistoryEntry = `-- name: UpdateCounselorSessionHistoryEntry :one
 UPDATE counselor_session_history
 SET session_id = $3,

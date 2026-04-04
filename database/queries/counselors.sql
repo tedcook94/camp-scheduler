@@ -25,3 +25,9 @@ RETURNING id, camp_id, counselor_name, junior_counselor, counselor_enabled;
 -- name: DeleteCounselor :execrows
 DELETE FROM counselors
 WHERE id = $1 AND camp_id = $2;
+
+-- name: ListEnabledCounselors :many
+SELECT id, camp_id, counselor_name, junior_counselor, counselor_enabled
+FROM counselors
+WHERE camp_id = $1 AND counselor_enabled = true
+ORDER BY counselor_name;

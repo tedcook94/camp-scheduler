@@ -24,3 +24,9 @@ RETURNING id, camp_id, counselor_id, session_id, preferred_counselor_id, rank;
 -- name: DeleteCounselorCocounselorPreference :execrows
 DELETE FROM counselor_cocounselor_preferences
 WHERE id = $1 AND camp_id = $2;
+
+-- name: ListSessionCocounselorPreferences :many
+SELECT counselor_id, preferred_counselor_id, rank
+FROM counselor_cocounselor_preferences
+WHERE session_id = $1 AND camp_id = $2
+ORDER BY counselor_id, rank;

@@ -24,3 +24,9 @@ RETURNING id, camp_id, counselor_id, session_id, age_group_id, rank;
 -- name: DeleteCounselorAgeGroupPreference :execrows
 DELETE FROM counselor_age_group_preferences
 WHERE id = $1 AND camp_id = $2;
+
+-- name: ListSessionAgeGroupPreferences :many
+SELECT counselor_id, age_group_id, rank
+FROM counselor_age_group_preferences
+WHERE session_id = $1 AND camp_id = $2
+ORDER BY counselor_id, rank;

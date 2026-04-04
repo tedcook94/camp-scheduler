@@ -128,6 +128,44 @@ func (q *Queries) ListCounselorAgeGroupPreferences(ctx context.Context, arg List
 	return items, nil
 }
 
+const listSessionAgeGroupPreferences = `-- name: ListSessionAgeGroupPreferences :many
+SELECT counselor_id, age_group_id, rank
+FROM counselor_age_group_preferences
+WHERE session_id = $1 AND camp_id = $2
+ORDER BY counselor_id, rank
+`
+
+type ListSessionAgeGroupPreferencesParams struct {
+	SessionID pgtype.UUID
+	CampID    pgtype.UUID
+}
+
+type ListSessionAgeGroupPreferencesRow struct {
+	CounselorID pgtype.UUID
+	AgeGroupID  pgtype.UUID
+	Rank        int32
+}
+
+func (q *Queries) ListSessionAgeGroupPreferences(ctx context.Context, arg ListSessionAgeGroupPreferencesParams) ([]ListSessionAgeGroupPreferencesRow, error) {
+	rows, err := q.db.Query(ctx, listSessionAgeGroupPreferences, arg.SessionID, arg.CampID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSessionAgeGroupPreferencesRow
+	for rows.Next() {
+		var i ListSessionAgeGroupPreferencesRow
+		if err := rows.Scan(&i.CounselorID, &i.AgeGroupID, &i.Rank); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateCounselorAgeGroupPreference = `-- name: UpdateCounselorAgeGroupPreference :one
 UPDATE counselor_age_group_preferences
 SET age_group_id = $3,

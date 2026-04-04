@@ -43,3 +43,8 @@ WHERE csh.counselor_id = $1
   AND csh.camp_id = $2
   AND (sqlc.narg('season_id')::uuid IS NULL OR se.id = sqlc.narg('season_id')::uuid)
 ORDER BY se.season_name, s.session_name;
+
+-- name: ListSessionHistory :many
+SELECT counselor_id, age_group_id, cabin_id
+FROM counselor_session_history
+WHERE session_id = $1 AND camp_id = $2;

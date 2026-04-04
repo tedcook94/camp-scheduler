@@ -97,12 +97,12 @@ New tables:
 
 ### Soft Constraints (optimized, weighted)
 
-- Returning counselor prefers same age group (weight: high)
+- Returning counselor prefers same village (weight: high)
 - Returning counselor prefers same cabin (weight: medium)
 - Counselor co-counselor preference (weight: medium)
-- Counselor age-group preference (weight: medium)
+- Counselor village/age-group preference (weight: medium)
 - Prefer multiple senior counselors per cabin over one senior with many juniors (weight: low)
-- Counselor activity preferences (Phase 2+, weight: medium)
+- Counselor activity preferences (Phase 2+, weight: high)
 - Camper friend requests -- be in same cabin (Phase 2+, weight: high)
 
 ## Solver Design
@@ -116,7 +116,7 @@ The solver is a constraint satisfaction + optimization engine:
    - Full assignment map (counselor -> cabin)
    - Total score + breakdown by constraint category
    - Per-assignment explanation (e.g., "Counselor X assigned to Cabin Y because:
-      returning to same age group (+10), co-counselor preference satisfied (+5)")
+     returning to same village (+10), co-counselor preference satisfied (+5)")
    - List of unsatisfied soft constraints with reasons (if any)
 
 The system always presents multiple ranked alternatives so the director can
@@ -148,7 +148,7 @@ constraints -- the director can see what trade-offs exist between options.
 - [x] Add counselor session history tracking
 - [ ] Implement the constraint solver engine
   - [x] Hard constraint validation
-  - [ ] Soft constraint scoring with configurable weights
+  - [x] Soft constraint scoring with configurable weights
   - [ ] Backtracking search with heuristics
   - [ ] Solution ranking
 - [ ] Implement explanation/audit trail generation

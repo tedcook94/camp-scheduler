@@ -146,11 +146,11 @@ constraints -- the director can see what trade-offs exist between options.
   - Will align with JWT-based camp scoping when auth is implemented
 - [x] Add counselor preference tables + CRUD
 - [x] Add counselor session history tracking
-- [ ] Implement the constraint solver engine
+- [x] Implement the constraint solver engine
   - [x] Hard constraint validation
   - [x] Soft constraint scoring with configurable weights
-  - [ ] Backtracking search with heuristics
-  - [ ] Solution ranking
+  - [x] Backtracking search with heuristics
+  - [x] Solution ranking
 - [ ] Implement explanation/audit trail generation
 - [ ] Add assignment run management (trigger, view results, select solution)
 - [ ] API endpoints for solver: trigger run, get results, select/apply solution

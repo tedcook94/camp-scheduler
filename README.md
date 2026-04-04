@@ -97,10 +97,10 @@ New tables:
 
 ### Soft Constraints (optimized, weighted)
 
-- Returning counselor prefers same village (weight: high)
+- Returning counselor prefers same age group (weight: high)
 - Returning counselor prefers same cabin (weight: medium)
 - Counselor co-counselor preference (weight: medium)
-- Counselor village/age-group preference (weight: medium)
+- Counselor age-group preference (weight: medium)
 - Prefer multiple senior counselors per cabin over one senior with many juniors (weight: low)
 - Counselor activity preferences (Phase 2+, weight: medium)
 - Camper friend requests -- be in same cabin (Phase 2+, weight: high)
@@ -116,7 +116,7 @@ The solver is a constraint satisfaction + optimization engine:
    - Full assignment map (counselor -> cabin)
    - Total score + breakdown by constraint category
    - Per-assignment explanation (e.g., "Counselor X assigned to Cabin Y because:
-     returning to same village (+10), co-counselor preference satisfied (+5)")
+      returning to same age group (+10), co-counselor preference satisfied (+5)")
    - List of unsatisfied soft constraints with reasons (if any)
 
 The system always presents multiple ranked alternatives so the director can

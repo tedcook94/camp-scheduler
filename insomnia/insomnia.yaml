@@ -1390,6 +1390,93 @@ resources:
     settingRebuildPath: true
     settingFollowRedirects: global
     _type: request
+  - _id: fld_counselor_history_01
+    parentId: fld_0165b0f3641045a88246e473a724a706
+    modified: 1690678000000
+    created: 1690678000000
+    name: counselor-history
+    description: ""
+    environment:
+      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/counselors/{{ _['cs-test-counselor-for-history'] }}/history"
+    environmentPropertyOrder:
+      "&":
+        - cs-endpoint
+    metaSortKey: -1690666699000
+    _type: request_group
+  - _id: req_counselor_history_summary
+    parentId: fld_counselor_history_01
+    modified: 1690678000001
+    created: 1690678000001
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Get Summary (default season)
+    description: ""
+    method: GET
+    body: {}
+    parameters: []
+    headers: []
+    authentication: {}
+    metaSortKey: -1690678000002
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_counselor_history_summary_season
+    parentId: fld_counselor_history_01
+    modified: 1690678000002
+    created: 1690678000002
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Get Summary (by season)
+    description: ""
+    method: GET
+    body: {}
+    parameters:
+      - id: pair_counselor_history_season_id
+        name: season_id
+        value: "{{ _['cs-test-season'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690678000001
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_counselor_history_summary_all
+    parentId: fld_counselor_history_01
+    modified: 1690678000003
+    created: 1690678000003
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Get Summary (all time)
+    description: ""
+    method: GET
+    body: {}
+    parameters:
+      - id: pair_counselor_history_all
+        name: season_id
+        value: all
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690678000000
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
   - _id: env_e91cde096b4a48a0bc9cc4a609f73ea7
     parentId: wrk_8335f34c06324aa6888c93fbe4e6e58e
     modified: 1690666916375

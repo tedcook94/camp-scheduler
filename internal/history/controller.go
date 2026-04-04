@@ -26,6 +26,9 @@ func (ctrl *Controller) RegisterRoutes(camps *gin.RouterGroup) {
 	history.POST("", ctrl.Create)
 	history.PUT("/:id", ctrl.Update)
 	history.DELETE("/:id", ctrl.Delete)
+
+	counselor := camps.Group("/:campId/counselors/:counselorId")
+	counselor.GET("/history", ctrl.GetHistorySummary)
 }
 
 type CreateSessionHistoryRequest struct {
@@ -47,6 +50,15 @@ type SessionHistoryResponse struct {
 	SessionID   string  `json:"session_id"`
 	AgeGroupID  string  `json:"age_group_id"`
 	CabinID     *string `json:"cabin_id"`
+}
+
+type HistorySummaryEntry struct {
+	ID           string  `json:"id"`
+	SessionName  string  `json:"session_name"`
+	SeasonID     string  `json:"season_id"`
+	SeasonName   string  `json:"season_name"`
+	AgeGroupName string  `json:"age_group_name"`
+	CabinName    *string `json:"cabin_name"`
 }
 
 func (ctrl *Controller) List(c *gin.Context) {
@@ -169,4 +181,27 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 	}
 
 	c.Status(http.StatusOK)
+}
+
+func (ctrl *Controller) GetHistorySummary(c *gin.Context) {
+	campID := c.Param("campId")
+	counselorID := c.Param("counselorId")
+
+	var seasonID *string
+	if s := c.Query("season_id"); s != "" {
+		seasonID = &s
+	}
+
+	entries, err := ctrl.svc.GetHistory(c.Request.Context(), campID, counselorID, seasonID)
+	if err != nil {
+		slog.
+			With("camp_id", campID).
+			With("counselor_id", counselorID).
+			With("error", err).
+			Error("error getting counselor history summary")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, entries)
 }

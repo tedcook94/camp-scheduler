@@ -144,7 +144,7 @@ constraints -- the director can see what trade-offs exist between options.
   - Ensures entities can only be accessed within their owning camp
   - Will align with JWT-based camp scoping when auth is implemented
 - [x] Add counselor preference tables + CRUD
-- [ ] Add counselor session history tracking
+- [x] Add counselor session history tracking
 - [ ] Implement the constraint solver engine
   - [ ] Hard constraint validation
   - [ ] Soft constraint scoring with configurable weights

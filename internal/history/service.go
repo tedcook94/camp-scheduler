@@ -7,6 +7,8 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 var ErrSessionHistoryNotFound = errors.New("session history entry not found")
@@ -170,6 +172,76 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 	}
 
 	return nil
+}
+
+func (svc *Service) GetHistory(ctx context.Context, campID, counselorID string, seasonID *string) ([]HistorySummaryEntry, error) {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return nil, err
+	}
+
+	counselorUUID, err := api.ParseUUID(counselorID)
+	if err != nil {
+		return nil, err
+	}
+
+	seasonUUID, err := svc.resolveSeasonID(ctx, campUUID, seasonID)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := svc.queries.GetCounselorHistorySummary(ctx, db.GetCounselorHistorySummaryParams{
+		CounselorID: counselorUUID,
+		CampID:      campUUID,
+		SeasonID:    seasonUUID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("getting counselor history summary: %w", err)
+	}
+
+	result := make([]HistorySummaryEntry, len(rows))
+	for i, r := range rows {
+		result[i] = toHistorySummaryEntry(r)
+	}
+	return result, nil
+}
+
+// resolveSeasonID returns the pgtype.UUID for the given season ID string.
+// If seasonID is nil, it looks up the most recent season for the camp.
+// If seasonID is the literal "all", it returns an invalid UUID to skip filtering.
+func (svc *Service) resolveSeasonID(ctx context.Context, campUUID pgtype.UUID, seasonID *string) (pgtype.UUID, error) {
+	if seasonID != nil {
+		if *seasonID == "all" {
+			return pgtype.UUID{}, nil
+		}
+		return api.ParseUUID(*seasonID)
+	}
+
+	seasons, err := svc.queries.ListSeasons(ctx, campUUID)
+	if err != nil {
+		return pgtype.UUID{}, fmt.Errorf("listing seasons to resolve default: %w", err)
+	}
+	if len(seasons) == 0 {
+		return pgtype.UUID{}, nil
+	}
+
+	return seasons[len(seasons)-1].ID, nil
+}
+
+func toHistorySummaryEntry(r db.GetCounselorHistorySummaryRow) HistorySummaryEntry {
+	var cabinName *string
+	if r.CabinName.Valid {
+		cabinName = &r.CabinName.String
+	}
+
+	return HistorySummaryEntry{
+		ID:           api.UUIDToString(r.ID),
+		SessionName:  r.SessionName,
+		SeasonID:     api.UUIDToString(r.SeasonID),
+		SeasonName:   r.SeasonName,
+		AgeGroupName: r.AgeGroupName,
+		CabinName:    cabinName,
+	}
 }
 
 func toSessionHistoryResponse(e db.CounselorSessionHistory) SessionHistoryResponse {

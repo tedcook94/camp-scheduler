@@ -90,7 +90,7 @@ New tables:
 ### Hard Constraints (must be satisfied)
 
 - Cabin capacity cannot be exceeded
-- Junior counselors cannot be the sole counselor in a cabin
+- A cabin must have at least one senior (non-junior) counselor assigned
 - Counselors must have required certification for an activity (Phase 2+)
 - A counselor cannot be double-booked in the same time slot (Phase 2+)
 - Activity capacity cannot be exceeded (Phase 2+)
@@ -101,8 +101,9 @@ New tables:
 - Returning counselor prefers same cabin (weight: medium)
 - Counselor co-counselor preference (weight: medium)
 - Counselor village/age-group preference (weight: medium)
+- Prefer multiple senior counselors per cabin over one senior with many juniors (weight: low)
+- Counselor activity preferences (Phase 2+, weight: medium)
 - Camper friend requests -- be in same cabin (Phase 2+, weight: high)
-- Camper activity preferences (Phase 2+, weight: medium)
 
 ## Solver Design
 
@@ -146,7 +147,7 @@ constraints -- the director can see what trade-offs exist between options.
 - [x] Add counselor preference tables + CRUD
 - [x] Add counselor session history tracking
 - [ ] Implement the constraint solver engine
-  - [ ] Hard constraint validation
+  - [x] Hard constraint validation
   - [ ] Soft constraint scoring with configurable weights
   - [ ] Backtracking search with heuristics
   - [ ] Solution ranking

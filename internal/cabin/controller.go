@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"camp-scheduler/internal/api"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 )
@@ -134,6 +136,10 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "cabin not found"})
+			return
+		}
+		if api.IsFKViolation(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": "cabin has dependent records and cannot be deleted"})
 			return
 		}
 		slog.

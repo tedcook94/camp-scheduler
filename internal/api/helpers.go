@@ -1,10 +1,17 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+func IsFKViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503"
+}
 
 func ParseUUID(s string) (pgtype.UUID, error) {
 	var uid pgtype.UUID

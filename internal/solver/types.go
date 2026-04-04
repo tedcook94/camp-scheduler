@@ -93,3 +93,20 @@ type Solution struct {
 	Assignment Assignment
 	Score      ScoreResult
 }
+
+type Explanation struct {
+	Assignments      []AssignmentExplanation
+	UnmetPreferences []UnmetPreference
+}
+
+type AssignmentExplanation struct {
+	CounselorID string
+	CabinID     string
+	Reasons     []string
+}
+
+type UnmetPreference struct {
+	CounselorID string
+	Constraint  string
+	Message     string
+}

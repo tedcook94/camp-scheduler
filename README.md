@@ -151,7 +151,8 @@ constraints -- the director can see what trade-offs exist between options.
   - [x] Soft constraint scoring with configurable weights
   - [x] Backtracking search with heuristics
   - [x] Solution ranking
-- [ ] Implement explanation/audit trail generation
+- [x] Implement explanation/audit trail generation
+- [ ] Persist assignments to database
 - [ ] Add assignment run management (trigger, view results, select solution)
 - [ ] API endpoints for solver: trigger run, get results, select/apply solution
 - [ ] Integration tests with realistic camp data
@@ -174,9 +175,11 @@ constraints -- the director can see what trade-offs exist between options.
 
 ### Phase 4: Polish & Integration
 
+- [ ] Reward repeated preferences that were previously unmet
 - [ ] JWT authentication
   - [ ] Remove camp_id from REST endpoint paths; derive camp context from JWT
 - [ ] Web frontend
+- [ ] Overrides (locking assignment)
 - [ ] Data import (CSV/spreadsheet)
 - [ ] External system integration (Campminder, etc.)
 - [ ] LLM conversational layer (MCP) for "why was X assigned to Y?" queries

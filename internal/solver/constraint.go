@@ -31,10 +31,7 @@ func checkCabinMinimumCounselors(snapshot SessionSnapshot, assignment Assignment
 // least one non-junior counselor. A cabin with zero counselors is not flagged
 // here — that's caught by the minimum counselors check.
 func checkCabinWithoutSeniorCounselor(snapshot SessionSnapshot, assignment Assignment) []Violation {
-	counselorsByID := make(map[string]Counselor, len(snapshot.Counselors))
-	for _, c := range snapshot.Counselors {
-		counselorsByID[c.ID] = c
-	}
+	counselorsByID := indexCounselors(snapshot)
 
 	var violations []Violation
 	for _, cabin := range snapshot.Cabins {

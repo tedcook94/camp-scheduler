@@ -165,10 +165,7 @@ func scoreMultipleSeniors(snapshot SessionSnapshot, assignment Assignment, weigh
 		return nil
 	}
 
-	counselorsByID := make(map[string]Counselor, len(snapshot.Counselors))
-	for _, c := range snapshot.Counselors {
-		counselorsByID[c.ID] = c
-	}
+	counselorsByID := indexCounselors(snapshot)
 
 	var components []ScoreComponent
 	for _, cabin := range snapshot.Cabins {
@@ -194,9 +191,7 @@ func scoreMultipleSeniors(snapshot SessionSnapshot, assignment Assignment, weigh
 	return components
 }
 
-// counselorWantsToReturn reports whether a returning counselor should receive
-// the "returning to same age group/cabin" bonus. Returns true when the
-// counselor has no age-group preferences (happy to go back) or when their
+// Returns true when the counselor has no age-group preferences or when their
 // rank-1 preference matches their previous age group.
 func counselorWantsToReturn(counselorID string, snapshot SessionSnapshot) bool {
 	prefs, hasPrefs := snapshot.AgeGroupPreferences[counselorID]
@@ -215,22 +210,4 @@ func counselorWantsToReturn(counselorID string, snapshot SessionSnapshot) bool {
 		}
 	}
 	return false
-}
-
-func indexCabins(snapshot SessionSnapshot) map[string]Cabin {
-	cabins := make(map[string]Cabin, len(snapshot.Cabins))
-	for _, c := range snapshot.Cabins {
-		cabins[c.ID] = c
-	}
-	return cabins
-}
-
-func invertAssignment(assignment Assignment) map[string]string {
-	result := make(map[string]string)
-	for cabinID, counselorIDs := range assignment.CabinCounselors {
-		for _, cID := range counselorIDs {
-			result[cID] = cabinID
-		}
-	}
-	return result
 }

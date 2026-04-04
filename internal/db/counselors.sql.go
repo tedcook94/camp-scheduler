@@ -38,11 +38,16 @@ func (q *Queries) CreateCounselor(ctx context.Context, arg CreateCounselorParams
 
 const deleteCounselor = `-- name: DeleteCounselor :execrows
 DELETE FROM counselors
-WHERE id = $1
+WHERE id = $1 AND camp_id = $2
 `
 
-func (q *Queries) DeleteCounselor(ctx context.Context, id pgtype.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteCounselor, id)
+type DeleteCounselorParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) DeleteCounselor(ctx context.Context, arg DeleteCounselorParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteCounselor, arg.ID, arg.CampID)
 	if err != nil {
 		return 0, err
 	}
@@ -52,11 +57,16 @@ func (q *Queries) DeleteCounselor(ctx context.Context, id pgtype.UUID) (int64, e
 const getCounselor = `-- name: GetCounselor :one
 SELECT id, camp_id, counselor_name, junior_counselor, counselor_enabled
 FROM counselors
-WHERE id = $1
+WHERE id = $1 AND camp_id = $2
 `
 
-func (q *Queries) GetCounselor(ctx context.Context, id pgtype.UUID) (Counselor, error) {
-	row := q.db.QueryRow(ctx, getCounselor, id)
+type GetCounselorParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) GetCounselor(ctx context.Context, arg GetCounselorParams) (Counselor, error) {
+	row := q.db.QueryRow(ctx, getCounselor, arg.ID, arg.CampID)
 	var i Counselor
 	err := row.Scan(
 		&i.ID,
@@ -103,15 +113,16 @@ func (q *Queries) ListCounselors(ctx context.Context, campID pgtype.UUID) ([]Cou
 
 const updateCounselor = `-- name: UpdateCounselor :one
 UPDATE counselors
-SET counselor_name = $2,
-    junior_counselor = $3,
-    counselor_enabled = $4
-WHERE id = $1
+SET counselor_name = $3,
+    junior_counselor = $4,
+    counselor_enabled = $5
+WHERE id = $1 AND camp_id = $2
 RETURNING id, camp_id, counselor_name, junior_counselor, counselor_enabled
 `
 
 type UpdateCounselorParams struct {
 	ID               pgtype.UUID
+	CampID           pgtype.UUID
 	CounselorName    string
 	JuniorCounselor  bool
 	CounselorEnabled bool
@@ -120,6 +131,7 @@ type UpdateCounselorParams struct {
 func (q *Queries) UpdateCounselor(ctx context.Context, arg UpdateCounselorParams) (Counselor, error) {
 	row := q.db.QueryRow(ctx, updateCounselor,
 		arg.ID,
+		arg.CampID,
 		arg.CounselorName,
 		arg.JuniorCounselor,
 		arg.CounselorEnabled,

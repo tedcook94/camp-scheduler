@@ -37,13 +37,21 @@ func (svc *Service) List(ctx context.Context, campID string) ([]SessionResponse,
 	return result, nil
 }
 
-func (svc *Service) GetByID(ctx context.Context, id string) (SessionResponse, error) {
+func (svc *Service) GetByID(ctx context.Context, campID, id string) (SessionResponse, error) {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return SessionResponse{}, err
+	}
+
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return SessionResponse{}, err
 	}
 
-	session, err := svc.queries.GetSession(ctx, uid)
+	session, err := svc.queries.GetSession(ctx, db.GetSessionParams{
+		ID:     uid,
+		CampID: campUUID,
+	})
 	if err != nil {
 		return SessionResponse{}, fmt.Errorf("getting session %s: %w", id, err)
 	}
@@ -80,7 +88,12 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateSession
 	return toSessionResponse(session), nil
 }
 
-func (svc *Service) Update(ctx context.Context, id string, req UpdateSessionRequest) (SessionResponse, error) {
+func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateSessionRequest) (SessionResponse, error) {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return SessionResponse{}, err
+	}
+
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return SessionResponse{}, err
@@ -98,6 +111,7 @@ func (svc *Service) Update(ctx context.Context, id string, req UpdateSessionRequ
 
 	session, err := svc.queries.UpdateSession(ctx, db.UpdateSessionParams{
 		ID:              uid,
+		CampID:          campUUID,
 		SeasonID:        seasonUUID,
 		SessionName:     req.Name,
 		PreviousSession: prevUUID,
@@ -109,13 +123,21 @@ func (svc *Service) Update(ctx context.Context, id string, req UpdateSessionRequ
 	return toSessionResponse(session), nil
 }
 
-func (svc *Service) Delete(ctx context.Context, id string) error {
+func (svc *Service) Delete(ctx context.Context, campID, id string) error {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return err
+	}
+
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return err
 	}
 
-	rows, err := svc.queries.DeleteSession(ctx, uid)
+	rows, err := svc.queries.DeleteSession(ctx, db.DeleteSessionParams{
+		ID:     uid,
+		CampID: campUUID,
+	})
 	if err != nil {
 		return fmt.Errorf("deleting session %s: %w", id, err)
 	}

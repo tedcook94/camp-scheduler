@@ -44,11 +44,16 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 
 const deleteSession = `-- name: DeleteSession :execrows
 DELETE FROM sessions
-WHERE id = $1
+WHERE id = $1 AND camp_id = $2
 `
 
-func (q *Queries) DeleteSession(ctx context.Context, id pgtype.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteSession, id)
+type DeleteSessionParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) DeleteSession(ctx context.Context, arg DeleteSessionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSession, arg.ID, arg.CampID)
 	if err != nil {
 		return 0, err
 	}
@@ -58,11 +63,16 @@ func (q *Queries) DeleteSession(ctx context.Context, id pgtype.UUID) (int64, err
 const getSession = `-- name: GetSession :one
 SELECT id, camp_id, season_id, session_name, previous_session
 FROM sessions
-WHERE id = $1
+WHERE id = $1 AND camp_id = $2
 `
 
-func (q *Queries) GetSession(ctx context.Context, id pgtype.UUID) (Session, error) {
-	row := q.db.QueryRow(ctx, getSession, id)
+type GetSessionParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) GetSession(ctx context.Context, arg GetSessionParams) (Session, error) {
+	row := q.db.QueryRow(ctx, getSession, arg.ID, arg.CampID)
 	var i Session
 	err := row.Scan(
 		&i.ID,
@@ -109,15 +119,16 @@ func (q *Queries) ListSessions(ctx context.Context, campID pgtype.UUID) ([]Sessi
 
 const updateSession = `-- name: UpdateSession :one
 UPDATE sessions
-SET season_id = $2,
-    session_name = $3,
-    previous_session = $4
-WHERE id = $1
+SET season_id = $3,
+    session_name = $4,
+    previous_session = $5
+WHERE id = $1 AND camp_id = $2
 RETURNING id, camp_id, season_id, session_name, previous_session
 `
 
 type UpdateSessionParams struct {
 	ID              pgtype.UUID
+	CampID          pgtype.UUID
 	SeasonID        pgtype.UUID
 	SessionName     string
 	PreviousSession pgtype.UUID
@@ -126,6 +137,7 @@ type UpdateSessionParams struct {
 func (q *Queries) UpdateSession(ctx context.Context, arg UpdateSessionParams) (Session, error) {
 	row := q.db.QueryRow(ctx, updateSession,
 		arg.ID,
+		arg.CampID,
 		arg.SeasonID,
 		arg.SessionName,
 		arg.PreviousSession,

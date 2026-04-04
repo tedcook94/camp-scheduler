@@ -37,13 +37,21 @@ func (svc *Service) List(ctx context.Context, campID string) ([]AgeGroupResponse
 	return result, nil
 }
 
-func (svc *Service) GetByID(ctx context.Context, id string) (AgeGroupResponse, error) {
+func (svc *Service) GetByID(ctx context.Context, campID, id string) (AgeGroupResponse, error) {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return AgeGroupResponse{}, err
+	}
+
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return AgeGroupResponse{}, err
 	}
 
-	group, err := svc.queries.GetAgeGroup(ctx, uid)
+	group, err := svc.queries.GetAgeGroup(ctx, db.GetAgeGroupParams{
+		ID:     uid,
+		CampID: campUUID,
+	})
 	if err != nil {
 		return AgeGroupResponse{}, fmt.Errorf("getting age group %s: %w", id, err)
 	}
@@ -68,7 +76,12 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateAgeGrou
 	return toAgeGroupResponse(group), nil
 }
 
-func (svc *Service) Update(ctx context.Context, id string, req UpdateAgeGroupRequest) (AgeGroupResponse, error) {
+func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateAgeGroupRequest) (AgeGroupResponse, error) {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return AgeGroupResponse{}, err
+	}
+
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return AgeGroupResponse{}, err
@@ -76,6 +89,7 @@ func (svc *Service) Update(ctx context.Context, id string, req UpdateAgeGroupReq
 
 	group, err := svc.queries.UpdateAgeGroup(ctx, db.UpdateAgeGroupParams{
 		ID:           uid,
+		CampID:       campUUID,
 		AgeGroupName: req.Name,
 	})
 	if err != nil {
@@ -85,13 +99,21 @@ func (svc *Service) Update(ctx context.Context, id string, req UpdateAgeGroupReq
 	return toAgeGroupResponse(group), nil
 }
 
-func (svc *Service) Delete(ctx context.Context, id string) error {
+func (svc *Service) Delete(ctx context.Context, campID, id string) error {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return err
+	}
+
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return err
 	}
 
-	rows, err := svc.queries.DeleteAgeGroup(ctx, uid)
+	rows, err := svc.queries.DeleteAgeGroup(ctx, db.DeleteAgeGroupParams{
+		ID:     uid,
+		CampID: campUUID,
+	})
 	if err != nil {
 		return fmt.Errorf("deleting age group %s: %w", id, err)
 	}

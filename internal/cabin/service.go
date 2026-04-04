@@ -37,13 +37,21 @@ func (svc *Service) List(ctx context.Context, campID string) ([]CabinResponse, e
 	return result, nil
 }
 
-func (svc *Service) GetByID(ctx context.Context, id string) (CabinResponse, error) {
+func (svc *Service) GetByID(ctx context.Context, campID, id string) (CabinResponse, error) {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return CabinResponse{}, err
+	}
+
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return CabinResponse{}, err
 	}
 
-	cabin, err := svc.queries.GetCabin(ctx, uid)
+	cabin, err := svc.queries.GetCabin(ctx, db.GetCabinParams{
+		ID:     uid,
+		CampID: campUUID,
+	})
 	if err != nil {
 		return CabinResponse{}, fmt.Errorf("getting cabin %s: %w", id, err)
 	}
@@ -74,7 +82,12 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCabinRe
 	return toCabinResponse(cabin), nil
 }
 
-func (svc *Service) Update(ctx context.Context, id string, req UpdateCabinRequest) (CabinResponse, error) {
+func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCabinRequest) (CabinResponse, error) {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return CabinResponse{}, err
+	}
+
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return CabinResponse{}, err
@@ -87,6 +100,7 @@ func (svc *Service) Update(ctx context.Context, id string, req UpdateCabinReques
 
 	cabin, err := svc.queries.UpdateCabin(ctx, db.UpdateCabinParams{
 		ID:         uid,
+		CampID:     campUUID,
 		AgeGroupID: ageGroupUUID,
 		CabinName:  req.Name,
 	})
@@ -97,13 +111,21 @@ func (svc *Service) Update(ctx context.Context, id string, req UpdateCabinReques
 	return toCabinResponse(cabin), nil
 }
 
-func (svc *Service) Delete(ctx context.Context, id string) error {
+func (svc *Service) Delete(ctx context.Context, campID, id string) error {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return err
+	}
+
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return err
 	}
 
-	rows, err := svc.queries.DeleteCabin(ctx, uid)
+	rows, err := svc.queries.DeleteCabin(ctx, db.DeleteCabinParams{
+		ID:     uid,
+		CampID: campUUID,
+	})
 	if err != nil {
 		return fmt.Errorf("deleting cabin %s: %w", id, err)
 	}

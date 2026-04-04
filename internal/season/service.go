@@ -37,13 +37,21 @@ func (svc *Service) List(ctx context.Context, campID string) ([]SeasonResponse, 
 	return result, nil
 }
 
-func (svc *Service) GetByID(ctx context.Context, id string) (SeasonResponse, error) {
+func (svc *Service) GetByID(ctx context.Context, campID, id string) (SeasonResponse, error) {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return SeasonResponse{}, err
+	}
+
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return SeasonResponse{}, err
 	}
 
-	season, err := svc.queries.GetSeason(ctx, uid)
+	season, err := svc.queries.GetSeason(ctx, db.GetSeasonParams{
+		ID:     uid,
+		CampID: campUUID,
+	})
 	if err != nil {
 		return SeasonResponse{}, fmt.Errorf("getting season %s: %w", id, err)
 	}
@@ -68,7 +76,12 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateSeasonR
 	return toSeasonResponse(season), nil
 }
 
-func (svc *Service) Update(ctx context.Context, id string, req UpdateSeasonRequest) (SeasonResponse, error) {
+func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateSeasonRequest) (SeasonResponse, error) {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return SeasonResponse{}, err
+	}
+
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return SeasonResponse{}, err
@@ -76,6 +89,7 @@ func (svc *Service) Update(ctx context.Context, id string, req UpdateSeasonReque
 
 	season, err := svc.queries.UpdateSeason(ctx, db.UpdateSeasonParams{
 		ID:         uid,
+		CampID:     campUUID,
 		SeasonName: req.Name,
 	})
 	if err != nil {
@@ -85,13 +99,21 @@ func (svc *Service) Update(ctx context.Context, id string, req UpdateSeasonReque
 	return toSeasonResponse(season), nil
 }
 
-func (svc *Service) Delete(ctx context.Context, id string) error {
+func (svc *Service) Delete(ctx context.Context, campID, id string) error {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return err
+	}
+
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return err
 	}
 
-	rows, err := svc.queries.DeleteSeason(ctx, uid)
+	rows, err := svc.queries.DeleteSeason(ctx, db.DeleteSeasonParams{
+		ID:     uid,
+		CampID: campUUID,
+	})
 	if err != nil {
 		return fmt.Errorf("deleting season %s: %w", id, err)
 	}

@@ -37,13 +37,21 @@ func (svc *Service) List(ctx context.Context, campID string) ([]CounselorRespons
 	return result, nil
 }
 
-func (svc *Service) GetByID(ctx context.Context, id string) (CounselorResponse, error) {
+func (svc *Service) GetByID(ctx context.Context, campID, id string) (CounselorResponse, error) {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return CounselorResponse{}, err
+	}
+
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return CounselorResponse{}, err
 	}
 
-	counselor, err := svc.queries.GetCounselor(ctx, uid)
+	counselor, err := svc.queries.GetCounselor(ctx, db.GetCounselorParams{
+		ID:     uid,
+		CampID: campUUID,
+	})
 	if err != nil {
 		return CounselorResponse{}, fmt.Errorf("getting counselor %s: %w", id, err)
 	}
@@ -69,7 +77,12 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCounsel
 	return toCounselorResponse(counselor), nil
 }
 
-func (svc *Service) Update(ctx context.Context, id string, req UpdateCounselorRequest) (CounselorResponse, error) {
+func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCounselorRequest) (CounselorResponse, error) {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return CounselorResponse{}, err
+	}
+
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return CounselorResponse{}, err
@@ -77,6 +90,7 @@ func (svc *Service) Update(ctx context.Context, id string, req UpdateCounselorRe
 
 	counselor, err := svc.queries.UpdateCounselor(ctx, db.UpdateCounselorParams{
 		ID:               uid,
+		CampID:           campUUID,
 		CounselorName:    req.Name,
 		JuniorCounselor:  req.JuniorCounselor,
 		CounselorEnabled: req.Enabled,
@@ -88,13 +102,21 @@ func (svc *Service) Update(ctx context.Context, id string, req UpdateCounselorRe
 	return toCounselorResponse(counselor), nil
 }
 
-func (svc *Service) Delete(ctx context.Context, id string) error {
+func (svc *Service) Delete(ctx context.Context, campID, id string) error {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return err
+	}
+
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return err
 	}
 
-	rows, err := svc.queries.DeleteCounselor(ctx, uid)
+	rows, err := svc.queries.DeleteCounselor(ctx, db.DeleteCounselorParams{
+		ID:     uid,
+		CampID: campUUID,
+	})
 	if err != nil {
 		return fmt.Errorf("deleting counselor %s: %w", id, err)
 	}

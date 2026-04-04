@@ -7,7 +7,7 @@ ORDER BY cabin_name;
 -- name: GetCabin :one
 SELECT id, camp_id, age_group_id, cabin_name
 FROM cabins
-WHERE id = $1;
+WHERE id = $1 AND camp_id = $2;
 
 -- name: CreateCabin :one
 INSERT INTO cabins (camp_id, age_group_id, cabin_name)
@@ -16,11 +16,11 @@ RETURNING id, camp_id, age_group_id, cabin_name;
 
 -- name: UpdateCabin :one
 UPDATE cabins
-SET age_group_id = $2,
-    cabin_name = $3
-WHERE id = $1
+SET age_group_id = $3,
+    cabin_name = $4
+WHERE id = $1 AND camp_id = $2
 RETURNING id, camp_id, age_group_id, cabin_name;
 
 -- name: DeleteCabin :execrows
 DELETE FROM cabins
-WHERE id = $1;
+WHERE id = $1 AND camp_id = $2;

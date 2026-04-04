@@ -31,11 +31,16 @@ func (q *Queries) CreateSeason(ctx context.Context, arg CreateSeasonParams) (Sea
 
 const deleteSeason = `-- name: DeleteSeason :execrows
 DELETE FROM seasons
-WHERE id = $1
+WHERE id = $1 AND camp_id = $2
 `
 
-func (q *Queries) DeleteSeason(ctx context.Context, id pgtype.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteSeason, id)
+type DeleteSeasonParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) DeleteSeason(ctx context.Context, arg DeleteSeasonParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSeason, arg.ID, arg.CampID)
 	if err != nil {
 		return 0, err
 	}
@@ -45,11 +50,16 @@ func (q *Queries) DeleteSeason(ctx context.Context, id pgtype.UUID) (int64, erro
 const getSeason = `-- name: GetSeason :one
 SELECT id, camp_id, season_name
 FROM seasons
-WHERE id = $1
+WHERE id = $1 AND camp_id = $2
 `
 
-func (q *Queries) GetSeason(ctx context.Context, id pgtype.UUID) (Season, error) {
-	row := q.db.QueryRow(ctx, getSeason, id)
+type GetSeasonParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) GetSeason(ctx context.Context, arg GetSeasonParams) (Season, error) {
+	row := q.db.QueryRow(ctx, getSeason, arg.ID, arg.CampID)
 	var i Season
 	err := row.Scan(&i.ID, &i.CampID, &i.SeasonName)
 	return i, err
@@ -84,18 +94,19 @@ func (q *Queries) ListSeasons(ctx context.Context, campID pgtype.UUID) ([]Season
 
 const updateSeason = `-- name: UpdateSeason :one
 UPDATE seasons
-SET season_name = $2
-WHERE id = $1
+SET season_name = $3
+WHERE id = $1 AND camp_id = $2
 RETURNING id, camp_id, season_name
 `
 
 type UpdateSeasonParams struct {
 	ID         pgtype.UUID
+	CampID     pgtype.UUID
 	SeasonName string
 }
 
 func (q *Queries) UpdateSeason(ctx context.Context, arg UpdateSeasonParams) (Season, error) {
-	row := q.db.QueryRow(ctx, updateSeason, arg.ID, arg.SeasonName)
+	row := q.db.QueryRow(ctx, updateSeason, arg.ID, arg.CampID, arg.SeasonName)
 	var i Season
 	err := row.Scan(&i.ID, &i.CampID, &i.SeasonName)
 	return i, err

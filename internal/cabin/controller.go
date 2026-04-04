@@ -62,15 +62,17 @@ func (ctrl *Controller) List(c *gin.Context) {
 }
 
 func (ctrl *Controller) Get(c *gin.Context) {
+	campID := c.Param("campId")
 	id := c.Param("id")
 
-	cabin, err := ctrl.svc.GetByID(c.Request.Context(), id)
+	cabin, err := ctrl.svc.GetByID(c.Request.Context(), campID, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "cabin not found"})
 			return
 		}
 		slog.
+			With("camp_id", campID).
 			With("id", id).
 			With("error", err).
 			Error("error getting cabin")
@@ -104,6 +106,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 }
 
 func (ctrl *Controller) Update(c *gin.Context) {
+	campID := c.Param("campId")
 	id := c.Param("id")
 
 	var req UpdateCabinRequest
@@ -112,13 +115,14 @@ func (ctrl *Controller) Update(c *gin.Context) {
 		return
 	}
 
-	cabin, err := ctrl.svc.Update(c.Request.Context(), id, req)
+	cabin, err := ctrl.svc.Update(c.Request.Context(), campID, id, req)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "cabin not found"})
 			return
 		}
 		slog.
+			With("camp_id", campID).
 			With("id", id).
 			With("error", err).
 			Error("error updating cabin")
@@ -130,9 +134,10 @@ func (ctrl *Controller) Update(c *gin.Context) {
 }
 
 func (ctrl *Controller) Delete(c *gin.Context) {
+	campID := c.Param("campId")
 	id := c.Param("id")
 
-	err := ctrl.svc.Delete(c.Request.Context(), id)
+	err := ctrl.svc.Delete(c.Request.Context(), campID, id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "cabin not found"})
@@ -143,6 +148,7 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 			return
 		}
 		slog.
+			With("camp_id", campID).
 			With("id", id).
 			With("error", err).
 			Error("error deleting cabin")

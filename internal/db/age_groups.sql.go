@@ -31,11 +31,16 @@ func (q *Queries) CreateAgeGroup(ctx context.Context, arg CreateAgeGroupParams) 
 
 const deleteAgeGroup = `-- name: DeleteAgeGroup :execrows
 DELETE FROM age_groups
-WHERE id = $1
+WHERE id = $1 AND camp_id = $2
 `
 
-func (q *Queries) DeleteAgeGroup(ctx context.Context, id pgtype.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteAgeGroup, id)
+type DeleteAgeGroupParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) DeleteAgeGroup(ctx context.Context, arg DeleteAgeGroupParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteAgeGroup, arg.ID, arg.CampID)
 	if err != nil {
 		return 0, err
 	}
@@ -45,11 +50,16 @@ func (q *Queries) DeleteAgeGroup(ctx context.Context, id pgtype.UUID) (int64, er
 const getAgeGroup = `-- name: GetAgeGroup :one
 SELECT id, camp_id, age_group_name
 FROM age_groups
-WHERE id = $1
+WHERE id = $1 AND camp_id = $2
 `
 
-func (q *Queries) GetAgeGroup(ctx context.Context, id pgtype.UUID) (AgeGroup, error) {
-	row := q.db.QueryRow(ctx, getAgeGroup, id)
+type GetAgeGroupParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) GetAgeGroup(ctx context.Context, arg GetAgeGroupParams) (AgeGroup, error) {
+	row := q.db.QueryRow(ctx, getAgeGroup, arg.ID, arg.CampID)
 	var i AgeGroup
 	err := row.Scan(&i.ID, &i.CampID, &i.AgeGroupName)
 	return i, err
@@ -84,18 +94,19 @@ func (q *Queries) ListAgeGroups(ctx context.Context, campID pgtype.UUID) ([]AgeG
 
 const updateAgeGroup = `-- name: UpdateAgeGroup :one
 UPDATE age_groups
-SET age_group_name = $2
-WHERE id = $1
+SET age_group_name = $3
+WHERE id = $1 AND camp_id = $2
 RETURNING id, camp_id, age_group_name
 `
 
 type UpdateAgeGroupParams struct {
 	ID           pgtype.UUID
+	CampID       pgtype.UUID
 	AgeGroupName string
 }
 
 func (q *Queries) UpdateAgeGroup(ctx context.Context, arg UpdateAgeGroupParams) (AgeGroup, error) {
-	row := q.db.QueryRow(ctx, updateAgeGroup, arg.ID, arg.AgeGroupName)
+	row := q.db.QueryRow(ctx, updateAgeGroup, arg.ID, arg.CampID, arg.AgeGroupName)
 	var i AgeGroup
 	err := row.Scan(&i.ID, &i.CampID, &i.AgeGroupName)
 	return i, err

@@ -7,7 +7,7 @@ ORDER BY session_name;
 -- name: GetSession :one
 SELECT id, camp_id, season_id, session_name, previous_session
 FROM sessions
-WHERE id = $1;
+WHERE id = $1 AND camp_id = $2;
 
 -- name: CreateSession :one
 INSERT INTO sessions (camp_id, season_id, session_name, previous_session)
@@ -16,12 +16,12 @@ RETURNING id, camp_id, season_id, session_name, previous_session;
 
 -- name: UpdateSession :one
 UPDATE sessions
-SET season_id = $2,
-    session_name = $3,
-    previous_session = $4
-WHERE id = $1
+SET season_id = $3,
+    session_name = $4,
+    previous_session = $5
+WHERE id = $1 AND camp_id = $2
 RETURNING id, camp_id, season_id, session_name, previous_session;
 
 -- name: DeleteSession :execrows
 DELETE FROM sessions
-WHERE id = $1;
+WHERE id = $1 AND camp_id = $2;

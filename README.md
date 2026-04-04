@@ -138,11 +138,10 @@ constraints -- the director can see what trade-offs exist between options.
 ### Phase 1: Counselor-to-Cabin Solver (MVP)
 
 - [x] Implement CRUD for all existing entities (age groups, cabins, seasons, sessions, counselors)
-- [ ] Determine delete behavior for entities with FK dependencies (block, cascade, reassign, etc.)
-- [ ] Add camp_id scoping to Get/Update/Delete queries for camp-owned entities
+- [x] Determine delete behavior for entities with FK dependencies (block, cascade, reassign, etc.)
+- [x] Add camp_id scoping to Get/Update/Delete queries for camp-owned entities
   - Ensures entities can only be accessed within their owning camp
   - Will align with JWT-based camp scoping when auth is implemented
-- [ ] Remove camp_id from REST endpoint paths once JWT auth provides camp context
 - [ ] Add counselor preference tables + CRUD
 - [ ] Add counselor session history tracking
 - [ ] Implement the constraint solver engine
@@ -173,6 +172,8 @@ constraints -- the director can see what trade-offs exist between options.
 
 ### Phase 4: Polish & Integration
 
+- [ ] JWT authentication
+  - [ ] Remove camp_id from REST endpoint paths; derive camp context from JWT
 - [ ] Web frontend
 - [ ] Data import (CSV/spreadsheet)
 - [ ] External system integration (Campminder, etc.)

@@ -74,3 +74,22 @@ type ScoreComponent struct {
 	CabinID     string
 	CounselorID string
 }
+
+type SolverConfig struct {
+	MaxSolutions  int
+	MaxIterations int
+	Weights       Weights
+}
+
+func DefaultSolverConfig() SolverConfig {
+	return SolverConfig{
+		MaxSolutions:  5,
+		MaxIterations: 100_000,
+		Weights:       DefaultWeights(),
+	}
+}
+
+type Solution struct {
+	Assignment Assignment
+	Score      ScoreResult
+}

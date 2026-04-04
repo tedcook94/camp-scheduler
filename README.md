@@ -59,7 +59,7 @@ the selected solution back.
 - **Camper** -- individual camper with age, gender, preferences
 - **Activity** -- e.g., "Archery", "Swimming", with capacity and certification requirements
 - **Time Slot** -- scheduling block within a session for activities
-- **Counselor Preferences** -- village preferences, co-counselor preferences, returning status
+- **Counselor Preferences** -- per-session ranked age group preferences, co-counselor preferences
 - **Camper Preferences** -- friend requests, activity preferences
 - **Certification** -- what a counselor is qualified to teach
 - **Assignment Results** -- stored solver output with scores and explanations
@@ -68,8 +68,9 @@ the selected solution back.
 
 New tables:
 
-- `counselor_preferences` -- returning status, desired villages, co-counselor preferences
-- `counselor_session_history` -- tracks which cabin/village a counselor was in previously
+- `counselor_age_group_preferences` -- per-session ranked age group preferences for a counselor
+- `counselor_cocounselor_preferences` -- per-session ranked co-counselor preferences (directional)
+- `counselor_session_history` -- tracks which cabin/age group a counselor was in previously
 - `counselor_cabin_assignments` -- solver output: counselor -> cabin for a session
 - `assignment_runs` -- metadata about each solver run (timestamp, score, status)
 - `assignment_explanations` -- per-assignment reasoning trail
@@ -142,7 +143,7 @@ constraints -- the director can see what trade-offs exist between options.
 - [x] Add camp_id scoping to Get/Update/Delete queries for camp-owned entities
   - Ensures entities can only be accessed within their owning camp
   - Will align with JWT-based camp scoping when auth is implemented
-- [ ] Add counselor preference tables + CRUD
+- [x] Add counselor preference tables + CRUD
 - [ ] Add counselor session history tracking
 - [ ] Implement the constraint solver engine
   - [ ] Hard constraint validation

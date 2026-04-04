@@ -935,6 +935,308 @@ resources:
     settingRebuildPath: true
     settingFollowRedirects: global
     _type: request
+  - _id: fld_age_group_prefs_01
+    parentId: fld_0165b0f3641045a88246e473a724a706
+    modified: 1690675000000
+    created: 1690675000000
+    name: age-group-preferences
+    description: ""
+    environment:
+      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/sessions/{{ _['cs-test-session-for-prefs'] }}/counselors/{{ _['cs-test-counselor-for-prefs'] }}/age-group-preferences"
+    environmentPropertyOrder:
+      "&":
+        - cs-endpoint
+    metaSortKey: -1690666702000
+    _type: request_group
+  - _id: req_age_group_prefs_list
+    parentId: fld_age_group_prefs_01
+    modified: 1690675000001
+    created: 1690675000001
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Get
+    description: ""
+    method: GET
+    body: {}
+    parameters: []
+    headers: []
+    authentication: {}
+    metaSortKey: -1690675000005
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_age_group_prefs_get
+    parentId: fld_age_group_prefs_01
+    modified: 1690675000002
+    created: 1690675000002
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Get By ID
+    description: ""
+    method: GET
+    body: {}
+    parameters:
+      - id: pair_age_group_prefs_get_id
+        name: id
+        value: "{{ _['cs-test-age-group-pref'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690675000004
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_age_group_prefs_create
+    parentId: fld_age_group_prefs_01
+    modified: 1690675000003
+    created: 1690675000003
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Create
+    description: ""
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"age_group_id": "{{ _['cs-test-age-group'] }}",
+        	"rank": 1
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690675000003
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_age_group_prefs_update
+    parentId: fld_age_group_prefs_01
+    modified: 1690675000004
+    created: 1690675000004
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Update
+    description: ""
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"age_group_id": "{{ _['cs-test-age-group'] }}",
+        	"rank": 2
+        }
+    parameters:
+      - id: pair_age_group_prefs_update_id
+        name: id
+        value: "{{ _['cs-test-age-group-pref'] }}"
+        description: ""
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690675000002
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_age_group_prefs_delete
+    parentId: fld_age_group_prefs_01
+    modified: 1690675000005
+    created: 1690675000005
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Delete
+    description: ""
+    method: DELETE
+    body: {}
+    parameters:
+      - id: pair_age_group_prefs_delete_id
+        name: id
+        value: "{{ _['cs-test-age-group-pref'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690675000001
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: fld_cocounselor_prefs_01
+    parentId: fld_0165b0f3641045a88246e473a724a706
+    modified: 1690676000000
+    created: 1690676000000
+    name: cocounselor-preferences
+    description: ""
+    environment:
+      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/sessions/{{ _['cs-test-session-for-prefs'] }}/counselors/{{ _['cs-test-counselor-for-prefs'] }}/cocounselor-preferences"
+    environmentPropertyOrder:
+      "&":
+        - cs-endpoint
+    metaSortKey: -1690666701000
+    _type: request_group
+  - _id: req_cocounselor_prefs_list
+    parentId: fld_cocounselor_prefs_01
+    modified: 1690676000001
+    created: 1690676000001
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Get
+    description: ""
+    method: GET
+    body: {}
+    parameters: []
+    headers: []
+    authentication: {}
+    metaSortKey: -1690676000005
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_cocounselor_prefs_get
+    parentId: fld_cocounselor_prefs_01
+    modified: 1690676000002
+    created: 1690676000002
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Get By ID
+    description: ""
+    method: GET
+    body: {}
+    parameters:
+      - id: pair_cocounselor_prefs_get_id
+        name: id
+        value: "{{ _['cs-test-cocounselor-pref'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690676000004
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_cocounselor_prefs_create
+    parentId: fld_cocounselor_prefs_01
+    modified: 1690676000003
+    created: 1690676000003
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Create
+    description: ""
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"preferred_counselor_id": "{{ _['cs-test-counselor'] }}",
+        	"rank": 1
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690676000003
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_cocounselor_prefs_update
+    parentId: fld_cocounselor_prefs_01
+    modified: 1690676000004
+    created: 1690676000004
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Update
+    description: ""
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"preferred_counselor_id": "{{ _['cs-test-counselor'] }}",
+        	"rank": 2
+        }
+    parameters:
+      - id: pair_cocounselor_prefs_update_id
+        name: id
+        value: "{{ _['cs-test-cocounselor-pref'] }}"
+        description: ""
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690676000002
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_cocounselor_prefs_delete
+    parentId: fld_cocounselor_prefs_01
+    modified: 1690676000005
+    created: 1690676000005
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Delete
+    description: ""
+    method: DELETE
+    body: {}
+    parameters:
+      - id: pair_cocounselor_prefs_delete_id
+        name: id
+        value: "{{ _['cs-test-cocounselor-pref'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690676000001
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
   - _id: env_e91cde096b4a48a0bc9cc4a609f73ea7
     parentId: wrk_8335f34c06324aa6888c93fbe4e6e58e
     modified: 1690666916375
@@ -968,6 +1270,10 @@ resources:
       cs-test-season: ""
       cs-test-session: ""
       cs-test-counselor: ""
+      cs-test-session-for-prefs: ""
+      cs-test-counselor-for-prefs: ""
+      cs-test-age-group-pref: ""
+      cs-test-cocounselor-pref: ""
     dataPropertyOrder:
       "&":
         - cs-protocol
@@ -979,6 +1285,10 @@ resources:
         - cs-test-season
         - cs-test-session
         - cs-test-counselor
+        - cs-test-session-for-prefs
+        - cs-test-counselor-for-prefs
+        - cs-test-age-group-pref
+        - cs-test-cocounselor-pref
     color: null
     isPrivate: false
     metaSortKey: 1690666718229

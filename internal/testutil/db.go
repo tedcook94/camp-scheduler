@@ -49,6 +49,8 @@ func MustQueries(t *testing.T) *db.Queries {
 func TruncateAll(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 	tables := []string{
+		"counselor_cocounselor_preferences",
+		"counselor_age_group_preferences",
 		"session_age_group_cabins",
 		"session_age_groups",
 		"sessions",

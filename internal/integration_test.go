@@ -157,6 +157,20 @@ func TestSolverIntegration(t *testing.T) {
 	t.Run("complex_camp", testComplexCamp)
 }
 
+func TestCamperSolverIntegration(t *testing.T) {
+	t.Run("basic_camper_assignment", testBasicCamperAssignment)
+	t.Run("camper_friend_preferences", testCamperFriendPreferences)
+}
+
+func TestReviewFixes(t *testing.T) {
+	t.Run("enrollment_session_scoping", testEnrollmentSessionScoping)
+	t.Run("enrollment_session_uniqueness", testEnrollmentSessionUniqueness)
+	t.Run("get_solution_run_ownership", testGetSolutionRunOwnership)
+	t.Run("get_solution_run_not_found", testGetSolutionRunNotFound)
+	t.Run("select_solution_camper_run", testSelectSolutionCamperRun)
+	t.Run("camper_run_invalid_session", testCamperRunInvalidSession)
+}
+
 // testSimpleCamp exercises the full API -> DB -> Solver -> Results flow with a
 // small, realistic camp: 2 age groups, 4 cabins, 6 counselors.
 func testSimpleCamp(t *testing.T) {
@@ -717,4 +731,547 @@ func testComplexCamp(t *testing.T) {
 	if len(runsAfterDelete) != 0 {
 		t.Fatalf("expected 0 runs after delete, got %d", len(runsAfterDelete))
 	}
+}
+
+// testBasicCamperAssignment verifies the full camper assignment flow:
+// create camp entities, enroll campers, trigger a camper_cabin run,
+// and verify assignments respect cabin capacity and age group constraints.
+func testBasicCamperAssignment(t *testing.T) {
+	ts := mustSetupServer(t)
+
+	// Create camp.
+	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{
+		"name": "Camp Lakeside",
+	})
+	campID := str(campResp, "id")
+	base := "/camps/" + campID
+
+	// Create age groups.
+	juniors := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Young"})
+	juniorsID := str(juniors, "id")
+
+	// Create cabins.
+	cabinA := mustPost(t, apiURL(ts, base+"/cabins"), map[string]any{
+		"name": "Birch", "age_group_id": juniorsID,
+	})
+	cabinAID := str(cabinA, "id")
+
+	cabinB := mustPost(t, apiURL(ts, base+"/cabins"), map[string]any{
+		"name": "Elm", "age_group_id": juniorsID,
+	})
+	cabinBID := str(cabinB, "id")
+
+	// Create season and session.
+	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{
+		"name": "Summer 2026", "start_date": "2026-06-01", "end_date": "2026-08-31",
+	})
+	seasonID := str(season, "id")
+
+	session := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	})
+	sessionID := str(session, "id")
+	sessionBase := base + "/sessions/" + sessionID
+
+	// Configure session age group and cabins with capacity.
+	sag := mustPost(t, apiURL(ts, sessionBase+"/age-groups"), map[string]any{
+		"age_group_id": juniorsID, "group_size": 20,
+	})
+	sagID := str(sag, "id")
+
+	mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
+		"session_age_group_id": sagID, "cabin_id": cabinAID,
+		"group_size": 4, "required_counselors": 1,
+	})
+	mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
+		"session_age_group_id": sagID, "cabin_id": cabinBID,
+		"group_size": 4, "required_counselors": 1,
+	})
+
+	// Create campers.
+	camperNames := []string{"Alice", "Bob", "Charlie", "Diana", "Eve", "Frank"}
+	camperIDs := make([]string, len(camperNames))
+	for i, name := range camperNames {
+		resp := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": name})
+		camperIDs[i] = str(resp, "id")
+	}
+
+	// Enroll all campers.
+	for _, camperID := range camperIDs {
+		mustPost(t, apiURL(ts, sessionBase+"/enrollments"), map[string]any{
+			"camper_id": camperID, "session_age_group_id": sagID,
+		})
+	}
+
+	// Trigger camper_cabin run.
+	runURL := apiURL(ts, sessionBase+"/assignment-runs")
+	runResp := mustPost(t, runURL, map[string]any{
+		"run_type": "camper_cabin",
+	})
+
+	if str(runResp, "run_type") != "camper_cabin" {
+		t.Fatalf("expected run_type camper_cabin, got %s", str(runResp, "run_type"))
+	}
+	if str(runResp, "status") != "completed" {
+		t.Fatalf("expected status completed, got %s", str(runResp, "status"))
+	}
+
+	solutions := list(runResp, "solutions")
+	if len(solutions) == 0 {
+		t.Fatal("expected at least one solution")
+	}
+
+	// Check the top solution's assignments.
+	topSolution := asMap(solutions[0])
+	topSolutionID := str(topSolution, "id")
+	runID := str(runResp, "id")
+
+	solDetail := mustGet(t, runURL+"/"+runID+"/solutions/"+topSolutionID)
+	assignments := list(solDetail, "assignments")
+	if len(assignments) != 6 {
+		t.Fatalf("expected 6 camper assignments, got %d", len(assignments))
+	}
+
+	// Verify assignments respect capacity: no cabin has more than 4.
+	cabinCounts := make(map[string]int)
+	for _, a := range assignments {
+		am := asMap(a)
+		cabinCounts[str(am, "cabin_id")]++
+	}
+	for cabinID, count := range cabinCounts {
+		if count > 4 {
+			t.Fatalf("cabin %s has %d campers, exceeding capacity of 4", cabinID, count)
+		}
+	}
+
+	// Clean up.
+	mustDelete(t, runURL+"/"+runID)
+}
+
+// testCamperFriendPreferences verifies that the solver optimizes for friend
+// preferences and generates appropriate explanations.
+func testCamperFriendPreferences(t *testing.T) {
+	ts := mustSetupServer(t)
+
+	// Create camp.
+	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{
+		"name": "Camp Friendship",
+	})
+	campID := str(campResp, "id")
+	base := "/camps/" + campID
+
+	// Create age group and cabins.
+	teens := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Teens"})
+	teensID := str(teens, "id")
+
+	cabin1 := mustPost(t, apiURL(ts, base+"/cabins"), map[string]any{
+		"name": "Hawk", "age_group_id": teensID,
+	})
+	cabin1ID := str(cabin1, "id")
+
+	cabin2 := mustPost(t, apiURL(ts, base+"/cabins"), map[string]any{
+		"name": "Eagle", "age_group_id": teensID,
+	})
+	cabin2ID := str(cabin2, "id")
+
+	// Create season and session.
+	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{
+		"name": "Summer 2026", "start_date": "2026-06-01", "end_date": "2026-08-31",
+	})
+	seasonID := str(season, "id")
+
+	session := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	})
+	sessionID := str(session, "id")
+	sessionBase := base + "/sessions/" + sessionID
+
+	// Configure cabins with capacity 3 each.
+	sag := mustPost(t, apiURL(ts, sessionBase+"/age-groups"), map[string]any{
+		"age_group_id": teensID, "group_size": 6,
+	})
+	sagID := str(sag, "id")
+
+	mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
+		"session_age_group_id": sagID, "cabin_id": cabin1ID,
+		"group_size": 3, "required_counselors": 1,
+	})
+	mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
+		"session_age_group_id": sagID, "cabin_id": cabin2ID,
+		"group_size": 3, "required_counselors": 1,
+	})
+
+	// Create 4 campers: Amy, Beth, Carol, Dana.
+	amy := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": "Amy"})
+	amyID := str(amy, "id")
+	beth := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": "Beth"})
+	bethID := str(beth, "id")
+	carol := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": "Carol"})
+	carolID := str(carol, "id")
+	dana := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": "Dana"})
+	danaID := str(dana, "id")
+
+	// Enroll all.
+	for _, id := range []string{amyID, bethID, carolID, danaID} {
+		mustPost(t, apiURL(ts, sessionBase+"/enrollments"), map[string]any{
+			"camper_id": id, "session_age_group_id": sagID,
+		})
+	}
+
+	// Amy wants Beth, Beth wants Amy (mutual friends).
+	mustPost(t, apiURL(ts, sessionBase+"/campers/"+amyID+"/friend-preferences"), map[string]any{
+		"preferred_camper_id": bethID, "rank": 1,
+	})
+	mustPost(t, apiURL(ts, sessionBase+"/campers/"+bethID+"/friend-preferences"), map[string]any{
+		"preferred_camper_id": amyID, "rank": 1,
+	})
+
+	// Carol wants Dana.
+	mustPost(t, apiURL(ts, sessionBase+"/campers/"+carolID+"/friend-preferences"), map[string]any{
+		"preferred_camper_id": danaID, "rank": 1,
+	})
+
+	// Trigger camper run.
+	runURL := apiURL(ts, sessionBase+"/assignment-runs")
+	runResp := mustPost(t, runURL, map[string]any{
+		"run_type":      "camper_cabin",
+		"max_solutions": 3,
+	})
+
+	solutions := list(runResp, "solutions")
+	if len(solutions) == 0 {
+		t.Fatal("expected at least one solution")
+	}
+
+	// Get the top solution.
+	topSolution := asMap(solutions[0])
+	topScore := num(topSolution, "score")
+	if topScore <= 0 {
+		t.Fatalf("expected positive score for solution with friend prefs, got %.1f", topScore)
+	}
+
+	// Check the solution detail.
+	runID := str(runResp, "id")
+	topSolutionID := str(topSolution, "id")
+	solDetail := mustGet(t, runURL+"/"+runID+"/solutions/"+topSolutionID)
+
+	// Verify score breakdown exists.
+	breakdown := list(solDetail, "score_breakdown")
+	if len(breakdown) == 0 {
+		t.Fatal("expected non-empty score_breakdown")
+	}
+
+	// Verify Amy and Beth are in the same cabin in the top solution.
+	assignments := list(solDetail, "assignments")
+	camperCabinMap := make(map[string]string)
+	for _, a := range assignments {
+		am := asMap(a)
+		camperCabinMap[str(am, "camper_id")] = str(am, "cabin_id")
+	}
+
+	if camperCabinMap[amyID] != camperCabinMap[bethID] {
+		t.Fatal("expected Amy and Beth to be in the same cabin (mutual friends)")
+	}
+
+	// Verify explanations exist.
+	explanations := list(solDetail, "explanations")
+	if len(explanations) == 0 {
+		t.Fatal("expected non-empty explanations")
+	}
+
+	// Check that there are reason-type explanations.
+	hasReason := false
+	for _, e := range explanations {
+		em := asMap(e)
+		if str(em, "explanation_type") == "reason" {
+			hasReason = true
+			break
+		}
+	}
+	if !hasReason {
+		t.Fatal("expected at least one 'reason' explanation")
+	}
+
+	// Clean up.
+	mustDelete(t, runURL+"/"+runID)
+}
+
+// testEnrollmentSessionScoping verifies that GET and DELETE enrollment
+// endpoints enforce session scoping: accessing an enrollment via the wrong
+// session returns 404 even if the enrollment ID and camp ID are valid.
+func testEnrollmentSessionScoping(t *testing.T) {
+	ts := mustSetupServer(t)
+
+	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{"name": "Camp Scope"})
+	campID := str(campResp, "id")
+	base := "/camps/" + campID
+
+	ag := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Kids"})
+	agID := str(ag, "id")
+
+	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31"})
+	seasonID := str(season, "id")
+
+	s1 := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{"name": "S1", "season_id": seasonID})
+	s1ID := str(s1, "id")
+
+	s2 := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{
+		"name": "S2", "season_id": seasonID, "previous_session_id": s1ID,
+	})
+	s2ID := str(s2, "id")
+
+	sag := mustPost(t, apiURL(ts, base+"/sessions/"+s1ID+"/age-groups"), map[string]any{
+		"age_group_id": agID,
+	})
+	sagID := str(sag, "id")
+
+	camper := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": "Test Camper"})
+	camperID := str(camper, "id")
+
+	enrollment := mustPost(t, apiURL(ts, base+"/sessions/"+s1ID+"/enrollments"), map[string]any{
+		"camper_id": camperID, "session_age_group_id": sagID,
+	})
+	enrollmentID := str(enrollment, "id")
+
+	// GET via correct session should succeed.
+	mustGet(t, apiURL(ts, base+"/sessions/"+s1ID+"/enrollments/"+enrollmentID))
+
+	// GET via wrong session should return 404.
+	doRawRequest(t, http.MethodGet,
+		apiURL(ts, base+"/sessions/"+s2ID+"/enrollments/"+enrollmentID),
+		nil, http.StatusNotFound)
+
+	// DELETE via wrong session should return 404.
+	doRawRequest(t, http.MethodDelete,
+		apiURL(ts, base+"/sessions/"+s2ID+"/enrollments/"+enrollmentID),
+		nil, http.StatusNotFound)
+
+	// DELETE via correct session should succeed.
+	mustDelete(t, apiURL(ts, base+"/sessions/"+s1ID+"/enrollments/"+enrollmentID))
+}
+
+// testEnrollmentSessionUniqueness verifies that a camper cannot be enrolled
+// twice in the same session, even across different age groups.
+func testEnrollmentSessionUniqueness(t *testing.T) {
+	ts := mustSetupServer(t)
+
+	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{"name": "Camp Unique"})
+	campID := str(campResp, "id")
+	base := "/camps/" + campID
+
+	ag1 := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Young"})
+	ag1ID := str(ag1, "id")
+	ag2 := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Old"})
+	ag2ID := str(ag2, "id")
+
+	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31"})
+	seasonID := str(season, "id")
+
+	session := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	})
+	sessionID := str(session, "id")
+
+	sag1 := mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/age-groups"), map[string]any{
+		"age_group_id": ag1ID,
+	})
+	sag1ID := str(sag1, "id")
+	sag2 := mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/age-groups"), map[string]any{
+		"age_group_id": ag2ID,
+	})
+	sag2ID := str(sag2, "id")
+
+	camper := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": "Duplicate Dan"})
+	camperID := str(camper, "id")
+
+	// First enrollment succeeds.
+	mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/enrollments"), map[string]any{
+		"camper_id": camperID, "session_age_group_id": sag1ID,
+	})
+
+	// Second enrollment in the same session (different age group) should fail
+	// due to UNIQUE(camper_id, session_id).
+	doRawRequest(t, http.MethodPost,
+		apiURL(ts, base+"/sessions/"+sessionID+"/enrollments"),
+		map[string]any{"camper_id": camperID, "session_age_group_id": sag2ID},
+		http.StatusConflict)
+}
+
+// testGetSolutionRunOwnership verifies that requesting a solution through a
+// run that doesn't own it returns 404, preventing cross-run data leakage.
+func testGetSolutionRunOwnership(t *testing.T) {
+	ts := mustSetupServer(t)
+
+	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{"name": "Camp Ownership"})
+	campID := str(campResp, "id")
+	base := "/camps/" + campID
+
+	ag := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Juniors"})
+	agID := str(ag, "id")
+
+	cabin := mustPost(t, apiURL(ts, base+"/cabins"), map[string]any{
+		"name": "Pine", "age_group_id": agID,
+	})
+	cabinID := str(cabin, "id")
+
+	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31"})
+	seasonID := str(season, "id")
+
+	session := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	})
+	sessionID := str(session, "id")
+
+	sag := mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/age-groups"), map[string]any{
+		"age_group_id": agID, "group_size": 10,
+	})
+	sagID := str(sag, "id")
+
+	mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/cabins"), map[string]any{
+		"session_age_group_id": sagID, "cabin_id": cabinID,
+		"group_size": 4, "required_counselors": 1,
+	})
+
+	// Create 2 campers and enroll them.
+	for _, name := range []string{"Alice", "Bob"} {
+		c := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": name})
+		mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/enrollments"), map[string]any{
+			"camper_id": str(c, "id"), "session_age_group_id": sagID,
+		})
+	}
+
+	// Trigger two camper runs to get solutions from different runs.
+	runURL := apiURL(ts, base+"/sessions/"+sessionID+"/assignment-runs")
+	run1 := mustPost(t, runURL, map[string]any{"run_type": "camper_cabin"})
+	run1ID := str(run1, "id")
+	sol1ID := str(asMap(list(run1, "solutions")[0]), "id")
+
+	run2 := mustPost(t, runURL, map[string]any{"run_type": "camper_cabin"})
+	run2ID := str(run2, "id")
+
+	// Getting run1's solution through run1 should succeed.
+	mustGet(t, runURL+"/"+run1ID+"/solutions/"+sol1ID)
+
+	// Getting run1's solution through run2 should return 404.
+	doRawRequest(t, http.MethodGet,
+		runURL+"/"+run2ID+"/solutions/"+sol1ID,
+		nil, http.StatusNotFound)
+
+	// Clean up.
+	mustDelete(t, runURL+"/"+run1ID)
+	mustDelete(t, runURL+"/"+run2ID)
+}
+
+// testGetSolutionRunNotFound verifies that GetSolution returns 404 (not 500)
+// when the run doesn't exist.
+func testGetSolutionRunNotFound(t *testing.T) {
+	ts := mustSetupServer(t)
+
+	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{"name": "Camp 404"})
+	campID := str(campResp, "id")
+
+	season := mustPost(t, apiURL(ts, "/camps/"+campID+"/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31"})
+	seasonID := str(season, "id")
+
+	session := mustPost(t, apiURL(ts, "/camps/"+campID+"/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	})
+	sessionID := str(session, "id")
+
+	fakeRunID := "00000000-0000-0000-0000-000000000001"
+	fakeSolID := "00000000-0000-0000-0000-000000000002"
+
+	runURL := apiURL(ts, "/camps/"+campID+"/sessions/"+sessionID+"/assignment-runs")
+
+	// GetRun with nonexistent run ID should return 404.
+	doRawRequest(t, http.MethodGet, runURL+"/"+fakeRunID, nil, http.StatusNotFound)
+
+	// GetSolution with nonexistent run ID should return 404, not 500.
+	doRawRequest(t, http.MethodGet,
+		runURL+"/"+fakeRunID+"/solutions/"+fakeSolID,
+		nil, http.StatusNotFound)
+}
+
+// testSelectSolutionCamperRun verifies that SelectSolution works for
+// camper_cabin runs (not just counselor_cabin runs).
+func testSelectSolutionCamperRun(t *testing.T) {
+	ts := mustSetupServer(t)
+
+	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{"name": "Camp Select"})
+	campID := str(campResp, "id")
+	base := "/camps/" + campID
+
+	ag := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Teens"})
+	agID := str(ag, "id")
+
+	cabin := mustPost(t, apiURL(ts, base+"/cabins"), map[string]any{
+		"name": "Hawk", "age_group_id": agID,
+	})
+	cabinID := str(cabin, "id")
+
+	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31"})
+	seasonID := str(season, "id")
+
+	session := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	})
+	sessionID := str(session, "id")
+	sessionBase := base + "/sessions/" + sessionID
+
+	sag := mustPost(t, apiURL(ts, sessionBase+"/age-groups"), map[string]any{
+		"age_group_id": agID, "group_size": 10,
+	})
+	sagID := str(sag, "id")
+
+	mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
+		"session_age_group_id": sagID, "cabin_id": cabinID,
+		"group_size": 4, "required_counselors": 1,
+	})
+
+	// Create and enroll 2 campers.
+	for _, name := range []string{"Alice", "Bob"} {
+		c := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": name})
+		mustPost(t, apiURL(ts, sessionBase+"/enrollments"), map[string]any{
+			"camper_id": str(c, "id"), "session_age_group_id": sagID,
+		})
+	}
+
+	// Trigger camper run.
+	runURL := apiURL(ts, sessionBase+"/assignment-runs")
+	runResp := mustPost(t, runURL, map[string]any{"run_type": "camper_cabin"})
+	runID := str(runResp, "id")
+	topSolutionID := str(asMap(list(runResp, "solutions")[0]), "id")
+
+	// Select solution should succeed for a camper run.
+	selectResp := doRequest(t, http.MethodPost,
+		runURL+"/"+runID+"/solutions/"+topSolutionID+"/select", nil, http.StatusOK)
+
+	selectedID := str(selectResp, "selected_solution_id")
+	if selectedID != topSolutionID {
+		t.Fatalf("expected selected_solution_id %q, got %q", topSolutionID, selectedID)
+	}
+	if str(selectResp, "status") != "selected" {
+		t.Fatalf("expected status 'selected', got %q", str(selectResp, "status"))
+	}
+
+	// Verify via GetRun.
+	updatedRun := mustGet(t, runURL+"/"+runID)
+	if str(updatedRun, "selected_solution_id") != topSolutionID {
+		t.Fatal("run detail does not reflect selected camper solution")
+	}
+
+	// Clean up.
+	mustDelete(t, runURL+"/"+runID)
+}
+
+func testCamperRunInvalidSession(t *testing.T) {
+	ts := mustSetupServer(t)
+
+	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{"name": "Camp Ghost"})
+	campID := str(campResp, "id")
+
+	fakeSessionID := "00000000-0000-0000-0000-000000000099"
+	runURL := apiURL(ts, "/camps/"+campID+"/sessions/"+fakeSessionID+"/assignment-runs")
+
+	doRawRequest(t, http.MethodPost, runURL, map[string]any{"run_type": "camper_cabin"}, http.StatusNotFound)
 }

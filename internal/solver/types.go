@@ -42,6 +42,7 @@ type Violation struct {
 	Message     string
 	CabinID     string
 	CounselorID string
+	CamperID    string
 }
 
 type Weights struct {
@@ -73,6 +74,7 @@ type ScoreComponent struct {
 	Message     string
 	CabinID     string
 	CounselorID string
+	CamperID    string
 }
 
 type SolverConfig struct {

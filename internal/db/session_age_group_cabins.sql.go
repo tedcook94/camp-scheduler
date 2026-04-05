@@ -11,6 +11,122 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createSessionAgeGroupCabin = `-- name: CreateSessionAgeGroupCabin :one
+INSERT INTO session_age_group_cabins (camp_id, session_age_group_id, cabin_id, group_size, required_counselors)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, camp_id, session_age_group_id, cabin_id, group_size, required_counselors
+`
+
+type CreateSessionAgeGroupCabinParams struct {
+	CampID             pgtype.UUID
+	SessionAgeGroupID  pgtype.UUID
+	CabinID            pgtype.UUID
+	GroupSize          pgtype.Int4
+	RequiredCounselors pgtype.Int4
+}
+
+func (q *Queries) CreateSessionAgeGroupCabin(ctx context.Context, arg CreateSessionAgeGroupCabinParams) (SessionAgeGroupCabin, error) {
+	row := q.db.QueryRow(ctx, createSessionAgeGroupCabin,
+		arg.CampID,
+		arg.SessionAgeGroupID,
+		arg.CabinID,
+		arg.GroupSize,
+		arg.RequiredCounselors,
+	)
+	var i SessionAgeGroupCabin
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.SessionAgeGroupID,
+		&i.CabinID,
+		&i.GroupSize,
+		&i.RequiredCounselors,
+	)
+	return i, err
+}
+
+const deleteSessionAgeGroupCabin = `-- name: DeleteSessionAgeGroupCabin :execrows
+DELETE FROM session_age_group_cabins
+WHERE id = $1 AND camp_id = $2
+`
+
+type DeleteSessionAgeGroupCabinParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) DeleteSessionAgeGroupCabin(ctx context.Context, arg DeleteSessionAgeGroupCabinParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSessionAgeGroupCabin, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const getSessionAgeGroupCabin = `-- name: GetSessionAgeGroupCabin :one
+SELECT id, camp_id, session_age_group_id, cabin_id, group_size, required_counselors
+FROM session_age_group_cabins
+WHERE id = $1 AND camp_id = $2
+`
+
+type GetSessionAgeGroupCabinParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) GetSessionAgeGroupCabin(ctx context.Context, arg GetSessionAgeGroupCabinParams) (SessionAgeGroupCabin, error) {
+	row := q.db.QueryRow(ctx, getSessionAgeGroupCabin, arg.ID, arg.CampID)
+	var i SessionAgeGroupCabin
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.SessionAgeGroupID,
+		&i.CabinID,
+		&i.GroupSize,
+		&i.RequiredCounselors,
+	)
+	return i, err
+}
+
+const listSessionAgeGroupCabins = `-- name: ListSessionAgeGroupCabins :many
+SELECT id, camp_id, session_age_group_id, cabin_id, group_size, required_counselors
+FROM session_age_group_cabins
+WHERE session_age_group_id = $1 AND camp_id = $2
+ORDER BY cabin_id
+`
+
+type ListSessionAgeGroupCabinsParams struct {
+	SessionAgeGroupID pgtype.UUID
+	CampID            pgtype.UUID
+}
+
+func (q *Queries) ListSessionAgeGroupCabins(ctx context.Context, arg ListSessionAgeGroupCabinsParams) ([]SessionAgeGroupCabin, error) {
+	rows, err := q.db.Query(ctx, listSessionAgeGroupCabins, arg.SessionAgeGroupID, arg.CampID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SessionAgeGroupCabin
+	for rows.Next() {
+		var i SessionAgeGroupCabin
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.SessionAgeGroupID,
+			&i.CabinID,
+			&i.GroupSize,
+			&i.RequiredCounselors,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSessionCabins = `-- name: ListSessionCabins :many
 SELECT
     c.id,
@@ -59,4 +175,41 @@ func (q *Queries) ListSessionCabins(ctx context.Context, arg ListSessionCabinsPa
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateSessionAgeGroupCabin = `-- name: UpdateSessionAgeGroupCabin :one
+UPDATE session_age_group_cabins
+SET cabin_id = $3,
+    group_size = $4,
+    required_counselors = $5
+WHERE id = $1 AND camp_id = $2
+RETURNING id, camp_id, session_age_group_id, cabin_id, group_size, required_counselors
+`
+
+type UpdateSessionAgeGroupCabinParams struct {
+	ID                 pgtype.UUID
+	CampID             pgtype.UUID
+	CabinID            pgtype.UUID
+	GroupSize          pgtype.Int4
+	RequiredCounselors pgtype.Int4
+}
+
+func (q *Queries) UpdateSessionAgeGroupCabin(ctx context.Context, arg UpdateSessionAgeGroupCabinParams) (SessionAgeGroupCabin, error) {
+	row := q.db.QueryRow(ctx, updateSessionAgeGroupCabin,
+		arg.ID,
+		arg.CampID,
+		arg.CabinID,
+		arg.GroupSize,
+		arg.RequiredCounselors,
+	)
+	var i SessionAgeGroupCabin
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.SessionAgeGroupID,
+		&i.CabinID,
+		&i.GroupSize,
+		&i.RequiredCounselors,
+	)
+	return i, err
 }

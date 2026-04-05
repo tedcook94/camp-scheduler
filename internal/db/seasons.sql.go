@@ -64,7 +64,7 @@ const getMostRecentSeason = `-- name: GetMostRecentSeason :one
 SELECT id, camp_id, season_name, start_date, end_date
 FROM seasons
 WHERE camp_id = $1
-ORDER BY start_date DESC
+ORDER BY start_date DESC, id DESC
 LIMIT 1
 `
 
@@ -109,7 +109,7 @@ const listSeasons = `-- name: ListSeasons :many
 SELECT id, camp_id, season_name, start_date, end_date
 FROM seasons
 WHERE camp_id = $1
-ORDER BY start_date DESC
+ORDER BY start_date DESC, id DESC
 `
 
 func (q *Queries) ListSeasons(ctx context.Context, campID pgtype.UUID) ([]Season, error) {

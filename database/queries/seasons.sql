@@ -2,7 +2,7 @@
 SELECT id, camp_id, season_name, start_date, end_date
 FROM seasons
 WHERE camp_id = $1
-ORDER BY start_date DESC;
+ORDER BY start_date DESC, id DESC;
 
 -- name: GetSeason :one
 SELECT id, camp_id, season_name, start_date, end_date
@@ -28,5 +28,5 @@ WHERE id = $1 AND camp_id = $2;
 SELECT id, camp_id, season_name, start_date, end_date
 FROM seasons
 WHERE camp_id = $1
-ORDER BY start_date DESC
+ORDER BY start_date DESC, id DESC
 LIMIT 1;

@@ -30,13 +30,20 @@ type Server struct {
 }
 
 func New(cfg config.Config) (*Server, error) {
-	if cfg.Server.Mode != "local" {
-		gin.SetMode(gin.ReleaseMode)
-	}
-
 	pool, err := initDB(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
+	}
+	return NewWithPool(cfg, pool), nil
+}
+
+// NewWithPool creates a server with an existing database connection pool,
+// allowing callers (such as integration tests) to supply their own pool.
+func NewWithPool(cfg config.Config, pool *pgxpool.Pool) *Server {
+	if cfg.Server.Mode == "local" {
+		gin.SetMode(gin.DebugMode)
+	} else {
+		gin.SetMode(gin.ReleaseMode)
 	}
 
 	s := &Server{
@@ -51,7 +58,7 @@ func New(cfg config.Config) (*Server, error) {
 	}
 
 	s.routes()
-	return s, nil
+	return s
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {

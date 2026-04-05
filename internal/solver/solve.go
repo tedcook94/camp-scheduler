@@ -7,12 +7,15 @@ func Solve(snapshot SessionSnapshot, config SolverConfig) []Solution {
 		return nil
 	}
 
+	counselorsByID := indexCounselors(snapshot)
+
 	s := &searchState{
-		snapshot:   snapshot,
-		config:     config,
-		cabinIDs:   make([]string, len(snapshot.Cabins)),
-		assignment: make(map[string][]string, len(snapshot.Cabins)),
-		iterations: 0,
+		snapshot:       snapshot,
+		config:         config,
+		counselorsByID: counselorsByID,
+		cabinIDs:       make([]string, len(snapshot.Cabins)),
+		assignment:     make(map[string][]string, len(snapshot.Cabins)),
+		iterations:     0,
 	}
 
 	for i, c := range snapshot.Cabins {
@@ -30,12 +33,13 @@ func Solve(snapshot SessionSnapshot, config SolverConfig) []Solution {
 }
 
 type searchState struct {
-	snapshot   SessionSnapshot
-	config     SolverConfig
-	cabinIDs   []string
-	assignment map[string][]string
-	solutions  []Solution
-	iterations int
+	snapshot       SessionSnapshot
+	config         SolverConfig
+	counselorsByID map[string]Counselor
+	cabinIDs       []string
+	assignment     map[string][]string
+	solutions      []Solution
+	iterations     int
 }
 
 func (s *searchState) search(counselors []Counselor, index int) {
@@ -49,11 +53,16 @@ func (s *searchState) search(counselors []Counselor, index int) {
 		return
 	}
 
-	counselor := counselors[index]
+	remaining := counselors[index:]
+	counselor := remaining[0]
 
 	for _, cabinID := range s.cabinIDs {
 		s.assignment[cabinID] = append(s.assignment[cabinID], counselor.ID)
-		s.search(counselors, index+1)
+
+		if s.feasible(remaining[1:]) {
+			s.search(counselors, index+1)
+		}
+
 		s.assignment[cabinID] = s.assignment[cabinID][:len(s.assignment[cabinID])-1]
 
 		if s.iterations >= s.config.MaxIterations {
@@ -62,7 +71,66 @@ func (s *searchState) search(counselors []Counselor, index int) {
 	}
 
 	// Also try not placing this counselor at all.
-	s.search(counselors, index+1)
+	if s.feasible(remaining[1:]) {
+		s.search(counselors, index+1)
+	}
+}
+
+// feasible checks whether the current partial assignment can still lead to a
+// valid solution given the counselors remaining to be placed. It prunes
+// branches that are guaranteed to violate hard constraints.
+func (s *searchState) feasible(remaining []Counselor) bool {
+	remainingSeniors := 0
+	for _, c := range remaining {
+		if !c.IsJunior {
+			remainingSeniors++
+		}
+	}
+
+	cabinsNeedingSenior := 0
+	for _, cabin := range s.snapshot.Cabins {
+		assigned := s.assignment[cabin.ID]
+		if len(assigned) == 0 {
+			// Empty cabins with no staffing requirement can stay empty --
+			// the hard constraint checker skips them for the senior check.
+			if cabin.RequiredCounselors > 0 {
+				cabinsNeedingSenior++
+			}
+			continue
+		}
+
+		hasSenior := false
+		for _, cID := range assigned {
+			if !s.counselorsByID[cID].IsJunior {
+				hasSenior = true
+				break
+			}
+		}
+
+		if !hasSenior {
+			// Cabin is staffed with only juniors -- it still needs a senior.
+			cabinsNeedingSenior++
+		}
+	}
+
+	if remainingSeniors < cabinsNeedingSenior {
+		return false
+	}
+
+	// Check that each cabin can still reach its required_counselors count.
+	totalRemaining := len(remaining)
+	deficit := 0
+	for _, cabin := range s.snapshot.Cabins {
+		need := cabin.RequiredCounselors - len(s.assignment[cabin.ID])
+		if need > 0 {
+			deficit += need
+		}
+	}
+	if totalRemaining < deficit {
+		return false
+	}
+
+	return true
 }
 
 func (s *searchState) evaluateSolution() {

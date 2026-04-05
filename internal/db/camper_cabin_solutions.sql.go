@@ -48,16 +48,17 @@ func (q *Queries) CreateCamperCabinSolution(ctx context.Context, arg CreateCampe
 const getCamperCabinSolution = `-- name: GetCamperCabinSolution :one
 SELECT id, camp_id, assignment_run_id, solution_index, score, score_breakdown
 FROM camper_cabin_solutions
-WHERE id = $1 AND camp_id = $2
+WHERE id = $1 AND camp_id = $2 AND assignment_run_id = $3
 `
 
 type GetCamperCabinSolutionParams struct {
-	ID     pgtype.UUID
-	CampID pgtype.UUID
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	AssignmentRunID pgtype.UUID
 }
 
 func (q *Queries) GetCamperCabinSolution(ctx context.Context, arg GetCamperCabinSolutionParams) (CamperCabinSolution, error) {
-	row := q.db.QueryRow(ctx, getCamperCabinSolution, arg.ID, arg.CampID)
+	row := q.db.QueryRow(ctx, getCamperCabinSolution, arg.ID, arg.CampID, arg.AssignmentRunID)
 	var i CamperCabinSolution
 	err := row.Scan(
 		&i.ID,

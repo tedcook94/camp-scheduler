@@ -34,9 +34,11 @@ func (ctrl *Controller) RegisterRoutes(camps *gin.RouterGroup) {
 }
 
 type TriggerRunRequest struct {
-	MaxSolutions  *int     `json:"max_solutions"`
-	MaxIterations *int     `json:"max_iterations"`
-	Weights       *Weights `json:"weights"`
+	RunType       string                `json:"run_type"`
+	MaxSolutions  *int                  `json:"max_solutions"`
+	MaxIterations *int                  `json:"max_iterations"`
+	Weights       *Weights              `json:"weights"`
+	CamperWeights *CamperWeightsRequest `json:"camper_weights"`
 }
 
 type Weights struct {
@@ -45,6 +47,10 @@ type Weights struct {
 	CocounselorPreference *float64 `json:"cocounselor_preference"`
 	AgeGroupPreference    *float64 `json:"age_group_preference"`
 	MultipleSeniors       *float64 `json:"multiple_seniors"`
+}
+
+type CamperWeightsRequest struct {
+	FriendPreference *float64 `json:"friend_preference"`
 }
 
 type RunResponse struct {
@@ -78,13 +84,15 @@ type SolutionDetailResponse struct {
 
 type AssignmentResponse struct {
 	ID          string `json:"id"`
-	CounselorID string `json:"counselor_id"`
+	CounselorID string `json:"counselor_id,omitempty"`
+	CamperID    string `json:"camper_id,omitempty"`
 	CabinID     string `json:"cabin_id"`
 }
 
 type ExplanationResponse struct {
 	ID              string  `json:"id"`
-	CounselorID     string  `json:"counselor_id"`
+	CounselorID     string  `json:"counselor_id,omitempty"`
+	CamperID        string  `json:"camper_id,omitempty"`
 	ExplanationType string  `json:"explanation_type"`
 	ConstraintName  *string `json:"constraint_name"`
 	Message         string  `json:"message"`
@@ -100,36 +108,66 @@ func (ctrl *Controller) TriggerRun(c *gin.Context) {
 		return
 	}
 
-	cfg, err := buildSolverConfig(req)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	runType := req.RunType
+	if runType == "" {
+		runType = "counselor_cabin"
 	}
 
-	run, err := ctrl.svc.TriggerRun(c.Request.Context(), campID, sessionID, cfg)
-	if err != nil {
-		if errors.Is(err, ErrNoSolutions) {
-			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "solver produced no valid solutions"})
-			return
-		}
-		if errors.Is(err, pgx.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
-			return
-		}
-		if api.IsBadInput(err) {
+	switch runType {
+	case "counselor_cabin":
+		cfg, err := buildSolverConfig(req)
+		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
-			With("session_id", sessionID).
-			With("error", err).
-			Error("error triggering assignment run")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+
+		run, err := ctrl.svc.TriggerRun(c.Request.Context(), campID, sessionID, cfg)
+		if err != nil {
+			ctrl.handleTriggerError(c, campID, sessionID, err)
+			return
+		}
+
+		c.JSON(http.StatusCreated, run)
+
+	case "camper_cabin":
+		cfg, err := buildCamperSolverConfig(req)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		run, err := ctrl.svc.TriggerCamperRun(c.Request.Context(), campID, sessionID, cfg)
+		if err != nil {
+			ctrl.handleTriggerError(c, campID, sessionID, err)
+			return
+		}
+
+		c.JSON(http.StatusCreated, run)
+
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("unknown run_type: %s", runType)})
+	}
+}
+
+func (ctrl *Controller) handleTriggerError(c *gin.Context, campID, sessionID string, err error) {
+	if errors.Is(err, ErrNoSolutions) {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "solver produced no valid solutions"})
 		return
 	}
-
-	c.JSON(http.StatusCreated, run)
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
+		return
+	}
+	if api.IsBadInput(err) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	slog.
+		With("camp_id", campID).
+		With("session_id", sessionID).
+		With("error", err).
+		Error("error triggering assignment run")
+	c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 }
 
 func (ctrl *Controller) ListRuns(c *gin.Context) {
@@ -208,10 +246,15 @@ func (ctrl *Controller) DeleteRun(c *gin.Context) {
 
 func (ctrl *Controller) GetSolution(c *gin.Context) {
 	campID := c.Param("campId")
+	runID := c.Param("runId")
 	solutionID := c.Param("solutionId")
 
-	sol, err := ctrl.svc.GetSolution(c.Request.Context(), campID, solutionID)
+	sol, err := ctrl.svc.GetSolution(c.Request.Context(), campID, runID, solutionID)
 	if err != nil {
+		if errors.Is(err, ErrRunNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "assignment run not found"})
+			return
+		}
 		if errors.Is(err, ErrSolutionNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "solution not found"})
 			return
@@ -294,6 +337,30 @@ func buildSolverConfig(req TriggerRunRequest) (solver.SolverConfig, error) {
 		}
 		if req.Weights.MultipleSeniors != nil {
 			cfg.Weights.MultipleSeniors = *req.Weights.MultipleSeniors
+		}
+	}
+
+	return cfg, nil
+}
+
+func buildCamperSolverConfig(req TriggerRunRequest) (solver.CamperSolverConfig, error) {
+	cfg := solver.DefaultCamperSolverConfig()
+
+	if req.MaxSolutions != nil {
+		if *req.MaxSolutions <= 0 {
+			return cfg, fmt.Errorf("max_solutions must be greater than 0")
+		}
+		cfg.MaxSolutions = *req.MaxSolutions
+	}
+	if req.MaxIterations != nil {
+		if *req.MaxIterations <= 0 {
+			return cfg, fmt.Errorf("max_iterations must be greater than 0")
+		}
+		cfg.MaxIterations = *req.MaxIterations
+	}
+	if req.CamperWeights != nil {
+		if req.CamperWeights.FriendPreference != nil {
+			cfg.Weights.FriendPreference = *req.CamperWeights.FriendPreference
 		}
 	}
 

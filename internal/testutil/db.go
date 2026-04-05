@@ -4,7 +4,6 @@ package testutil
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"camp-scheduler/internal/config"
@@ -46,31 +45,13 @@ func MustQueries(t *testing.T) *db.Queries {
 	return db.New(MustOpenDB(t))
 }
 
-// TruncateAll removes all data from tables in the correct order for FK constraints.
-// Useful as a test cleanup step.
+// TruncateAll removes all data from every application table. Because every
+// table has a direct or transitive foreign key to camps, truncating camps
+// with CASCADE is sufficient.
 func TruncateAll(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
-	tables := []string{
-		"counselor_cabin_explanations",
-		"counselor_cabin_assignments",
-		"counselor_cabin_solutions",
-		"assignment_runs",
-		"counselor_cocounselor_preferences",
-		"counselor_age_group_preferences",
-		"counselor_session_history",
-		"session_age_group_cabins",
-		"session_age_groups",
-		"sessions",
-		"seasons",
-		"counselors",
-		"cabins",
-		"age_groups",
-		"camps",
-	}
-	for _, table := range tables {
-		_, err := pool.Exec(context.Background(), fmt.Sprintf("DELETE FROM %s", table))
-		if err != nil {
-			t.Fatalf("truncating %s: %v", table, err)
-		}
+	_, err := pool.Exec(context.Background(), "TRUNCATE camps CASCADE")
+	if err != nil {
+		t.Fatalf("truncating tables: %v", err)
 	}
 }

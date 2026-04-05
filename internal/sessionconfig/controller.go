@@ -73,6 +73,7 @@ type UpdateSessionCabinRequest struct {
 type SessionCabinResponse struct {
 	ID                 string `json:"id"`
 	CampID             string `json:"camp_id"`
+	SessionID          string `json:"session_id"`
 	SessionAgeGroupID  string `json:"session_age_group_id"`
 	CabinID            string `json:"cabin_id"`
 	GroupSize          *int32 `json:"group_size"`

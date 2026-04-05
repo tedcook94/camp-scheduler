@@ -14,6 +14,15 @@ type AgeGroup struct {
 	AgeGroupName string
 }
 
+type AssignmentRun struct {
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	SessionID pgtype.UUID
+	RunType   string
+	Status    string
+	CreatedAt pgtype.Timestamptz
+}
+
 type Cabin struct {
 	ID         pgtype.UUID
 	CampID     pgtype.UUID
@@ -43,6 +52,33 @@ type CounselorAgeGroupPreference struct {
 	SessionID   pgtype.UUID
 	AgeGroupID  pgtype.UUID
 	Rank        int32
+}
+
+type CounselorCabinAssignment struct {
+	ID          pgtype.UUID
+	CampID      pgtype.UUID
+	SolutionID  pgtype.UUID
+	CounselorID pgtype.UUID
+	CabinID     pgtype.UUID
+}
+
+type CounselorCabinExplanation struct {
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	SolutionID      pgtype.UUID
+	CounselorID     pgtype.UUID
+	ExplanationType string
+	ConstraintName  pgtype.Text
+	Message         string
+}
+
+type CounselorCabinSolution struct {
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	AssignmentRunID pgtype.UUID
+	SolutionIndex   int32
+	Score           float64
+	ScoreBreakdown  []byte
 }
 
 type CounselorCocounselorPreference struct {

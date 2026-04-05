@@ -46,6 +46,7 @@ const listCounselorCabinAssignmentsBySolution = `-- name: ListCounselorCabinAssi
 SELECT id, camp_id, solution_id, counselor_id, cabin_id
 FROM counselor_cabin_assignments
 WHERE solution_id = $1 AND camp_id = $2
+ORDER BY cabin_id, counselor_id
 `
 
 type ListCounselorCabinAssignmentsBySolutionParams struct {

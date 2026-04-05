@@ -6,4 +6,5 @@ RETURNING id, camp_id, solution_id, counselor_id, explanation_type, constraint_n
 -- name: ListCounselorCabinExplanationsBySolution :many
 SELECT id, camp_id, solution_id, counselor_id, explanation_type, constraint_name, message
 FROM counselor_cabin_explanations
-WHERE solution_id = $1 AND camp_id = $2;
+WHERE solution_id = $1 AND camp_id = $2
+ORDER BY counselor_id, explanation_type;

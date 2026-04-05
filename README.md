@@ -154,7 +154,7 @@ constraints -- the director can see what trade-offs exist between options.
   - [x] Solution ranking
 - [x] Implement explanation/audit trail generation
 - [x] Load `SessionSnapshot` from database (bulk queries + snapshot builder)
-- [ ] Persist assignments to database
+- [x] Persist assignments to database
 - [ ] Add assignment run management (trigger, view results, select solution)
 - [ ] API endpoints for solver: trigger run, get results, select/apply solution
 - [ ] Integration tests with realistic camp data

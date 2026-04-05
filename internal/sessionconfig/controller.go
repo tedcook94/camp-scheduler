@@ -135,6 +135,10 @@ func (ctrl *Controller) CreateAgeGroup(c *gin.Context) {
 
 	group, err := ctrl.svc.CreateAgeGroup(c.Request.Context(), campID, sessionID, req)
 	if err != nil {
+		if api.IsFKViolation(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
+			return
+		}
 		slog.
 			With("camp_id", campID).
 			With("session_id", sessionID).
@@ -162,6 +166,10 @@ func (ctrl *Controller) UpdateAgeGroup(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session age group not found"})
+			return
+		}
+		if api.IsFKViolation(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
 			return
 		}
 		slog.
@@ -265,6 +273,10 @@ func (ctrl *Controller) CreateCabin(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "session age group not found for this session"})
 			return
 		}
+		if api.IsFKViolation(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
+			return
+		}
 		slog.
 			With("camp_id", campID).
 			With("session_id", sessionID).
@@ -292,6 +304,10 @@ func (ctrl *Controller) UpdateCabin(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session cabin not found"})
+			return
+		}
+		if api.IsFKViolation(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
 			return
 		}
 		slog.

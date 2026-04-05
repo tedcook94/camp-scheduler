@@ -124,6 +124,10 @@ func (s *Server) routes() {
 	cocounselorPrefController := preferences.NewCocounselorController(cocounselorPrefService)
 	cocounselorPrefController.RegisterRoutes(camps)
 
+	camperFriendPrefService := preferences.NewCamperFriendService(queries)
+	camperFriendPrefController := preferences.NewCamperFriendController(camperFriendPrefService)
+	camperFriendPrefController.RegisterRoutes(camps)
+
 	historyService := history.NewService(queries)
 	historyController := history.NewController(historyService)
 	historyController.RegisterRoutes(camps)

@@ -73,6 +73,10 @@ func (s *Server) routes() {
 		c.Status(http.StatusOK)
 	})
 	s.router.GET("/ready", func(c *gin.Context) {
+		if err := s.pool.Ping(c.Request.Context()); err != nil {
+			c.Status(http.StatusServiceUnavailable)
+			return
+		}
 		c.Status(http.StatusOK)
 	})
 

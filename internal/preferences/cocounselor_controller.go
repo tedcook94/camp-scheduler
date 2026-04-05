@@ -30,12 +30,12 @@ func (ctrl *CocounselorController) RegisterRoutes(camps *gin.RouterGroup) {
 
 type CreateCocounselorPreferenceRequest struct {
 	PreferredCounselorID string `json:"preferred_counselor_id" binding:"required"`
-	Rank                 int32  `json:"rank" binding:"required"`
+	Rank                 int32  `json:"rank" binding:"required,gt=0"`
 }
 
 type UpdateCocounselorPreferenceRequest struct {
 	PreferredCounselorID string `json:"preferred_counselor_id" binding:"required"`
-	Rank                 int32  `json:"rank" binding:"required"`
+	Rank                 int32  `json:"rank" binding:"required,gt=0"`
 }
 
 type CocounselorPreferenceResponse struct {

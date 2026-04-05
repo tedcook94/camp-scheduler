@@ -30,12 +30,12 @@ func (ctrl *AgeGroupController) RegisterRoutes(camps *gin.RouterGroup) {
 
 type CreateAgeGroupPreferenceRequest struct {
 	AgeGroupID string `json:"age_group_id" binding:"required"`
-	Rank       int32  `json:"rank" binding:"required"`
+	Rank       int32  `json:"rank" binding:"required,gt=0"`
 }
 
 type UpdateAgeGroupPreferenceRequest struct {
 	AgeGroupID string `json:"age_group_id" binding:"required"`
-	Rank       int32  `json:"rank" binding:"required"`
+	Rank       int32  `json:"rank" binding:"required,gt=0"`
 }
 
 type AgeGroupPreferenceResponse struct {

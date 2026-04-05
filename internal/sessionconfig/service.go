@@ -186,27 +186,17 @@ func (svc *Service) ListCabins(ctx context.Context, campID, sessionID string) ([
 		return nil, err
 	}
 
-	ageGroups, err := svc.queries.ListSessionAgeGroups(ctx, db.ListSessionAgeGroupsParams{
+	rows, err := svc.queries.ListSessionAgeGroupCabinsBySession(ctx, db.ListSessionAgeGroupCabinsBySessionParams{
 		SessionID: sessionUUID,
 		CampID:    campUUID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error listing session age groups: %w", err)
+		return nil, fmt.Errorf("error listing session cabins: %w", err)
 	}
 
-	var result []SessionCabinResponse
-	for _, ag := range ageGroups {
-		rows, err := svc.queries.ListSessionAgeGroupCabins(ctx, db.ListSessionAgeGroupCabinsParams{
-			SessionAgeGroupID: ag.ID,
-			CampID:            campUUID,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("error listing session cabins: %w", err)
-		}
-
-		for _, r := range rows {
-			result = append(result, toSessionCabinResponse(r))
-		}
+	result := make([]SessionCabinResponse, len(rows))
+	for i, r := range rows {
+		result[i] = toSessionCabinResponse(r)
 	}
 	return result, nil
 }

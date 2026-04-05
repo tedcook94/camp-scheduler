@@ -132,6 +132,46 @@ func (q *Queries) ListSessionAgeGroupCabins(ctx context.Context, arg ListSession
 	return items, nil
 }
 
+const listSessionAgeGroupCabinsBySession = `-- name: ListSessionAgeGroupCabinsBySession :many
+SELECT sagc.id, sagc.camp_id, sagc.session_age_group_id, sagc.cabin_id, sagc.group_size, sagc.required_counselors
+FROM session_age_group_cabins sagc
+JOIN session_age_groups sag ON sag.id = sagc.session_age_group_id
+WHERE sag.session_id = $1 AND sagc.camp_id = $2
+ORDER BY sagc.cabin_id
+`
+
+type ListSessionAgeGroupCabinsBySessionParams struct {
+	SessionID pgtype.UUID
+	CampID    pgtype.UUID
+}
+
+func (q *Queries) ListSessionAgeGroupCabinsBySession(ctx context.Context, arg ListSessionAgeGroupCabinsBySessionParams) ([]SessionAgeGroupCabin, error) {
+	rows, err := q.db.Query(ctx, listSessionAgeGroupCabinsBySession, arg.SessionID, arg.CampID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SessionAgeGroupCabin
+	for rows.Next() {
+		var i SessionAgeGroupCabin
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.SessionAgeGroupID,
+			&i.CabinID,
+			&i.GroupSize,
+			&i.RequiredCounselors,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSessionCabins = `-- name: ListSessionCabins :many
 SELECT
     c.id,

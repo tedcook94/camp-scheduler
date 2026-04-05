@@ -16,6 +16,13 @@ FROM session_age_group_cabins
 WHERE session_age_group_id = $1 AND camp_id = $2
 ORDER BY cabin_id;
 
+-- name: ListSessionAgeGroupCabinsBySession :many
+SELECT sagc.id, sagc.camp_id, sagc.session_age_group_id, sagc.cabin_id, sagc.group_size, sagc.required_counselors
+FROM session_age_group_cabins sagc
+JOIN session_age_groups sag ON sag.id = sagc.session_age_group_id
+WHERE sag.session_id = $1 AND sagc.camp_id = $2
+ORDER BY sagc.cabin_id;
+
 -- name: GetSessionAgeGroupCabin :one
 SELECT sagc.id, sagc.camp_id, sagc.session_age_group_id, sagc.cabin_id, sagc.group_size, sagc.required_counselors
 FROM session_age_group_cabins sagc

@@ -27,7 +27,7 @@ func (svc *Service) List(ctx context.Context, campID string) ([]CounselorRespons
 
 	counselors, err := svc.queries.ListCounselors(ctx, uid)
 	if err != nil {
-		return nil, fmt.Errorf("listing counselors: %w", err)
+		return nil, fmt.Errorf("error listing counselors: %w", err)
 	}
 
 	result := make([]CounselorResponse, len(counselors))
@@ -53,7 +53,7 @@ func (svc *Service) GetByID(ctx context.Context, campID, id string) (CounselorRe
 		CampID: campUUID,
 	})
 	if err != nil {
-		return CounselorResponse{}, fmt.Errorf("getting counselor %s: %w", id, err)
+		return CounselorResponse{}, fmt.Errorf("error getting counselor %s: %w", id, err)
 	}
 
 	return toCounselorResponse(counselor), nil
@@ -71,7 +71,7 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCounsel
 		JuniorCounselor: req.JuniorCounselor,
 	})
 	if err != nil {
-		return CounselorResponse{}, fmt.Errorf("creating counselor: %w", err)
+		return CounselorResponse{}, fmt.Errorf("error creating counselor: %w", err)
 	}
 
 	return toCounselorResponse(counselor), nil
@@ -96,7 +96,7 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCou
 		CounselorEnabled: req.Enabled,
 	})
 	if err != nil {
-		return CounselorResponse{}, fmt.Errorf("updating counselor %s: %w", id, err)
+		return CounselorResponse{}, fmt.Errorf("error updating counselor %s: %w", id, err)
 	}
 
 	return toCounselorResponse(counselor), nil
@@ -118,7 +118,7 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 		CampID: campUUID,
 	})
 	if err != nil {
-		return fmt.Errorf("deleting counselor %s: %w", id, err)
+		return fmt.Errorf("error deleting counselor %s: %w", id, err)
 	}
 	if rows == 0 {
 		return ErrNotFound

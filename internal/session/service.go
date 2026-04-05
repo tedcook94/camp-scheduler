@@ -27,7 +27,7 @@ func (svc *Service) List(ctx context.Context, campID string) ([]SessionResponse,
 
 	sessions, err := svc.queries.ListSessions(ctx, uid)
 	if err != nil {
-		return nil, fmt.Errorf("listing sessions: %w", err)
+		return nil, fmt.Errorf("error listing sessions: %w", err)
 	}
 
 	result := make([]SessionResponse, len(sessions))
@@ -53,7 +53,7 @@ func (svc *Service) GetByID(ctx context.Context, campID, id string) (SessionResp
 		CampID: campUUID,
 	})
 	if err != nil {
-		return SessionResponse{}, fmt.Errorf("getting session %s: %w", id, err)
+		return SessionResponse{}, fmt.Errorf("error getting session %s: %w", id, err)
 	}
 
 	return toSessionResponse(session), nil
@@ -82,7 +82,7 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateSession
 		PreviousSession: prevUUID,
 	})
 	if err != nil {
-		return SessionResponse{}, fmt.Errorf("creating session: %w", err)
+		return SessionResponse{}, fmt.Errorf("error creating session: %w", err)
 	}
 
 	return toSessionResponse(session), nil
@@ -117,7 +117,7 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateSes
 		PreviousSession: prevUUID,
 	})
 	if err != nil {
-		return SessionResponse{}, fmt.Errorf("updating session %s: %w", id, err)
+		return SessionResponse{}, fmt.Errorf("error updating session %s: %w", id, err)
 	}
 
 	return toSessionResponse(session), nil
@@ -139,7 +139,7 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 		CampID: campUUID,
 	})
 	if err != nil {
-		return fmt.Errorf("deleting session %s: %w", id, err)
+		return fmt.Errorf("error deleting session %s: %w", id, err)
 	}
 	if rows == 0 {
 		return ErrNotFound

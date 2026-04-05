@@ -22,7 +22,7 @@ func NewService(queries *db.Queries) *Service {
 func (svc *Service) List(ctx context.Context) ([]CampResponse, error) {
 	camps, err := svc.queries.ListCamps(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("listing camps: %w", err)
+		return nil, fmt.Errorf("error listing camps: %w", err)
 	}
 
 	result := make([]CampResponse, len(camps))
@@ -40,7 +40,7 @@ func (svc *Service) GetByID(ctx context.Context, id string) (CampResponse, error
 
 	camp, err := svc.queries.GetCamp(ctx, uid)
 	if err != nil {
-		return CampResponse{}, fmt.Errorf("getting camp %s: %w", id, err)
+		return CampResponse{}, fmt.Errorf("error getting camp %s: %w", id, err)
 	}
 
 	return toCampResponse(camp), nil
@@ -52,7 +52,7 @@ func (svc *Service) Create(ctx context.Context, req CreateCampRequest) (CampResp
 		CampLocation: api.ToPgText(req.Location),
 	})
 	if err != nil {
-		return CampResponse{}, fmt.Errorf("creating camp: %w", err)
+		return CampResponse{}, fmt.Errorf("error creating camp: %w", err)
 	}
 
 	return toCampResponse(camp), nil
@@ -71,7 +71,7 @@ func (svc *Service) Update(ctx context.Context, id string, req UpdateCampRequest
 		CampEnabled:  req.Enabled,
 	})
 	if err != nil {
-		return CampResponse{}, fmt.Errorf("updating camp %s: %w", id, err)
+		return CampResponse{}, fmt.Errorf("error updating camp %s: %w", id, err)
 	}
 
 	return toCampResponse(camp), nil
@@ -85,7 +85,7 @@ func (svc *Service) Delete(ctx context.Context, id string) error {
 
 	rows, err := svc.queries.DeleteCamp(ctx, uid)
 	if err != nil {
-		return fmt.Errorf("deleting camp %s: %w", id, err)
+		return fmt.Errorf("error deleting camp %s: %w", id, err)
 	}
 	if rows == 0 {
 		return ErrNotFound

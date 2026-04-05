@@ -22,7 +22,9 @@ a constraint satisfaction solver. See `README.md` for the full project plan.
   algorithms, and non-obvious "why" decisions. Do not add comments that restate
   what the code does -- code should be self-documenting through naming.
 - **Error handling:** Use stdlib error wrapping (`fmt.Errorf` with `%w`). No
-  third-party error libraries.
+  third-party error libraries. Error format strings should start with "error"
+  (e.g., `fmt.Errorf("error listing camps: %w", err)`), matching the logging
+  convention.
 - **Naming:** Follow Go conventions. Exported names get brief doc comments only
   when the name alone isn't sufficient.
 - **Logging:** Use `log/slog` with the `slog.With()` chaining style for

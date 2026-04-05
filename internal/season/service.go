@@ -27,7 +27,7 @@ func (svc *Service) List(ctx context.Context, campID string) ([]SeasonResponse, 
 
 	seasons, err := svc.queries.ListSeasons(ctx, uid)
 	if err != nil {
-		return nil, fmt.Errorf("listing seasons: %w", err)
+		return nil, fmt.Errorf("error listing seasons: %w", err)
 	}
 
 	result := make([]SeasonResponse, len(seasons))
@@ -53,7 +53,7 @@ func (svc *Service) GetByID(ctx context.Context, campID, id string) (SeasonRespo
 		CampID: campUUID,
 	})
 	if err != nil {
-		return SeasonResponse{}, fmt.Errorf("getting season %s: %w", id, err)
+		return SeasonResponse{}, fmt.Errorf("error getting season %s: %w", id, err)
 	}
 
 	return toSeasonResponse(season), nil
@@ -70,7 +70,7 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateSeasonR
 		SeasonName: req.Name,
 	})
 	if err != nil {
-		return SeasonResponse{}, fmt.Errorf("creating season: %w", err)
+		return SeasonResponse{}, fmt.Errorf("error creating season: %w", err)
 	}
 
 	return toSeasonResponse(season), nil
@@ -93,7 +93,7 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateSea
 		SeasonName: req.Name,
 	})
 	if err != nil {
-		return SeasonResponse{}, fmt.Errorf("updating season %s: %w", id, err)
+		return SeasonResponse{}, fmt.Errorf("error updating season %s: %w", id, err)
 	}
 
 	return toSeasonResponse(season), nil
@@ -115,7 +115,7 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 		CampID: campUUID,
 	})
 	if err != nil {
-		return fmt.Errorf("deleting season %s: %w", id, err)
+		return fmt.Errorf("error deleting season %s: %w", id, err)
 	}
 	if rows == 0 {
 		return ErrNotFound

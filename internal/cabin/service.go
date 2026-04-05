@@ -27,7 +27,7 @@ func (svc *Service) List(ctx context.Context, campID string) ([]CabinResponse, e
 
 	cabins, err := svc.queries.ListCabins(ctx, uid)
 	if err != nil {
-		return nil, fmt.Errorf("listing cabins: %w", err)
+		return nil, fmt.Errorf("error listing cabins: %w", err)
 	}
 
 	result := make([]CabinResponse, len(cabins))
@@ -53,7 +53,7 @@ func (svc *Service) GetByID(ctx context.Context, campID, id string) (CabinRespon
 		CampID: campUUID,
 	})
 	if err != nil {
-		return CabinResponse{}, fmt.Errorf("getting cabin %s: %w", id, err)
+		return CabinResponse{}, fmt.Errorf("error getting cabin %s: %w", id, err)
 	}
 
 	return toCabinResponse(cabin), nil
@@ -76,7 +76,7 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCabinRe
 		CabinName:  req.Name,
 	})
 	if err != nil {
-		return CabinResponse{}, fmt.Errorf("creating cabin: %w", err)
+		return CabinResponse{}, fmt.Errorf("error creating cabin: %w", err)
 	}
 
 	return toCabinResponse(cabin), nil
@@ -105,7 +105,7 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCab
 		CabinName:  req.Name,
 	})
 	if err != nil {
-		return CabinResponse{}, fmt.Errorf("updating cabin %s: %w", id, err)
+		return CabinResponse{}, fmt.Errorf("error updating cabin %s: %w", id, err)
 	}
 
 	return toCabinResponse(cabin), nil
@@ -127,7 +127,7 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 		CampID: campUUID,
 	})
 	if err != nil {
-		return fmt.Errorf("deleting cabin %s: %w", id, err)
+		return fmt.Errorf("error deleting cabin %s: %w", id, err)
 	}
 	if rows == 0 {
 		return ErrNotFound

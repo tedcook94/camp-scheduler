@@ -27,7 +27,7 @@ func StoreSolutions(ctx context.Context, pool *pgxpool.Pool, campID, sessionID s
 
 	tx, err := pool.Begin(ctx)
 	if err != nil {
-		return "", fmt.Errorf("beginning transaction: %w", err)
+		return "", fmt.Errorf("error beginning transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
@@ -40,17 +40,17 @@ func StoreSolutions(ctx context.Context, pool *pgxpool.Pool, campID, sessionID s
 		Status:    "completed",
 	})
 	if err != nil {
-		return "", fmt.Errorf("creating assignment run: %w", err)
+		return "", fmt.Errorf("error creating assignment run: %w", err)
 	}
 
 	for i, solution := range solutions {
 		if err := storeSolution(ctx, qtx, campUUID, run.ID, i, snapshot, solution); err != nil {
-			return "", fmt.Errorf("storing solution %d: %w", i, err)
+			return "", fmt.Errorf("error storing solution %d: %w", i, err)
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return "", fmt.Errorf("committing transaction: %w", err)
+		return "", fmt.Errorf("error committing transaction: %w", err)
 	}
 
 	return api.UUIDToString(run.ID), nil
@@ -59,7 +59,7 @@ func StoreSolutions(ctx context.Context, pool *pgxpool.Pool, campID, sessionID s
 func storeSolution(ctx context.Context, qtx *db.Queries, campID, runID pgtype.UUID, index int, snapshot SessionSnapshot, solution Solution) error {
 	breakdownJSON, err := json.Marshal(solution.Score.Breakdown)
 	if err != nil {
-		return fmt.Errorf("marshaling score breakdown: %w", err)
+		return fmt.Errorf("error marshaling score breakdown: %w", err)
 	}
 
 	sol, err := qtx.CreateCounselorCabinSolution(ctx, db.CreateCounselorCabinSolutionParams{
@@ -70,7 +70,7 @@ func storeSolution(ctx context.Context, qtx *db.Queries, campID, runID pgtype.UU
 		ScoreBreakdown:  breakdownJSON,
 	})
 	if err != nil {
-		return fmt.Errorf("creating solution row: %w", err)
+		return fmt.Errorf("error creating solution row: %w", err)
 	}
 
 	explanation := Explain(snapshot, solution)
@@ -105,7 +105,7 @@ func storeAssignments(ctx context.Context, qtx *db.Queries, campID, solutionID p
 			CabinID:     cabinUUID,
 		})
 		if err != nil {
-			return fmt.Errorf("creating assignment for counselor %s: %w", ae.CounselorID, err)
+			return fmt.Errorf("error creating assignment for counselor %s: %w", ae.CounselorID, err)
 		}
 	}
 	return nil
@@ -127,7 +127,7 @@ func storeExplanations(ctx context.Context, qtx *db.Queries, campID, solutionID 
 				Message:         reason,
 			})
 			if err != nil {
-				return fmt.Errorf("creating reason explanation for counselor %s: %w", ae.CounselorID, err)
+				return fmt.Errorf("error creating reason explanation for counselor %s: %w", ae.CounselorID, err)
 			}
 		}
 	}
@@ -147,7 +147,7 @@ func storeExplanations(ctx context.Context, qtx *db.Queries, campID, solutionID 
 			Message:         up.Message,
 		})
 		if err != nil {
-			return fmt.Errorf("creating unmet preference explanation for counselor %s: %w", up.CounselorID, err)
+			return fmt.Errorf("error creating unmet preference explanation for counselor %s: %w", up.CounselorID, err)
 		}
 	}
 

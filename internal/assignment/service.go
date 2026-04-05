@@ -32,7 +32,7 @@ func NewService(queries *db.Queries, pool *pgxpool.Pool) *Service {
 func (svc *Service) TriggerRun(ctx context.Context, campID, sessionID string, cfg solver.SolverConfig) (RunDetailResponse, error) {
 	snapshot, err := solver.BuildSnapshot(ctx, svc.queries, campID, sessionID)
 	if err != nil {
-		return RunDetailResponse{}, fmt.Errorf("building snapshot: %w", err)
+		return RunDetailResponse{}, fmt.Errorf("error building snapshot: %w", err)
 	}
 
 	solutions := solver.Solve(snapshot, cfg)
@@ -42,7 +42,7 @@ func (svc *Service) TriggerRun(ctx context.Context, campID, sessionID string, cf
 
 	runID, err := solver.StoreSolutions(ctx, svc.pool, campID, sessionID, snapshot, solutions)
 	if err != nil {
-		return RunDetailResponse{}, fmt.Errorf("storing solutions: %w", err)
+		return RunDetailResponse{}, fmt.Errorf("error storing solutions: %w", err)
 	}
 
 	return svc.GetRun(ctx, campID, runID)
@@ -64,7 +64,7 @@ func (svc *Service) ListRuns(ctx context.Context, campID, sessionID string) ([]R
 		CampID:    campUUID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("listing assignment runs: %w", err)
+		return nil, fmt.Errorf("error listing assignment runs: %w", err)
 	}
 
 	result := make([]RunResponse, len(rows))
@@ -93,7 +93,7 @@ func (svc *Service) GetRun(ctx context.Context, campID, runID string) (RunDetail
 		if errors.Is(err, pgx.ErrNoRows) {
 			return RunDetailResponse{}, ErrRunNotFound
 		}
-		return RunDetailResponse{}, fmt.Errorf("getting assignment run %s: %w", runID, err)
+		return RunDetailResponse{}, fmt.Errorf("error getting assignment run %s: %w", runID, err)
 	}
 
 	solRows, err := svc.queries.ListCounselorCabinSolutionsByRun(ctx, db.ListCounselorCabinSolutionsByRunParams{
@@ -101,7 +101,7 @@ func (svc *Service) GetRun(ctx context.Context, campID, runID string) (RunDetail
 		CampID:          campUUID,
 	})
 	if err != nil {
-		return RunDetailResponse{}, fmt.Errorf("listing solutions for run %s: %w", runID, err)
+		return RunDetailResponse{}, fmt.Errorf("error listing solutions for run %s: %w", runID, err)
 	}
 
 	solutions := make([]SolutionSummaryResponse, len(solRows))
@@ -131,7 +131,7 @@ func (svc *Service) DeleteRun(ctx context.Context, campID, runID string) error {
 		CampID: campUUID,
 	})
 	if err != nil {
-		return fmt.Errorf("deleting assignment run %s: %w", runID, err)
+		return fmt.Errorf("error deleting assignment run %s: %w", runID, err)
 	}
 	if rows == 0 {
 		return ErrRunNotFound
@@ -159,7 +159,7 @@ func (svc *Service) GetSolution(ctx context.Context, campID, solutionID string) 
 		if errors.Is(err, pgx.ErrNoRows) {
 			return SolutionDetailResponse{}, ErrSolutionNotFound
 		}
-		return SolutionDetailResponse{}, fmt.Errorf("getting solution %s: %w", solutionID, err)
+		return SolutionDetailResponse{}, fmt.Errorf("error getting solution %s: %w", solutionID, err)
 	}
 
 	assignments, err := svc.queries.ListCounselorCabinAssignmentsBySolution(ctx, db.ListCounselorCabinAssignmentsBySolutionParams{
@@ -167,7 +167,7 @@ func (svc *Service) GetSolution(ctx context.Context, campID, solutionID string) 
 		CampID:     campUUID,
 	})
 	if err != nil {
-		return SolutionDetailResponse{}, fmt.Errorf("listing assignments for solution %s: %w", solutionID, err)
+		return SolutionDetailResponse{}, fmt.Errorf("error listing assignments for solution %s: %w", solutionID, err)
 	}
 
 	explanations, err := svc.queries.ListCounselorCabinExplanationsBySolution(ctx, db.ListCounselorCabinExplanationsBySolutionParams{
@@ -175,7 +175,7 @@ func (svc *Service) GetSolution(ctx context.Context, campID, solutionID string) 
 		CampID:     campUUID,
 	})
 	if err != nil {
-		return SolutionDetailResponse{}, fmt.Errorf("listing explanations for solution %s: %w", solutionID, err)
+		return SolutionDetailResponse{}, fmt.Errorf("error listing explanations for solution %s: %w", solutionID, err)
 	}
 
 	assignmentResponses := make([]AssignmentResponse, len(assignments))
@@ -220,7 +220,7 @@ func (svc *Service) SelectSolution(ctx context.Context, campID, runID, solutionI
 		if errors.Is(err, pgx.ErrNoRows) {
 			return RunResponse{}, ErrSolutionNotFound
 		}
-		return RunResponse{}, fmt.Errorf("getting solution %s: %w", solutionID, err)
+		return RunResponse{}, fmt.Errorf("error getting solution %s: %w", solutionID, err)
 	}
 
 	if api.UUIDToString(sol.AssignmentRunID) != runID {
@@ -236,7 +236,7 @@ func (svc *Service) SelectSolution(ctx context.Context, campID, runID, solutionI
 		if errors.Is(err, pgx.ErrNoRows) {
 			return RunResponse{}, ErrRunNotFound
 		}
-		return RunResponse{}, fmt.Errorf("selecting solution %s for run %s: %w", solutionID, runID, err)
+		return RunResponse{}, fmt.Errorf("error selecting solution %s for run %s: %w", solutionID, runID, err)
 	}
 
 	return toRunResponseFromSelect(run), nil

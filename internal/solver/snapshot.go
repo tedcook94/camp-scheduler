@@ -26,7 +26,7 @@ func BuildSnapshot(ctx context.Context, queries *db.Queries, campID, sessionID s
 		CampID: campUUID,
 	})
 	if err != nil {
-		return SessionSnapshot{}, fmt.Errorf("getting session: %w", err)
+		return SessionSnapshot{}, fmt.Errorf("error getting session: %w", err)
 	}
 
 	cabins, err := loadCabins(ctx, queries, sessionUUID, campUUID)
@@ -70,7 +70,7 @@ func loadCabins(ctx context.Context, queries *db.Queries, sessionID, campID pgty
 		CampID:    campID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("listing session cabins: %w", err)
+		return nil, fmt.Errorf("error listing session cabins: %w", err)
 	}
 
 	cabins := make([]Cabin, len(rows))
@@ -92,7 +92,7 @@ func loadCabins(ctx context.Context, queries *db.Queries, sessionID, campID pgty
 func loadCounselors(ctx context.Context, queries *db.Queries, campID pgtype.UUID) ([]Counselor, error) {
 	rows, err := queries.ListEnabledCounselors(ctx, campID)
 	if err != nil {
-		return nil, fmt.Errorf("listing enabled counselors: %w", err)
+		return nil, fmt.Errorf("error listing enabled counselors: %w", err)
 	}
 
 	counselors := make([]Counselor, len(rows))
@@ -112,7 +112,7 @@ func loadAgeGroupPreferences(ctx context.Context, queries *db.Queries, sessionID
 		CampID:    campID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("listing session age group preferences: %w", err)
+		return nil, fmt.Errorf("error listing session age group preferences: %w", err)
 	}
 
 	prefs := make(map[string][]RankedPreference)
@@ -132,7 +132,7 @@ func loadCocounselorPreferences(ctx context.Context, queries *db.Queries, sessio
 		CampID:    campID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("listing session cocounselor preferences: %w", err)
+		return nil, fmt.Errorf("error listing session cocounselor preferences: %w", err)
 	}
 
 	prefs := make(map[string][]RankedPreference)
@@ -156,7 +156,7 @@ func loadPreviousPlacements(ctx context.Context, queries *db.Queries, session db
 		CampID:    campID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("listing previous session history: %w", err)
+		return nil, fmt.Errorf("error listing previous session history: %w", err)
 	}
 
 	if len(rows) == 0 {

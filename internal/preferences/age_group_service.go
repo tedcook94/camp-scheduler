@@ -41,7 +41,7 @@ func (svc *AgeGroupService) List(ctx context.Context, campID, sessionID, counsel
 		CampID:      campUUID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("listing age group preferences: %w", err)
+		return nil, fmt.Errorf("error listing age group preferences: %w", err)
 	}
 
 	result := make([]AgeGroupPreferenceResponse, len(prefs))
@@ -67,7 +67,7 @@ func (svc *AgeGroupService) GetByID(ctx context.Context, campID, id string) (Age
 		CampID: campUUID,
 	})
 	if err != nil {
-		return AgeGroupPreferenceResponse{}, fmt.Errorf("getting age group preference %s: %w", id, err)
+		return AgeGroupPreferenceResponse{}, fmt.Errorf("error getting age group preference %s: %w", id, err)
 	}
 
 	return toAgeGroupPreferenceResponse(pref), nil
@@ -102,7 +102,7 @@ func (svc *AgeGroupService) Create(ctx context.Context, campID, sessionID, couns
 		Rank:        req.Rank,
 	})
 	if err != nil {
-		return AgeGroupPreferenceResponse{}, fmt.Errorf("creating age group preference: %w", err)
+		return AgeGroupPreferenceResponse{}, fmt.Errorf("error creating age group preference: %w", err)
 	}
 
 	return toAgeGroupPreferenceResponse(pref), nil
@@ -131,7 +131,7 @@ func (svc *AgeGroupService) Update(ctx context.Context, campID, id string, req U
 		Rank:       req.Rank,
 	})
 	if err != nil {
-		return AgeGroupPreferenceResponse{}, fmt.Errorf("updating age group preference %s: %w", id, err)
+		return AgeGroupPreferenceResponse{}, fmt.Errorf("error updating age group preference %s: %w", id, err)
 	}
 
 	return toAgeGroupPreferenceResponse(pref), nil
@@ -153,7 +153,7 @@ func (svc *AgeGroupService) Delete(ctx context.Context, campID, id string) error
 		CampID: campUUID,
 	})
 	if err != nil {
-		return fmt.Errorf("deleting age group preference %s: %w", id, err)
+		return fmt.Errorf("error deleting age group preference %s: %w", id, err)
 	}
 	if rows == 0 {
 		return ErrAgeGroupPreferenceNotFound

@@ -27,7 +27,7 @@ func (svc *Service) List(ctx context.Context, campID string) ([]AgeGroupResponse
 
 	groups, err := svc.queries.ListAgeGroups(ctx, uid)
 	if err != nil {
-		return nil, fmt.Errorf("listing age groups: %w", err)
+		return nil, fmt.Errorf("error listing age groups: %w", err)
 	}
 
 	result := make([]AgeGroupResponse, len(groups))
@@ -53,7 +53,7 @@ func (svc *Service) GetByID(ctx context.Context, campID, id string) (AgeGroupRes
 		CampID: campUUID,
 	})
 	if err != nil {
-		return AgeGroupResponse{}, fmt.Errorf("getting age group %s: %w", id, err)
+		return AgeGroupResponse{}, fmt.Errorf("error getting age group %s: %w", id, err)
 	}
 
 	return toAgeGroupResponse(group), nil
@@ -70,7 +70,7 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateAgeGrou
 		AgeGroupName: req.Name,
 	})
 	if err != nil {
-		return AgeGroupResponse{}, fmt.Errorf("creating age group: %w", err)
+		return AgeGroupResponse{}, fmt.Errorf("error creating age group: %w", err)
 	}
 
 	return toAgeGroupResponse(group), nil
@@ -93,7 +93,7 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateAge
 		AgeGroupName: req.Name,
 	})
 	if err != nil {
-		return AgeGroupResponse{}, fmt.Errorf("updating age group %s: %w", id, err)
+		return AgeGroupResponse{}, fmt.Errorf("error updating age group %s: %w", id, err)
 	}
 
 	return toAgeGroupResponse(group), nil
@@ -115,7 +115,7 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 		CampID: campUUID,
 	})
 	if err != nil {
-		return fmt.Errorf("deleting age group %s: %w", id, err)
+		return fmt.Errorf("error deleting age group %s: %w", id, err)
 	}
 	if rows == 0 {
 		return ErrNotFound

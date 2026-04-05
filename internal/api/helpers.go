@@ -16,7 +16,7 @@ func IsFKViolation(err error) bool {
 func ParseUUID(s string) (pgtype.UUID, error) {
 	var uid pgtype.UUID
 	if err := uid.Scan(s); err != nil {
-		return uid, fmt.Errorf("invalid uuid %q: %w", s, err)
+		return uid, fmt.Errorf("error invalid uuid %q: %w", s, err)
 	}
 	return uid, nil
 }

@@ -37,7 +37,7 @@ func (svc *Service) List(ctx context.Context, campID, counselorID string) ([]Ses
 		CampID:      campUUID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("listing session history: %w", err)
+		return nil, fmt.Errorf("error listing session history: %w", err)
 	}
 
 	result := make([]SessionHistoryResponse, len(entries))
@@ -63,7 +63,7 @@ func (svc *Service) GetByID(ctx context.Context, campID, id string) (SessionHist
 		CampID: campUUID,
 	})
 	if err != nil {
-		return SessionHistoryResponse{}, fmt.Errorf("getting session history entry %s: %w", id, err)
+		return SessionHistoryResponse{}, fmt.Errorf("error getting session history entry %s: %w", id, err)
 	}
 
 	return toSessionHistoryResponse(entry), nil
@@ -103,7 +103,7 @@ func (svc *Service) Create(ctx context.Context, campID, counselorID string, req 
 		CabinID:     cabinUUID,
 	})
 	if err != nil {
-		return SessionHistoryResponse{}, fmt.Errorf("creating session history entry: %w", err)
+		return SessionHistoryResponse{}, fmt.Errorf("error creating session history entry: %w", err)
 	}
 
 	return toSessionHistoryResponse(entry), nil
@@ -143,7 +143,7 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateSes
 		CabinID:    cabinUUID,
 	})
 	if err != nil {
-		return SessionHistoryResponse{}, fmt.Errorf("updating session history entry %s: %w", id, err)
+		return SessionHistoryResponse{}, fmt.Errorf("error updating session history entry %s: %w", id, err)
 	}
 
 	return toSessionHistoryResponse(entry), nil
@@ -165,7 +165,7 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 		CampID: campUUID,
 	})
 	if err != nil {
-		return fmt.Errorf("deleting session history entry %s: %w", id, err)
+		return fmt.Errorf("error deleting session history entry %s: %w", id, err)
 	}
 	if rows == 0 {
 		return ErrSessionHistoryNotFound
@@ -196,7 +196,7 @@ func (svc *Service) GetHistory(ctx context.Context, campID, counselorID string, 
 		SeasonID:    seasonUUID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("getting counselor history summary: %w", err)
+		return nil, fmt.Errorf("error getting counselor history summary: %w", err)
 	}
 
 	result := make([]HistorySummaryEntry, len(rows))
@@ -219,7 +219,7 @@ func (svc *Service) resolveSeasonID(ctx context.Context, campUUID pgtype.UUID, s
 
 	seasons, err := svc.queries.ListSeasons(ctx, campUUID)
 	if err != nil {
-		return pgtype.UUID{}, fmt.Errorf("listing seasons to resolve default: %w", err)
+		return pgtype.UUID{}, fmt.Errorf("error listing seasons to resolve default: %w", err)
 	}
 	if len(seasons) == 0 {
 		return pgtype.UUID{}, nil

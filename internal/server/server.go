@@ -35,7 +35,7 @@ func New(cfg config.Config) (*Server, error) {
 
 	pool, err := initDB(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("connecting to database: %w", err)
+		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
 
 	s := &Server{
@@ -133,17 +133,17 @@ func initDB(cfg config.Config) (*pgxpool.Pool, error) {
 
 	poolCfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-		return nil, fmt.Errorf("parsing database config: %w", err)
+		return nil, fmt.Errorf("error parsing database config: %w", err)
 	}
 
 	pool, err := pgxpool.NewWithConfig(context.Background(), poolCfg)
 	if err != nil {
-		return nil, fmt.Errorf("creating connection pool: %w", err)
+		return nil, fmt.Errorf("error creating connection pool: %w", err)
 	}
 
 	if err := pool.Ping(context.Background()); err != nil {
 		pool.Close()
-		return nil, fmt.Errorf("pinging database: %w", err)
+		return nil, fmt.Errorf("error pinging database: %w", err)
 	}
 
 	slog.

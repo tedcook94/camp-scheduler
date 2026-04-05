@@ -41,7 +41,7 @@ func (svc *CocounselorService) List(ctx context.Context, campID, sessionID, coun
 		CampID:      campUUID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("listing co-counselor preferences: %w", err)
+		return nil, fmt.Errorf("error listing co-counselor preferences: %w", err)
 	}
 
 	result := make([]CocounselorPreferenceResponse, len(prefs))
@@ -67,7 +67,7 @@ func (svc *CocounselorService) GetByID(ctx context.Context, campID, id string) (
 		CampID: campUUID,
 	})
 	if err != nil {
-		return CocounselorPreferenceResponse{}, fmt.Errorf("getting co-counselor preference %s: %w", id, err)
+		return CocounselorPreferenceResponse{}, fmt.Errorf("error getting co-counselor preference %s: %w", id, err)
 	}
 
 	return toCocounselorPreferenceResponse(pref), nil
@@ -102,7 +102,7 @@ func (svc *CocounselorService) Create(ctx context.Context, campID, sessionID, co
 		Rank:                 req.Rank,
 	})
 	if err != nil {
-		return CocounselorPreferenceResponse{}, fmt.Errorf("creating co-counselor preference: %w", err)
+		return CocounselorPreferenceResponse{}, fmt.Errorf("error creating co-counselor preference: %w", err)
 	}
 
 	return toCocounselorPreferenceResponse(pref), nil
@@ -131,7 +131,7 @@ func (svc *CocounselorService) Update(ctx context.Context, campID, id string, re
 		Rank:                 req.Rank,
 	})
 	if err != nil {
-		return CocounselorPreferenceResponse{}, fmt.Errorf("updating co-counselor preference %s: %w", id, err)
+		return CocounselorPreferenceResponse{}, fmt.Errorf("error updating co-counselor preference %s: %w", id, err)
 	}
 
 	return toCocounselorPreferenceResponse(pref), nil
@@ -153,7 +153,7 @@ func (svc *CocounselorService) Delete(ctx context.Context, campID, id string) er
 		CampID: campUUID,
 	})
 	if err != nil {
-		return fmt.Errorf("deleting co-counselor preference %s: %w", id, err)
+		return fmt.Errorf("error deleting co-counselor preference %s: %w", id, err)
 	}
 	if rows == 0 {
 		return ErrCocounselorPreferenceNotFound

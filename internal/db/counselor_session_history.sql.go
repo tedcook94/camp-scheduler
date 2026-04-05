@@ -47,16 +47,17 @@ func (q *Queries) CreateCounselorSessionHistoryEntry(ctx context.Context, arg Cr
 
 const deleteCounselorSessionHistoryEntry = `-- name: DeleteCounselorSessionHistoryEntry :execrows
 DELETE FROM counselor_session_history
-WHERE id = $1 AND camp_id = $2
+WHERE id = $1 AND camp_id = $2 AND counselor_id = $3
 `
 
 type DeleteCounselorSessionHistoryEntryParams struct {
-	ID     pgtype.UUID
-	CampID pgtype.UUID
+	ID          pgtype.UUID
+	CampID      pgtype.UUID
+	CounselorID pgtype.UUID
 }
 
 func (q *Queries) DeleteCounselorSessionHistoryEntry(ctx context.Context, arg DeleteCounselorSessionHistoryEntryParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteCounselorSessionHistoryEntry, arg.ID, arg.CampID)
+	result, err := q.db.Exec(ctx, deleteCounselorSessionHistoryEntry, arg.ID, arg.CampID, arg.CounselorID)
 	if err != nil {
 		return 0, err
 	}
@@ -127,16 +128,17 @@ func (q *Queries) GetCounselorHistorySummary(ctx context.Context, arg GetCounsel
 const getCounselorSessionHistoryEntry = `-- name: GetCounselorSessionHistoryEntry :one
 SELECT id, camp_id, counselor_id, session_id, age_group_id, cabin_id
 FROM counselor_session_history
-WHERE id = $1 AND camp_id = $2
+WHERE id = $1 AND camp_id = $2 AND counselor_id = $3
 `
 
 type GetCounselorSessionHistoryEntryParams struct {
-	ID     pgtype.UUID
-	CampID pgtype.UUID
+	ID          pgtype.UUID
+	CampID      pgtype.UUID
+	CounselorID pgtype.UUID
 }
 
 func (q *Queries) GetCounselorSessionHistoryEntry(ctx context.Context, arg GetCounselorSessionHistoryEntryParams) (CounselorSessionHistory, error) {
-	row := q.db.QueryRow(ctx, getCounselorSessionHistoryEntry, arg.ID, arg.CampID)
+	row := q.db.QueryRow(ctx, getCounselorSessionHistoryEntry, arg.ID, arg.CampID, arg.CounselorID)
 	var i CounselorSessionHistory
 	err := row.Scan(
 		&i.ID,
@@ -227,25 +229,27 @@ func (q *Queries) ListSessionHistory(ctx context.Context, arg ListSessionHistory
 
 const updateCounselorSessionHistoryEntry = `-- name: UpdateCounselorSessionHistoryEntry :one
 UPDATE counselor_session_history
-SET session_id = $3,
-    age_group_id = $4,
-    cabin_id = $5
-WHERE id = $1 AND camp_id = $2
+SET session_id = $4,
+    age_group_id = $5,
+    cabin_id = $6
+WHERE id = $1 AND camp_id = $2 AND counselor_id = $3
 RETURNING id, camp_id, counselor_id, session_id, age_group_id, cabin_id
 `
 
 type UpdateCounselorSessionHistoryEntryParams struct {
-	ID         pgtype.UUID
-	CampID     pgtype.UUID
-	SessionID  pgtype.UUID
-	AgeGroupID pgtype.UUID
-	CabinID    pgtype.UUID
+	ID          pgtype.UUID
+	CampID      pgtype.UUID
+	CounselorID pgtype.UUID
+	SessionID   pgtype.UUID
+	AgeGroupID  pgtype.UUID
+	CabinID     pgtype.UUID
 }
 
 func (q *Queries) UpdateCounselorSessionHistoryEntry(ctx context.Context, arg UpdateCounselorSessionHistoryEntryParams) (CounselorSessionHistory, error) {
 	row := q.db.QueryRow(ctx, updateCounselorSessionHistoryEntry,
 		arg.ID,
 		arg.CampID,
+		arg.CounselorID,
 		arg.SessionID,
 		arg.AgeGroupID,
 		arg.CabinID,

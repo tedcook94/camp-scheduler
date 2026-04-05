@@ -101,9 +101,10 @@ func (ctrl *Controller) ListAgeGroups(c *gin.Context) {
 
 func (ctrl *Controller) GetAgeGroup(c *gin.Context) {
 	campID := c.Param("campId")
+	sessionID := c.Param("sessionId")
 	id := c.Param("id")
 
-	group, err := ctrl.svc.GetAgeGroup(c.Request.Context(), campID, id)
+	group, err := ctrl.svc.GetAgeGroup(c.Request.Context(), campID, sessionID, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session age group not found"})
@@ -111,6 +112,7 @@ func (ctrl *Controller) GetAgeGroup(c *gin.Context) {
 		}
 		slog.
 			With("camp_id", campID).
+			With("session_id", sessionID).
 			With("id", id).
 			With("error", err).
 			Error("error getting session age group")
@@ -147,6 +149,7 @@ func (ctrl *Controller) CreateAgeGroup(c *gin.Context) {
 
 func (ctrl *Controller) UpdateAgeGroup(c *gin.Context) {
 	campID := c.Param("campId")
+	sessionID := c.Param("sessionId")
 	id := c.Param("id")
 
 	var req UpdateSessionAgeGroupRequest
@@ -155,7 +158,7 @@ func (ctrl *Controller) UpdateAgeGroup(c *gin.Context) {
 		return
 	}
 
-	group, err := ctrl.svc.UpdateAgeGroup(c.Request.Context(), campID, id, req)
+	group, err := ctrl.svc.UpdateAgeGroup(c.Request.Context(), campID, sessionID, id, req)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session age group not found"})
@@ -163,6 +166,7 @@ func (ctrl *Controller) UpdateAgeGroup(c *gin.Context) {
 		}
 		slog.
 			With("camp_id", campID).
+			With("session_id", sessionID).
 			With("id", id).
 			With("error", err).
 			Error("error updating session age group")
@@ -175,9 +179,10 @@ func (ctrl *Controller) UpdateAgeGroup(c *gin.Context) {
 
 func (ctrl *Controller) DeleteAgeGroup(c *gin.Context) {
 	campID := c.Param("campId")
+	sessionID := c.Param("sessionId")
 	id := c.Param("id")
 
-	err := ctrl.svc.DeleteAgeGroup(c.Request.Context(), campID, id)
+	err := ctrl.svc.DeleteAgeGroup(c.Request.Context(), campID, sessionID, id)
 	if err != nil {
 		if errors.Is(err, ErrAgeGroupNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session age group not found"})
@@ -189,6 +194,7 @@ func (ctrl *Controller) DeleteAgeGroup(c *gin.Context) {
 		}
 		slog.
 			With("camp_id", campID).
+			With("session_id", sessionID).
 			With("id", id).
 			With("error", err).
 			Error("error deleting session age group")
@@ -221,9 +227,10 @@ func (ctrl *Controller) ListCabins(c *gin.Context) {
 
 func (ctrl *Controller) GetCabin(c *gin.Context) {
 	campID := c.Param("campId")
+	sessionID := c.Param("sessionId")
 	id := c.Param("id")
 
-	cabin, err := ctrl.svc.GetCabin(c.Request.Context(), campID, id)
+	cabin, err := ctrl.svc.GetCabin(c.Request.Context(), campID, sessionID, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session cabin not found"})
@@ -231,6 +238,7 @@ func (ctrl *Controller) GetCabin(c *gin.Context) {
 		}
 		slog.
 			With("camp_id", campID).
+			With("session_id", sessionID).
 			With("id", id).
 			With("error", err).
 			Error("error getting session cabin")
@@ -243,6 +251,7 @@ func (ctrl *Controller) GetCabin(c *gin.Context) {
 
 func (ctrl *Controller) CreateCabin(c *gin.Context) {
 	campID := c.Param("campId")
+	sessionID := c.Param("sessionId")
 
 	var req CreateSessionCabinRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -250,10 +259,15 @@ func (ctrl *Controller) CreateCabin(c *gin.Context) {
 		return
 	}
 
-	cabin, err := ctrl.svc.CreateCabin(c.Request.Context(), campID, req)
+	cabin, err := ctrl.svc.CreateCabin(c.Request.Context(), campID, sessionID, req)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "session age group not found for this session"})
+			return
+		}
 		slog.
 			With("camp_id", campID).
+			With("session_id", sessionID).
 			With("error", err).
 			Error("error creating session cabin")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
@@ -265,6 +279,7 @@ func (ctrl *Controller) CreateCabin(c *gin.Context) {
 
 func (ctrl *Controller) UpdateCabin(c *gin.Context) {
 	campID := c.Param("campId")
+	sessionID := c.Param("sessionId")
 	id := c.Param("id")
 
 	var req UpdateSessionCabinRequest
@@ -273,7 +288,7 @@ func (ctrl *Controller) UpdateCabin(c *gin.Context) {
 		return
 	}
 
-	cabin, err := ctrl.svc.UpdateCabin(c.Request.Context(), campID, id, req)
+	cabin, err := ctrl.svc.UpdateCabin(c.Request.Context(), campID, sessionID, id, req)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session cabin not found"})
@@ -281,6 +296,7 @@ func (ctrl *Controller) UpdateCabin(c *gin.Context) {
 		}
 		slog.
 			With("camp_id", campID).
+			With("session_id", sessionID).
 			With("id", id).
 			With("error", err).
 			Error("error updating session cabin")
@@ -293,9 +309,10 @@ func (ctrl *Controller) UpdateCabin(c *gin.Context) {
 
 func (ctrl *Controller) DeleteCabin(c *gin.Context) {
 	campID := c.Param("campId")
+	sessionID := c.Param("sessionId")
 	id := c.Param("id")
 
-	err := ctrl.svc.DeleteCabin(c.Request.Context(), campID, id)
+	err := ctrl.svc.DeleteCabin(c.Request.Context(), campID, sessionID, id)
 	if err != nil {
 		if errors.Is(err, ErrCabinNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session cabin not found"})
@@ -307,6 +324,7 @@ func (ctrl *Controller) DeleteCabin(c *gin.Context) {
 		}
 		slog.
 			With("camp_id", campID).
+			With("session_id", sessionID).
 			With("id", id).
 			With("error", err).
 			Error("error deleting session cabin")

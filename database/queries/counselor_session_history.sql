@@ -7,7 +7,7 @@ ORDER BY session_id;
 -- name: GetCounselorSessionHistoryEntry :one
 SELECT id, camp_id, counselor_id, session_id, age_group_id, cabin_id
 FROM counselor_session_history
-WHERE id = $1 AND camp_id = $2;
+WHERE id = $1 AND camp_id = $2 AND counselor_id = $3;
 
 -- name: CreateCounselorSessionHistoryEntry :one
 INSERT INTO counselor_session_history (camp_id, counselor_id, session_id, age_group_id, cabin_id)
@@ -16,15 +16,15 @@ RETURNING id, camp_id, counselor_id, session_id, age_group_id, cabin_id;
 
 -- name: UpdateCounselorSessionHistoryEntry :one
 UPDATE counselor_session_history
-SET session_id = $3,
-    age_group_id = $4,
-    cabin_id = $5
-WHERE id = $1 AND camp_id = $2
+SET session_id = $4,
+    age_group_id = $5,
+    cabin_id = $6
+WHERE id = $1 AND camp_id = $2 AND counselor_id = $3
 RETURNING id, camp_id, counselor_id, session_id, age_group_id, cabin_id;
 
 -- name: DeleteCounselorSessionHistoryEntry :execrows
 DELETE FROM counselor_session_history
-WHERE id = $1 AND camp_id = $2;
+WHERE id = $1 AND camp_id = $2 AND counselor_id = $3;
 
 -- name: GetCounselorHistorySummary :many
 SELECT

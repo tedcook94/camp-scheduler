@@ -47,8 +47,13 @@ func (svc *Service) List(ctx context.Context, campID, counselorID string) ([]Ses
 	return result, nil
 }
 
-func (svc *Service) GetByID(ctx context.Context, campID, id string) (SessionHistoryResponse, error) {
+func (svc *Service) GetByID(ctx context.Context, campID, counselorID, id string) (SessionHistoryResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return SessionHistoryResponse{}, err
+	}
+
+	counselorUUID, err := api.ParseUUID(counselorID)
 	if err != nil {
 		return SessionHistoryResponse{}, err
 	}
@@ -59,8 +64,9 @@ func (svc *Service) GetByID(ctx context.Context, campID, id string) (SessionHist
 	}
 
 	entry, err := svc.queries.GetCounselorSessionHistoryEntry(ctx, db.GetCounselorSessionHistoryEntryParams{
-		ID:     uid,
-		CampID: campUUID,
+		ID:          uid,
+		CampID:      campUUID,
+		CounselorID: counselorUUID,
 	})
 	if err != nil {
 		return SessionHistoryResponse{}, fmt.Errorf("error getting session history entry %s: %w", id, err)
@@ -109,8 +115,13 @@ func (svc *Service) Create(ctx context.Context, campID, counselorID string, req 
 	return toSessionHistoryResponse(entry), nil
 }
 
-func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateSessionHistoryRequest) (SessionHistoryResponse, error) {
+func (svc *Service) Update(ctx context.Context, campID, counselorID, id string, req UpdateSessionHistoryRequest) (SessionHistoryResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return SessionHistoryResponse{}, err
+	}
+
+	counselorUUID, err := api.ParseUUID(counselorID)
 	if err != nil {
 		return SessionHistoryResponse{}, err
 	}
@@ -136,11 +147,12 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateSes
 	}
 
 	entry, err := svc.queries.UpdateCounselorSessionHistoryEntry(ctx, db.UpdateCounselorSessionHistoryEntryParams{
-		ID:         uid,
-		CampID:     campUUID,
-		SessionID:  sessionUUID,
-		AgeGroupID: ageGroupUUID,
-		CabinID:    cabinUUID,
+		ID:          uid,
+		CampID:      campUUID,
+		CounselorID: counselorUUID,
+		SessionID:   sessionUUID,
+		AgeGroupID:  ageGroupUUID,
+		CabinID:     cabinUUID,
 	})
 	if err != nil {
 		return SessionHistoryResponse{}, fmt.Errorf("error updating session history entry %s: %w", id, err)
@@ -149,8 +161,13 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateSes
 	return toSessionHistoryResponse(entry), nil
 }
 
-func (svc *Service) Delete(ctx context.Context, campID, id string) error {
+func (svc *Service) Delete(ctx context.Context, campID, counselorID, id string) error {
 	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return err
+	}
+
+	counselorUUID, err := api.ParseUUID(counselorID)
 	if err != nil {
 		return err
 	}
@@ -161,8 +178,9 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 	}
 
 	rows, err := svc.queries.DeleteCounselorSessionHistoryEntry(ctx, db.DeleteCounselorSessionHistoryEntryParams{
-		ID:     uid,
-		CampID: campUUID,
+		ID:          uid,
+		CampID:      campUUID,
+		CounselorID: counselorUUID,
 	})
 	if err != nil {
 		return fmt.Errorf("error deleting session history entry %s: %w", id, err)

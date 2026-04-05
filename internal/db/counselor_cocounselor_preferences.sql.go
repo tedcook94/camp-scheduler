@@ -47,16 +47,23 @@ func (q *Queries) CreateCounselorCocounselorPreference(ctx context.Context, arg 
 
 const deleteCounselorCocounselorPreference = `-- name: DeleteCounselorCocounselorPreference :execrows
 DELETE FROM counselor_cocounselor_preferences
-WHERE id = $1 AND camp_id = $2
+WHERE id = $1 AND camp_id = $2 AND session_id = $3 AND counselor_id = $4
 `
 
 type DeleteCounselorCocounselorPreferenceParams struct {
-	ID     pgtype.UUID
-	CampID pgtype.UUID
+	ID          pgtype.UUID
+	CampID      pgtype.UUID
+	SessionID   pgtype.UUID
+	CounselorID pgtype.UUID
 }
 
 func (q *Queries) DeleteCounselorCocounselorPreference(ctx context.Context, arg DeleteCounselorCocounselorPreferenceParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteCounselorCocounselorPreference, arg.ID, arg.CampID)
+	result, err := q.db.Exec(ctx, deleteCounselorCocounselorPreference,
+		arg.ID,
+		arg.CampID,
+		arg.SessionID,
+		arg.CounselorID,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -66,16 +73,23 @@ func (q *Queries) DeleteCounselorCocounselorPreference(ctx context.Context, arg 
 const getCounselorCocounselorPreference = `-- name: GetCounselorCocounselorPreference :one
 SELECT id, camp_id, counselor_id, session_id, preferred_counselor_id, rank
 FROM counselor_cocounselor_preferences
-WHERE id = $1 AND camp_id = $2
+WHERE id = $1 AND camp_id = $2 AND session_id = $3 AND counselor_id = $4
 `
 
 type GetCounselorCocounselorPreferenceParams struct {
-	ID     pgtype.UUID
-	CampID pgtype.UUID
+	ID          pgtype.UUID
+	CampID      pgtype.UUID
+	SessionID   pgtype.UUID
+	CounselorID pgtype.UUID
 }
 
 func (q *Queries) GetCounselorCocounselorPreference(ctx context.Context, arg GetCounselorCocounselorPreferenceParams) (CounselorCocounselorPreference, error) {
-	row := q.db.QueryRow(ctx, getCounselorCocounselorPreference, arg.ID, arg.CampID)
+	row := q.db.QueryRow(ctx, getCounselorCocounselorPreference,
+		arg.ID,
+		arg.CampID,
+		arg.SessionID,
+		arg.CounselorID,
+	)
 	var i CounselorCocounselorPreference
 	err := row.Scan(
 		&i.ID,
@@ -168,15 +182,17 @@ func (q *Queries) ListSessionCocounselorPreferences(ctx context.Context, arg Lis
 
 const updateCounselorCocounselorPreference = `-- name: UpdateCounselorCocounselorPreference :one
 UPDATE counselor_cocounselor_preferences
-SET preferred_counselor_id = $3,
-    rank = $4
-WHERE id = $1 AND camp_id = $2
+SET preferred_counselor_id = $5,
+    rank = $6
+WHERE id = $1 AND camp_id = $2 AND session_id = $3 AND counselor_id = $4
 RETURNING id, camp_id, counselor_id, session_id, preferred_counselor_id, rank
 `
 
 type UpdateCounselorCocounselorPreferenceParams struct {
 	ID                   pgtype.UUID
 	CampID               pgtype.UUID
+	SessionID            pgtype.UUID
+	CounselorID          pgtype.UUID
 	PreferredCounselorID pgtype.UUID
 	Rank                 int32
 }
@@ -185,6 +201,8 @@ func (q *Queries) UpdateCounselorCocounselorPreference(ctx context.Context, arg 
 	row := q.db.QueryRow(ctx, updateCounselorCocounselorPreference,
 		arg.ID,
 		arg.CampID,
+		arg.SessionID,
+		arg.CounselorID,
 		arg.PreferredCounselorID,
 		arg.Rank,
 	)

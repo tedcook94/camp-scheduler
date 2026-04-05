@@ -51,8 +51,18 @@ func (svc *CocounselorService) List(ctx context.Context, campID, sessionID, coun
 	return result, nil
 }
 
-func (svc *CocounselorService) GetByID(ctx context.Context, campID, id string) (CocounselorPreferenceResponse, error) {
+func (svc *CocounselorService) GetByID(ctx context.Context, campID, sessionID, counselorID, id string) (CocounselorPreferenceResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return CocounselorPreferenceResponse{}, err
+	}
+
+	sessionUUID, err := api.ParseUUID(sessionID)
+	if err != nil {
+		return CocounselorPreferenceResponse{}, err
+	}
+
+	counselorUUID, err := api.ParseUUID(counselorID)
 	if err != nil {
 		return CocounselorPreferenceResponse{}, err
 	}
@@ -63,8 +73,10 @@ func (svc *CocounselorService) GetByID(ctx context.Context, campID, id string) (
 	}
 
 	pref, err := svc.queries.GetCounselorCocounselorPreference(ctx, db.GetCounselorCocounselorPreferenceParams{
-		ID:     uid,
-		CampID: campUUID,
+		ID:          uid,
+		CampID:      campUUID,
+		SessionID:   sessionUUID,
+		CounselorID: counselorUUID,
 	})
 	if err != nil {
 		return CocounselorPreferenceResponse{}, fmt.Errorf("error getting co-counselor preference %s: %w", id, err)
@@ -108,8 +120,18 @@ func (svc *CocounselorService) Create(ctx context.Context, campID, sessionID, co
 	return toCocounselorPreferenceResponse(pref), nil
 }
 
-func (svc *CocounselorService) Update(ctx context.Context, campID, id string, req UpdateCocounselorPreferenceRequest) (CocounselorPreferenceResponse, error) {
+func (svc *CocounselorService) Update(ctx context.Context, campID, sessionID, counselorID, id string, req UpdateCocounselorPreferenceRequest) (CocounselorPreferenceResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return CocounselorPreferenceResponse{}, err
+	}
+
+	sessionUUID, err := api.ParseUUID(sessionID)
+	if err != nil {
+		return CocounselorPreferenceResponse{}, err
+	}
+
+	counselorUUID, err := api.ParseUUID(counselorID)
 	if err != nil {
 		return CocounselorPreferenceResponse{}, err
 	}
@@ -127,6 +149,8 @@ func (svc *CocounselorService) Update(ctx context.Context, campID, id string, re
 	pref, err := svc.queries.UpdateCounselorCocounselorPreference(ctx, db.UpdateCounselorCocounselorPreferenceParams{
 		ID:                   uid,
 		CampID:               campUUID,
+		SessionID:            sessionUUID,
+		CounselorID:          counselorUUID,
 		PreferredCounselorID: preferredUUID,
 		Rank:                 req.Rank,
 	})
@@ -137,8 +161,18 @@ func (svc *CocounselorService) Update(ctx context.Context, campID, id string, re
 	return toCocounselorPreferenceResponse(pref), nil
 }
 
-func (svc *CocounselorService) Delete(ctx context.Context, campID, id string) error {
+func (svc *CocounselorService) Delete(ctx context.Context, campID, sessionID, counselorID, id string) error {
 	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return err
+	}
+
+	sessionUUID, err := api.ParseUUID(sessionID)
+	if err != nil {
+		return err
+	}
+
+	counselorUUID, err := api.ParseUUID(counselorID)
 	if err != nil {
 		return err
 	}
@@ -149,8 +183,10 @@ func (svc *CocounselorService) Delete(ctx context.Context, campID, id string) er
 	}
 
 	rows, err := svc.queries.DeleteCounselorCocounselorPreference(ctx, db.DeleteCounselorCocounselorPreferenceParams{
-		ID:     uid,
-		CampID: campUUID,
+		ID:          uid,
+		CampID:      campUUID,
+		SessionID:   sessionUUID,
+		CounselorID: counselorUUID,
 	})
 	if err != nil {
 		return fmt.Errorf("error deleting co-counselor preference %s: %w", id, err)

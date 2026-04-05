@@ -50,8 +50,13 @@ func (svc *Service) ListAgeGroups(ctx context.Context, campID, sessionID string)
 	return result, nil
 }
 
-func (svc *Service) GetAgeGroup(ctx context.Context, campID, id string) (SessionAgeGroupResponse, error) {
+func (svc *Service) GetAgeGroup(ctx context.Context, campID, sessionID, id string) (SessionAgeGroupResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return SessionAgeGroupResponse{}, err
+	}
+
+	sessionUUID, err := api.ParseUUID(sessionID)
 	if err != nil {
 		return SessionAgeGroupResponse{}, err
 	}
@@ -62,8 +67,9 @@ func (svc *Service) GetAgeGroup(ctx context.Context, campID, id string) (Session
 	}
 
 	row, err := svc.queries.GetSessionAgeGroup(ctx, db.GetSessionAgeGroupParams{
-		ID:     uid,
-		CampID: campUUID,
+		ID:        uid,
+		CampID:    campUUID,
+		SessionID: sessionUUID,
 	})
 	if err != nil {
 		return SessionAgeGroupResponse{}, fmt.Errorf("error getting session age group %s: %w", id, err)
@@ -101,8 +107,13 @@ func (svc *Service) CreateAgeGroup(ctx context.Context, campID, sessionID string
 	return toSessionAgeGroupResponse(row), nil
 }
 
-func (svc *Service) UpdateAgeGroup(ctx context.Context, campID, id string, req UpdateSessionAgeGroupRequest) (SessionAgeGroupResponse, error) {
+func (svc *Service) UpdateAgeGroup(ctx context.Context, campID, sessionID, id string, req UpdateSessionAgeGroupRequest) (SessionAgeGroupResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return SessionAgeGroupResponse{}, err
+	}
+
+	sessionUUID, err := api.ParseUUID(sessionID)
 	if err != nil {
 		return SessionAgeGroupResponse{}, err
 	}
@@ -120,6 +131,7 @@ func (svc *Service) UpdateAgeGroup(ctx context.Context, campID, id string, req U
 	row, err := svc.queries.UpdateSessionAgeGroup(ctx, db.UpdateSessionAgeGroupParams{
 		ID:         uid,
 		CampID:     campUUID,
+		SessionID:  sessionUUID,
 		AgeGroupID: ageGroupUUID,
 		GroupSize:  api.ToPgInt4(req.GroupSize),
 	})
@@ -130,8 +142,13 @@ func (svc *Service) UpdateAgeGroup(ctx context.Context, campID, id string, req U
 	return toSessionAgeGroupResponse(row), nil
 }
 
-func (svc *Service) DeleteAgeGroup(ctx context.Context, campID, id string) error {
+func (svc *Service) DeleteAgeGroup(ctx context.Context, campID, sessionID, id string) error {
 	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return err
+	}
+
+	sessionUUID, err := api.ParseUUID(sessionID)
 	if err != nil {
 		return err
 	}
@@ -142,8 +159,9 @@ func (svc *Service) DeleteAgeGroup(ctx context.Context, campID, id string) error
 	}
 
 	rows, err := svc.queries.DeleteSessionAgeGroup(ctx, db.DeleteSessionAgeGroupParams{
-		ID:     uid,
-		CampID: campUUID,
+		ID:        uid,
+		CampID:    campUUID,
+		SessionID: sessionUUID,
 	})
 	if err != nil {
 		return fmt.Errorf("error deleting session age group %s: %w", id, err)
@@ -193,8 +211,13 @@ func (svc *Service) ListCabins(ctx context.Context, campID, sessionID string) ([
 	return result, nil
 }
 
-func (svc *Service) GetCabin(ctx context.Context, campID, id string) (SessionCabinResponse, error) {
+func (svc *Service) GetCabin(ctx context.Context, campID, sessionID, id string) (SessionCabinResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return SessionCabinResponse{}, err
+	}
+
+	sessionUUID, err := api.ParseUUID(sessionID)
 	if err != nil {
 		return SessionCabinResponse{}, err
 	}
@@ -205,8 +228,9 @@ func (svc *Service) GetCabin(ctx context.Context, campID, id string) (SessionCab
 	}
 
 	row, err := svc.queries.GetSessionAgeGroupCabin(ctx, db.GetSessionAgeGroupCabinParams{
-		ID:     uid,
-		CampID: campUUID,
+		ID:        uid,
+		CampID:    campUUID,
+		SessionID: sessionUUID,
 	})
 	if err != nil {
 		return SessionCabinResponse{}, fmt.Errorf("error getting session cabin %s: %w", id, err)
@@ -215,8 +239,13 @@ func (svc *Service) GetCabin(ctx context.Context, campID, id string) (SessionCab
 	return toSessionCabinResponse(row), nil
 }
 
-func (svc *Service) CreateCabin(ctx context.Context, campID string, req CreateSessionCabinRequest) (SessionCabinResponse, error) {
+func (svc *Service) CreateCabin(ctx context.Context, campID, sessionID string, req CreateSessionCabinRequest) (SessionCabinResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return SessionCabinResponse{}, err
+	}
+
+	sessionUUID, err := api.ParseUUID(sessionID)
 	if err != nil {
 		return SessionCabinResponse{}, err
 	}
@@ -224,6 +253,16 @@ func (svc *Service) CreateCabin(ctx context.Context, campID string, req CreateSe
 	sessionAgeGroupUUID, err := api.ParseUUID(req.SessionAgeGroupID)
 	if err != nil {
 		return SessionCabinResponse{}, err
+	}
+
+	// Verify the session age group belongs to this camp and session.
+	_, err = svc.queries.GetSessionAgeGroup(ctx, db.GetSessionAgeGroupParams{
+		ID:        sessionAgeGroupUUID,
+		CampID:    campUUID,
+		SessionID: sessionUUID,
+	})
+	if err != nil {
+		return SessionCabinResponse{}, fmt.Errorf("error validating session age group %s: %w", req.SessionAgeGroupID, err)
 	}
 
 	cabinUUID, err := api.ParseUUID(req.CabinID)
@@ -245,8 +284,13 @@ func (svc *Service) CreateCabin(ctx context.Context, campID string, req CreateSe
 	return toSessionCabinResponse(row), nil
 }
 
-func (svc *Service) UpdateCabin(ctx context.Context, campID, id string, req UpdateSessionCabinRequest) (SessionCabinResponse, error) {
+func (svc *Service) UpdateCabin(ctx context.Context, campID, sessionID, id string, req UpdateSessionCabinRequest) (SessionCabinResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return SessionCabinResponse{}, err
+	}
+
+	sessionUUID, err := api.ParseUUID(sessionID)
 	if err != nil {
 		return SessionCabinResponse{}, err
 	}
@@ -264,6 +308,7 @@ func (svc *Service) UpdateCabin(ctx context.Context, campID, id string, req Upda
 	row, err := svc.queries.UpdateSessionAgeGroupCabin(ctx, db.UpdateSessionAgeGroupCabinParams{
 		ID:                 uid,
 		CampID:             campUUID,
+		SessionID:          sessionUUID,
 		CabinID:            cabinUUID,
 		GroupSize:          api.ToPgInt4(req.GroupSize),
 		RequiredCounselors: api.ToPgInt4(req.RequiredCounselors),
@@ -275,8 +320,13 @@ func (svc *Service) UpdateCabin(ctx context.Context, campID, id string, req Upda
 	return toSessionCabinResponse(row), nil
 }
 
-func (svc *Service) DeleteCabin(ctx context.Context, campID, id string) error {
+func (svc *Service) DeleteCabin(ctx context.Context, campID, sessionID, id string) error {
 	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return err
+	}
+
+	sessionUUID, err := api.ParseUUID(sessionID)
 	if err != nil {
 		return err
 	}
@@ -287,8 +337,9 @@ func (svc *Service) DeleteCabin(ctx context.Context, campID, id string) error {
 	}
 
 	rows, err := svc.queries.DeleteSessionAgeGroupCabin(ctx, db.DeleteSessionAgeGroupCabinParams{
-		ID:     uid,
-		CampID: campUUID,
+		ID:        uid,
+		CampID:    campUUID,
+		SessionID: sessionUUID,
 	})
 	if err != nil {
 		return fmt.Errorf("error deleting session cabin %s: %w", id, err)

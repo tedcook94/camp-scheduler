@@ -69,9 +69,11 @@ func (ctrl *AgeGroupController) List(c *gin.Context) {
 
 func (ctrl *AgeGroupController) Get(c *gin.Context) {
 	campID := c.Param("campId")
+	sessionID := c.Param("sessionId")
+	counselorID := c.Param("counselorId")
 	id := c.Param("id")
 
-	pref, err := ctrl.svc.GetByID(c.Request.Context(), campID, id)
+	pref, err := ctrl.svc.GetByID(c.Request.Context(), campID, sessionID, counselorID, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "age group preference not found"})
@@ -79,6 +81,8 @@ func (ctrl *AgeGroupController) Get(c *gin.Context) {
 		}
 		slog.
 			With("camp_id", campID).
+			With("session_id", sessionID).
+			With("counselor_id", counselorID).
 			With("id", id).
 			With("error", err).
 			Error("error getting age group preference")
@@ -121,6 +125,8 @@ func (ctrl *AgeGroupController) Create(c *gin.Context) {
 
 func (ctrl *AgeGroupController) Update(c *gin.Context) {
 	campID := c.Param("campId")
+	sessionID := c.Param("sessionId")
+	counselorID := c.Param("counselorId")
 	id := c.Param("id")
 
 	var req UpdateAgeGroupPreferenceRequest
@@ -129,7 +135,7 @@ func (ctrl *AgeGroupController) Update(c *gin.Context) {
 		return
 	}
 
-	pref, err := ctrl.svc.Update(c.Request.Context(), campID, id, req)
+	pref, err := ctrl.svc.Update(c.Request.Context(), campID, sessionID, counselorID, id, req)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "age group preference not found"})
@@ -141,6 +147,8 @@ func (ctrl *AgeGroupController) Update(c *gin.Context) {
 		}
 		slog.
 			With("camp_id", campID).
+			With("session_id", sessionID).
+			With("counselor_id", counselorID).
 			With("id", id).
 			With("error", err).
 			Error("error updating age group preference")
@@ -153,9 +161,11 @@ func (ctrl *AgeGroupController) Update(c *gin.Context) {
 
 func (ctrl *AgeGroupController) Delete(c *gin.Context) {
 	campID := c.Param("campId")
+	sessionID := c.Param("sessionId")
+	counselorID := c.Param("counselorId")
 	id := c.Param("id")
 
-	err := ctrl.svc.Delete(c.Request.Context(), campID, id)
+	err := ctrl.svc.Delete(c.Request.Context(), campID, sessionID, counselorID, id)
 	if err != nil {
 		if errors.Is(err, ErrAgeGroupPreferenceNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "age group preference not found"})
@@ -163,6 +173,8 @@ func (ctrl *AgeGroupController) Delete(c *gin.Context) {
 		}
 		slog.
 			With("camp_id", campID).
+			With("session_id", sessionID).
+			With("counselor_id", counselorID).
 			With("id", id).
 			With("error", err).
 			Error("error deleting age group preference")

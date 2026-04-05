@@ -71,9 +71,10 @@ New tables:
 - `counselor_age_group_preferences` -- per-session ranked age group preferences for a counselor
 - `counselor_cocounselor_preferences` -- per-session ranked co-counselor preferences (directional)
 - `counselor_session_history` -- tracks which cabin/age group a counselor was in previously
-- `counselor_cabin_assignments` -- solver output: counselor -> cabin for a session
-- `assignment_runs` -- metadata about each solver run (timestamp, score, status)
-- `assignment_explanations` -- per-assignment reasoning trail
+- `assignment_runs` -- metadata about each solver run (type, status, timestamp); shared across solver types
+- `counselor_cabin_solutions` -- ranked solutions from a counselor-cabin solver run (score + breakdown)
+- `counselor_cabin_assignments` -- solver output: counselor -> cabin within a solution
+- `counselor_cabin_explanations` -- per-assignment reasoning trail and unmet preferences
 
 ### Schema Changes (Phase 2+)
 

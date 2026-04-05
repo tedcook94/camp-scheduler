@@ -81,9 +81,10 @@ func (ctrl *Controller) List(c *gin.Context) {
 
 func (ctrl *Controller) Get(c *gin.Context) {
 	campID := c.Param("campId")
+	counselorID := c.Param("counselorId")
 	id := c.Param("id")
 
-	entry, err := ctrl.svc.GetByID(c.Request.Context(), campID, id)
+	entry, err := ctrl.svc.GetByID(c.Request.Context(), campID, counselorID, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session history entry not found"})
@@ -91,6 +92,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 		}
 		slog.
 			With("camp_id", campID).
+			With("counselor_id", counselorID).
 			With("id", id).
 			With("error", err).
 			Error("error getting session history entry")
@@ -131,6 +133,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 
 func (ctrl *Controller) Update(c *gin.Context) {
 	campID := c.Param("campId")
+	counselorID := c.Param("counselorId")
 	id := c.Param("id")
 
 	var req UpdateSessionHistoryRequest
@@ -139,7 +142,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 		return
 	}
 
-	entry, err := ctrl.svc.Update(c.Request.Context(), campID, id, req)
+	entry, err := ctrl.svc.Update(c.Request.Context(), campID, counselorID, id, req)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session history entry not found"})
@@ -151,6 +154,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 		}
 		slog.
 			With("camp_id", campID).
+			With("counselor_id", counselorID).
 			With("id", id).
 			With("error", err).
 			Error("error updating session history entry")
@@ -163,9 +167,10 @@ func (ctrl *Controller) Update(c *gin.Context) {
 
 func (ctrl *Controller) Delete(c *gin.Context) {
 	campID := c.Param("campId")
+	counselorID := c.Param("counselorId")
 	id := c.Param("id")
 
-	err := ctrl.svc.Delete(c.Request.Context(), campID, id)
+	err := ctrl.svc.Delete(c.Request.Context(), campID, counselorID, id)
 	if err != nil {
 		if errors.Is(err, ErrSessionHistoryNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session history entry not found"})
@@ -173,6 +178,7 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 		}
 		slog.
 			With("camp_id", campID).
+			With("counselor_id", counselorID).
 			With("id", id).
 			With("error", err).
 			Error("error deleting session history entry")

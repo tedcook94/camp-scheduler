@@ -46,17 +46,20 @@ func (q *Queries) CreateSessionAgeGroupCabin(ctx context.Context, arg CreateSess
 }
 
 const deleteSessionAgeGroupCabin = `-- name: DeleteSessionAgeGroupCabin :execrows
-DELETE FROM session_age_group_cabins
-WHERE id = $1 AND camp_id = $2
+DELETE FROM session_age_group_cabins sagc
+USING session_age_groups sag
+WHERE sagc.id = $1 AND sagc.camp_id = $2
+  AND sag.id = sagc.session_age_group_id AND sag.session_id = $3
 `
 
 type DeleteSessionAgeGroupCabinParams struct {
-	ID     pgtype.UUID
-	CampID pgtype.UUID
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	SessionID pgtype.UUID
 }
 
 func (q *Queries) DeleteSessionAgeGroupCabin(ctx context.Context, arg DeleteSessionAgeGroupCabinParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteSessionAgeGroupCabin, arg.ID, arg.CampID)
+	result, err := q.db.Exec(ctx, deleteSessionAgeGroupCabin, arg.ID, arg.CampID, arg.SessionID)
 	if err != nil {
 		return 0, err
 	}
@@ -64,18 +67,20 @@ func (q *Queries) DeleteSessionAgeGroupCabin(ctx context.Context, arg DeleteSess
 }
 
 const getSessionAgeGroupCabin = `-- name: GetSessionAgeGroupCabin :one
-SELECT id, camp_id, session_age_group_id, cabin_id, group_size, required_counselors
-FROM session_age_group_cabins
-WHERE id = $1 AND camp_id = $2
+SELECT sagc.id, sagc.camp_id, sagc.session_age_group_id, sagc.cabin_id, sagc.group_size, sagc.required_counselors
+FROM session_age_group_cabins sagc
+JOIN session_age_groups sag ON sag.id = sagc.session_age_group_id
+WHERE sagc.id = $1 AND sagc.camp_id = $2 AND sag.session_id = $3
 `
 
 type GetSessionAgeGroupCabinParams struct {
-	ID     pgtype.UUID
-	CampID pgtype.UUID
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	SessionID pgtype.UUID
 }
 
 func (q *Queries) GetSessionAgeGroupCabin(ctx context.Context, arg GetSessionAgeGroupCabinParams) (SessionAgeGroupCabin, error) {
-	row := q.db.QueryRow(ctx, getSessionAgeGroupCabin, arg.ID, arg.CampID)
+	row := q.db.QueryRow(ctx, getSessionAgeGroupCabin, arg.ID, arg.CampID, arg.SessionID)
 	var i SessionAgeGroupCabin
 	err := row.Scan(
 		&i.ID,
@@ -178,17 +183,20 @@ func (q *Queries) ListSessionCabins(ctx context.Context, arg ListSessionCabinsPa
 }
 
 const updateSessionAgeGroupCabin = `-- name: UpdateSessionAgeGroupCabin :one
-UPDATE session_age_group_cabins
-SET cabin_id = $3,
-    group_size = $4,
-    required_counselors = $5
-WHERE id = $1 AND camp_id = $2
-RETURNING id, camp_id, session_age_group_id, cabin_id, group_size, required_counselors
+UPDATE session_age_group_cabins sagc
+SET cabin_id = $4,
+    group_size = $5,
+    required_counselors = $6
+FROM session_age_groups sag
+WHERE sagc.id = $1 AND sagc.camp_id = $2
+  AND sag.id = sagc.session_age_group_id AND sag.session_id = $3
+RETURNING sagc.id, sagc.camp_id, sagc.session_age_group_id, sagc.cabin_id, sagc.group_size, sagc.required_counselors
 `
 
 type UpdateSessionAgeGroupCabinParams struct {
 	ID                 pgtype.UUID
 	CampID             pgtype.UUID
+	SessionID          pgtype.UUID
 	CabinID            pgtype.UUID
 	GroupSize          pgtype.Int4
 	RequiredCounselors pgtype.Int4
@@ -198,6 +206,7 @@ func (q *Queries) UpdateSessionAgeGroupCabin(ctx context.Context, arg UpdateSess
 	row := q.db.QueryRow(ctx, updateSessionAgeGroupCabin,
 		arg.ID,
 		arg.CampID,
+		arg.SessionID,
 		arg.CabinID,
 		arg.GroupSize,
 		arg.RequiredCounselors,

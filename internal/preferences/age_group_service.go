@@ -51,8 +51,18 @@ func (svc *AgeGroupService) List(ctx context.Context, campID, sessionID, counsel
 	return result, nil
 }
 
-func (svc *AgeGroupService) GetByID(ctx context.Context, campID, id string) (AgeGroupPreferenceResponse, error) {
+func (svc *AgeGroupService) GetByID(ctx context.Context, campID, sessionID, counselorID, id string) (AgeGroupPreferenceResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return AgeGroupPreferenceResponse{}, err
+	}
+
+	sessionUUID, err := api.ParseUUID(sessionID)
+	if err != nil {
+		return AgeGroupPreferenceResponse{}, err
+	}
+
+	counselorUUID, err := api.ParseUUID(counselorID)
 	if err != nil {
 		return AgeGroupPreferenceResponse{}, err
 	}
@@ -63,8 +73,10 @@ func (svc *AgeGroupService) GetByID(ctx context.Context, campID, id string) (Age
 	}
 
 	pref, err := svc.queries.GetCounselorAgeGroupPreference(ctx, db.GetCounselorAgeGroupPreferenceParams{
-		ID:     uid,
-		CampID: campUUID,
+		ID:          uid,
+		CampID:      campUUID,
+		SessionID:   sessionUUID,
+		CounselorID: counselorUUID,
 	})
 	if err != nil {
 		return AgeGroupPreferenceResponse{}, fmt.Errorf("error getting age group preference %s: %w", id, err)
@@ -108,8 +120,18 @@ func (svc *AgeGroupService) Create(ctx context.Context, campID, sessionID, couns
 	return toAgeGroupPreferenceResponse(pref), nil
 }
 
-func (svc *AgeGroupService) Update(ctx context.Context, campID, id string, req UpdateAgeGroupPreferenceRequest) (AgeGroupPreferenceResponse, error) {
+func (svc *AgeGroupService) Update(ctx context.Context, campID, sessionID, counselorID, id string, req UpdateAgeGroupPreferenceRequest) (AgeGroupPreferenceResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return AgeGroupPreferenceResponse{}, err
+	}
+
+	sessionUUID, err := api.ParseUUID(sessionID)
+	if err != nil {
+		return AgeGroupPreferenceResponse{}, err
+	}
+
+	counselorUUID, err := api.ParseUUID(counselorID)
 	if err != nil {
 		return AgeGroupPreferenceResponse{}, err
 	}
@@ -125,10 +147,12 @@ func (svc *AgeGroupService) Update(ctx context.Context, campID, id string, req U
 	}
 
 	pref, err := svc.queries.UpdateCounselorAgeGroupPreference(ctx, db.UpdateCounselorAgeGroupPreferenceParams{
-		ID:         uid,
-		CampID:     campUUID,
-		AgeGroupID: ageGroupUUID,
-		Rank:       req.Rank,
+		ID:          uid,
+		CampID:      campUUID,
+		SessionID:   sessionUUID,
+		CounselorID: counselorUUID,
+		AgeGroupID:  ageGroupUUID,
+		Rank:        req.Rank,
 	})
 	if err != nil {
 		return AgeGroupPreferenceResponse{}, fmt.Errorf("error updating age group preference %s: %w", id, err)
@@ -137,8 +161,18 @@ func (svc *AgeGroupService) Update(ctx context.Context, campID, id string, req U
 	return toAgeGroupPreferenceResponse(pref), nil
 }
 
-func (svc *AgeGroupService) Delete(ctx context.Context, campID, id string) error {
+func (svc *AgeGroupService) Delete(ctx context.Context, campID, sessionID, counselorID, id string) error {
 	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return err
+	}
+
+	sessionUUID, err := api.ParseUUID(sessionID)
+	if err != nil {
+		return err
+	}
+
+	counselorUUID, err := api.ParseUUID(counselorID)
 	if err != nil {
 		return err
 	}
@@ -149,8 +183,10 @@ func (svc *AgeGroupService) Delete(ctx context.Context, campID, id string) error
 	}
 
 	rows, err := svc.queries.DeleteCounselorAgeGroupPreference(ctx, db.DeleteCounselorAgeGroupPreferenceParams{
-		ID:     uid,
-		CampID: campUUID,
+		ID:          uid,
+		CampID:      campUUID,
+		SessionID:   sessionUUID,
+		CounselorID: counselorUUID,
 	})
 	if err != nil {
 		return fmt.Errorf("error deleting age group preference %s: %w", id, err)

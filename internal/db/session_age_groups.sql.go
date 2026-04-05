@@ -44,16 +44,17 @@ func (q *Queries) CreateSessionAgeGroup(ctx context.Context, arg CreateSessionAg
 
 const deleteSessionAgeGroup = `-- name: DeleteSessionAgeGroup :execrows
 DELETE FROM session_age_groups
-WHERE id = $1 AND camp_id = $2
+WHERE id = $1 AND camp_id = $2 AND session_id = $3
 `
 
 type DeleteSessionAgeGroupParams struct {
-	ID     pgtype.UUID
-	CampID pgtype.UUID
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	SessionID pgtype.UUID
 }
 
 func (q *Queries) DeleteSessionAgeGroup(ctx context.Context, arg DeleteSessionAgeGroupParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteSessionAgeGroup, arg.ID, arg.CampID)
+	result, err := q.db.Exec(ctx, deleteSessionAgeGroup, arg.ID, arg.CampID, arg.SessionID)
 	if err != nil {
 		return 0, err
 	}
@@ -63,16 +64,17 @@ func (q *Queries) DeleteSessionAgeGroup(ctx context.Context, arg DeleteSessionAg
 const getSessionAgeGroup = `-- name: GetSessionAgeGroup :one
 SELECT id, camp_id, session_id, age_group_id, group_size
 FROM session_age_groups
-WHERE id = $1 AND camp_id = $2
+WHERE id = $1 AND camp_id = $2 AND session_id = $3
 `
 
 type GetSessionAgeGroupParams struct {
-	ID     pgtype.UUID
-	CampID pgtype.UUID
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	SessionID pgtype.UUID
 }
 
 func (q *Queries) GetSessionAgeGroup(ctx context.Context, arg GetSessionAgeGroupParams) (SessionAgeGroup, error) {
-	row := q.db.QueryRow(ctx, getSessionAgeGroup, arg.ID, arg.CampID)
+	row := q.db.QueryRow(ctx, getSessionAgeGroup, arg.ID, arg.CampID, arg.SessionID)
 	var i SessionAgeGroup
 	err := row.Scan(
 		&i.ID,
@@ -124,15 +126,16 @@ func (q *Queries) ListSessionAgeGroups(ctx context.Context, arg ListSessionAgeGr
 
 const updateSessionAgeGroup = `-- name: UpdateSessionAgeGroup :one
 UPDATE session_age_groups
-SET age_group_id = $3,
-    group_size = $4
-WHERE id = $1 AND camp_id = $2
+SET age_group_id = $4,
+    group_size = $5
+WHERE id = $1 AND camp_id = $2 AND session_id = $3
 RETURNING id, camp_id, session_id, age_group_id, group_size
 `
 
 type UpdateSessionAgeGroupParams struct {
 	ID         pgtype.UUID
 	CampID     pgtype.UUID
+	SessionID  pgtype.UUID
 	AgeGroupID pgtype.UUID
 	GroupSize  pgtype.Int4
 }
@@ -141,6 +144,7 @@ func (q *Queries) UpdateSessionAgeGroup(ctx context.Context, arg UpdateSessionAg
 	row := q.db.QueryRow(ctx, updateSessionAgeGroup,
 		arg.ID,
 		arg.CampID,
+		arg.SessionID,
 		arg.AgeGroupID,
 		arg.GroupSize,
 	)

@@ -17,6 +17,7 @@ import (
 	"camp-scheduler/internal/preferences"
 	"camp-scheduler/internal/season"
 	"camp-scheduler/internal/session"
+	"camp-scheduler/internal/sessionconfig"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -113,6 +114,10 @@ func (s *Server) routes() {
 	historyService := history.NewService(queries)
 	historyController := history.NewController(historyService)
 	historyController.RegisterRoutes(camps)
+
+	sessionConfigService := sessionconfig.NewService(queries)
+	sessionConfigController := sessionconfig.NewController(sessionConfigService)
+	sessionConfigController.RegisterRoutes(camps)
 
 	assignmentService := assignment.NewService(queries, s.pool)
 	assignmentController := assignment.NewController(assignmentService)

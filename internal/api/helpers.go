@@ -49,3 +49,18 @@ func UUIDToStringPtr(u pgtype.UUID) *string {
 	s := UUIDToString(u)
 	return &s
 }
+
+func ToPgInt4(v *int) pgtype.Int4 {
+	if v == nil {
+		return pgtype.Int4{}
+	}
+	return pgtype.Int4{Int32: int32(*v), Valid: true}
+}
+
+func FromPgInt4(v pgtype.Int4) *int {
+	if !v.Valid {
+		return nil
+	}
+	i := int(v.Int32)
+	return &i
+}

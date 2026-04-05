@@ -1477,6 +1477,311 @@ resources:
     settingRebuildPath: true
     settingFollowRedirects: global
     _type: request
+  - _id: fld_session_age_groups_01
+    parentId: fld_0165b0f3641045a88246e473a724a706
+    modified: 1690680000000
+    created: 1690680000000
+    name: session-age-groups
+    description: ""
+    environment:
+      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/sessions/{{ _['cs-test-session'] }}/age-groups"
+    environmentPropertyOrder:
+      "&":
+        - cs-endpoint
+    metaSortKey: -1690666697500
+    _type: request_group
+  - _id: req_session_age_groups_list
+    parentId: fld_session_age_groups_01
+    modified: 1690680000001
+    created: 1690680000001
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Get
+    description: ""
+    method: GET
+    body: {}
+    parameters: []
+    headers: []
+    authentication: {}
+    metaSortKey: -1690680000005
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_session_age_groups_get
+    parentId: fld_session_age_groups_01
+    modified: 1690680000002
+    created: 1690680000002
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Get By ID
+    description: ""
+    method: GET
+    body: {}
+    parameters:
+      - id: pair_session_age_groups_get_id
+        name: id
+        value: "{{ _['cs-test-session-age-group'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690680000004
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_session_age_groups_create
+    parentId: fld_session_age_groups_01
+    modified: 1690680000003
+    created: 1690680000003
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Create
+    description: ""
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"age_group_id": "{{ _['cs-test-age-group'] }}",
+        	"group_size": 20
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690680000003
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_session_age_groups_update
+    parentId: fld_session_age_groups_01
+    modified: 1690680000004
+    created: 1690680000004
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Update
+    description: ""
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"age_group_id": "{{ _['cs-test-age-group'] }}",
+        	"group_size": 25
+        }
+    parameters:
+      - id: pair_session_age_groups_update_id
+        name: id
+        value: "{{ _['cs-test-session-age-group'] }}"
+        description: ""
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690680000002
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_session_age_groups_delete
+    parentId: fld_session_age_groups_01
+    modified: 1690680000005
+    created: 1690680000005
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Delete
+    description: ""
+    method: DELETE
+    body: {}
+    parameters:
+      - id: pair_session_age_groups_delete_id
+        name: id
+        value: "{{ _['cs-test-session-age-group'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690680000001
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: fld_session_cabins_01
+    parentId: fld_0165b0f3641045a88246e473a724a706
+    modified: 1690681000000
+    created: 1690681000000
+    name: session-cabins
+    description: ""
+    environment:
+      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/sessions/{{ _['cs-test-session'] }}/cabins"
+    environmentPropertyOrder:
+      "&":
+        - cs-endpoint
+    metaSortKey: -1690666697000
+    _type: request_group
+  - _id: req_session_cabins_list
+    parentId: fld_session_cabins_01
+    modified: 1690681000001
+    created: 1690681000001
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Get
+    description: ""
+    method: GET
+    body: {}
+    parameters: []
+    headers: []
+    authentication: {}
+    metaSortKey: -1690681000005
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_session_cabins_get
+    parentId: fld_session_cabins_01
+    modified: 1690681000002
+    created: 1690681000002
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Get By ID
+    description: ""
+    method: GET
+    body: {}
+    parameters:
+      - id: pair_session_cabins_get_id
+        name: id
+        value: "{{ _['cs-test-session-cabin'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690681000004
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_session_cabins_create
+    parentId: fld_session_cabins_01
+    modified: 1690681000003
+    created: 1690681000003
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Create
+    description: ""
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"session_age_group_id": "{{ _['cs-test-session-age-group'] }}",
+        	"cabin_id": "{{ _['cs-test-cabin'] }}",
+        	"group_size": 10,
+        	"required_counselors": 2
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690681000003
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_session_cabins_update
+    parentId: fld_session_cabins_01
+    modified: 1690681000004
+    created: 1690681000004
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Update
+    description: ""
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"cabin_id": "{{ _['cs-test-cabin'] }}",
+        	"group_size": 12,
+        	"required_counselors": 3
+        }
+    parameters:
+      - id: pair_session_cabins_update_id
+        name: id
+        value: "{{ _['cs-test-session-cabin'] }}"
+        description: ""
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690681000002
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_session_cabins_delete
+    parentId: fld_session_cabins_01
+    modified: 1690681000005
+    created: 1690681000005
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Delete
+    description: ""
+    method: DELETE
+    body: {}
+    parameters:
+      - id: pair_session_cabins_delete_id
+        name: id
+        value: "{{ _['cs-test-session-cabin'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690681000001
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
   - _id: fld_assignment_runs_01
     parentId: fld_0165b0f3641045a88246e473a724a706
     modified: 1690679000000
@@ -1728,6 +2033,8 @@ resources:
       cs-test-session-history: ""
       cs-test-assignment-run: ""
       cs-test-solution: ""
+      cs-test-session-age-group: ""
+      cs-test-session-cabin: ""
     dataPropertyOrder:
       "&":
         - cs-protocol
@@ -1747,6 +2054,8 @@ resources:
         - cs-test-session-history
         - cs-test-assignment-run
         - cs-test-solution
+        - cs-test-session-age-group
+        - cs-test-session-cabin
     color: null
     isPrivate: false
     metaSortKey: 1690666718229

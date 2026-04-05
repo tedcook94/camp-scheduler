@@ -15,12 +15,13 @@ type AgeGroup struct {
 }
 
 type AssignmentRun struct {
-	ID        pgtype.UUID
-	CampID    pgtype.UUID
-	SessionID pgtype.UUID
-	RunType   string
-	Status    string
-	CreatedAt pgtype.Timestamptz
+	ID                 pgtype.UUID
+	CampID             pgtype.UUID
+	SessionID          pgtype.UUID
+	RunType            string
+	Status             string
+	CreatedAt          pgtype.Timestamptz
+	SelectedSolutionID pgtype.UUID
 }
 
 type Cabin struct {

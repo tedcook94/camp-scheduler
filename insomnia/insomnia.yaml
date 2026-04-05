@@ -1782,6 +1782,155 @@ resources:
     settingRebuildPath: true
     settingFollowRedirects: global
     _type: request
+  - _id: fld_campers_01
+    parentId: fld_0165b0f3641045a88246e473a724a706
+    modified: 1690682000000
+    created: 1690682000000
+    name: campers
+    description: ""
+    environment:
+      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/campers"
+    environmentPropertyOrder:
+      "&":
+        - cs-endpoint
+    metaSortKey: -1690666696500
+    _type: request_group
+  - _id: req_campers_list
+    parentId: fld_campers_01
+    modified: 1690682000001
+    created: 1690682000001
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Get
+    description: ""
+    method: GET
+    body: {}
+    parameters: []
+    headers: []
+    authentication: {}
+    metaSortKey: -1690682000005
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_campers_get
+    parentId: fld_campers_01
+    modified: 1690682000002
+    created: 1690682000002
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Get By ID
+    description: ""
+    method: GET
+    body: {}
+    parameters:
+      - id: pair_campers_get_id
+        name: id
+        value: "{{ _['cs-test-camper'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690682000004
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_campers_create
+    parentId: fld_campers_01
+    modified: 1690682000003
+    created: 1690682000003
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Create
+    description: ""
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"name": "Alice Johnson"
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690682000003
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_campers_update
+    parentId: fld_campers_01
+    modified: 1690682000004
+    created: 1690682000004
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Update
+    description: ""
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"name": "Alice Smith"
+        }
+    parameters:
+      - id: pair_campers_update_id
+        name: id
+        value: "{{ _['cs-test-camper'] }}"
+        description: ""
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690682000002
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_campers_delete
+    parentId: fld_campers_01
+    modified: 1690682000005
+    created: 1690682000005
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Delete
+    description: ""
+    method: DELETE
+    body: {}
+    parameters:
+      - id: pair_campers_delete_id
+        name: id
+        value: "{{ _['cs-test-camper'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690682000001
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
   - _id: fld_assignment_runs_01
     parentId: fld_0165b0f3641045a88246e473a724a706
     modified: 1690679000000
@@ -2035,6 +2184,7 @@ resources:
       cs-test-solution: ""
       cs-test-session-age-group: ""
       cs-test-session-cabin: ""
+      cs-test-camper: ""
     dataPropertyOrder:
       "&":
         - cs-protocol
@@ -2056,6 +2206,7 @@ resources:
         - cs-test-solution
         - cs-test-session-age-group
         - cs-test-session-cabin
+        - cs-test-camper
     color: null
     isPrivate: false
     metaSortKey: 1690666718229

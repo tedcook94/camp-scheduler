@@ -14,7 +14,7 @@ import (
 const createAssignmentRun = `-- name: CreateAssignmentRun :one
 INSERT INTO assignment_runs (camp_id, session_id, run_type, status)
 VALUES ($1, $2, $3, $4)
-RETURNING id, camp_id, session_id, run_type, status, selected_solution_id, created_at
+RETURNING id, camp_id, session_id, run_type, status, created_at
 `
 
 type CreateAssignmentRunParams struct {
@@ -24,31 +24,20 @@ type CreateAssignmentRunParams struct {
 	Status    string
 }
 
-type CreateAssignmentRunRow struct {
-	ID                 pgtype.UUID
-	CampID             pgtype.UUID
-	SessionID          pgtype.UUID
-	RunType            string
-	Status             string
-	SelectedSolutionID pgtype.UUID
-	CreatedAt          pgtype.Timestamptz
-}
-
-func (q *Queries) CreateAssignmentRun(ctx context.Context, arg CreateAssignmentRunParams) (CreateAssignmentRunRow, error) {
+func (q *Queries) CreateAssignmentRun(ctx context.Context, arg CreateAssignmentRunParams) (AssignmentRun, error) {
 	row := q.db.QueryRow(ctx, createAssignmentRun,
 		arg.CampID,
 		arg.SessionID,
 		arg.RunType,
 		arg.Status,
 	)
-	var i CreateAssignmentRunRow
+	var i AssignmentRun
 	err := row.Scan(
 		&i.ID,
 		&i.CampID,
 		&i.SessionID,
 		&i.RunType,
 		&i.Status,
-		&i.SelectedSolutionID,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -73,7 +62,7 @@ func (q *Queries) DeleteAssignmentRun(ctx context.Context, arg DeleteAssignmentR
 }
 
 const getAssignmentRun = `-- name: GetAssignmentRun :one
-SELECT id, camp_id, session_id, run_type, status, selected_solution_id, created_at
+SELECT id, camp_id, session_id, run_type, status, created_at
 FROM assignment_runs
 WHERE id = $1 AND camp_id = $2
 `
@@ -83,36 +72,33 @@ type GetAssignmentRunParams struct {
 	CampID pgtype.UUID
 }
 
-type GetAssignmentRunRow struct {
-	ID                 pgtype.UUID
-	CampID             pgtype.UUID
-	SessionID          pgtype.UUID
-	RunType            string
-	Status             string
-	SelectedSolutionID pgtype.UUID
-	CreatedAt          pgtype.Timestamptz
-}
-
-func (q *Queries) GetAssignmentRun(ctx context.Context, arg GetAssignmentRunParams) (GetAssignmentRunRow, error) {
+func (q *Queries) GetAssignmentRun(ctx context.Context, arg GetAssignmentRunParams) (AssignmentRun, error) {
 	row := q.db.QueryRow(ctx, getAssignmentRun, arg.ID, arg.CampID)
-	var i GetAssignmentRunRow
+	var i AssignmentRun
 	err := row.Scan(
 		&i.ID,
 		&i.CampID,
 		&i.SessionID,
 		&i.RunType,
 		&i.Status,
-		&i.SelectedSolutionID,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const listAssignmentRunsBySession = `-- name: ListAssignmentRunsBySession :many
-SELECT id, camp_id, session_id, run_type, status, selected_solution_id, created_at
-FROM assignment_runs
-WHERE session_id = $1 AND camp_id = $2
-ORDER BY created_at DESC
+SELECT
+    ar.id,
+    ar.camp_id,
+    ar.session_id,
+    ar.run_type,
+    ar.status,
+    ar.created_at,
+    arss.solution_id AS selected_solution_id
+FROM assignment_runs ar
+LEFT JOIN assignment_run_selected_solutions arss ON arss.run_id = ar.id AND arss.camp_id = ar.camp_id
+WHERE ar.session_id = $1 AND ar.camp_id = $2
+ORDER BY ar.created_at DESC
 `
 
 type ListAssignmentRunsBySessionParams struct {
@@ -126,8 +112,8 @@ type ListAssignmentRunsBySessionRow struct {
 	SessionID          pgtype.UUID
 	RunType            string
 	Status             string
-	SelectedSolutionID pgtype.UUID
 	CreatedAt          pgtype.Timestamptz
+	SelectedSolutionID pgtype.UUID
 }
 
 func (q *Queries) ListAssignmentRunsBySession(ctx context.Context, arg ListAssignmentRunsBySessionParams) ([]ListAssignmentRunsBySessionRow, error) {
@@ -145,8 +131,8 @@ func (q *Queries) ListAssignmentRunsBySession(ctx context.Context, arg ListAssig
 			&i.SessionID,
 			&i.RunType,
 			&i.Status,
-			&i.SelectedSolutionID,
 			&i.CreatedAt,
+			&i.SelectedSolutionID,
 		); err != nil {
 			return nil, err
 		}
@@ -158,49 +144,11 @@ func (q *Queries) ListAssignmentRunsBySession(ctx context.Context, arg ListAssig
 	return items, nil
 }
 
-const selectSolution = `-- name: SelectSolution :one
-UPDATE assignment_runs
-SET selected_solution_id = $3, status = 'selected'
-WHERE id = $1 AND camp_id = $2
-RETURNING id, camp_id, session_id, run_type, status, selected_solution_id, created_at
-`
-
-type SelectSolutionParams struct {
-	ID                 pgtype.UUID
-	CampID             pgtype.UUID
-	SelectedSolutionID pgtype.UUID
-}
-
-type SelectSolutionRow struct {
-	ID                 pgtype.UUID
-	CampID             pgtype.UUID
-	SessionID          pgtype.UUID
-	RunType            string
-	Status             string
-	SelectedSolutionID pgtype.UUID
-	CreatedAt          pgtype.Timestamptz
-}
-
-func (q *Queries) SelectSolution(ctx context.Context, arg SelectSolutionParams) (SelectSolutionRow, error) {
-	row := q.db.QueryRow(ctx, selectSolution, arg.ID, arg.CampID, arg.SelectedSolutionID)
-	var i SelectSolutionRow
-	err := row.Scan(
-		&i.ID,
-		&i.CampID,
-		&i.SessionID,
-		&i.RunType,
-		&i.Status,
-		&i.SelectedSolutionID,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
 const updateAssignmentRunStatus = `-- name: UpdateAssignmentRunStatus :one
 UPDATE assignment_runs
 SET status = $3
 WHERE id = $1 AND camp_id = $2
-RETURNING id, camp_id, session_id, run_type, status, selected_solution_id, created_at
+RETURNING id, camp_id, session_id, run_type, status, created_at
 `
 
 type UpdateAssignmentRunStatusParams struct {
@@ -209,26 +157,15 @@ type UpdateAssignmentRunStatusParams struct {
 	Status string
 }
 
-type UpdateAssignmentRunStatusRow struct {
-	ID                 pgtype.UUID
-	CampID             pgtype.UUID
-	SessionID          pgtype.UUID
-	RunType            string
-	Status             string
-	SelectedSolutionID pgtype.UUID
-	CreatedAt          pgtype.Timestamptz
-}
-
-func (q *Queries) UpdateAssignmentRunStatus(ctx context.Context, arg UpdateAssignmentRunStatusParams) (UpdateAssignmentRunStatusRow, error) {
+func (q *Queries) UpdateAssignmentRunStatus(ctx context.Context, arg UpdateAssignmentRunStatusParams) (AssignmentRun, error) {
 	row := q.db.QueryRow(ctx, updateAssignmentRunStatus, arg.ID, arg.CampID, arg.Status)
-	var i UpdateAssignmentRunStatusRow
+	var i AssignmentRun
 	err := row.Scan(
 		&i.ID,
 		&i.CampID,
 		&i.SessionID,
 		&i.RunType,
 		&i.Status,
-		&i.SelectedSolutionID,
 		&i.CreatedAt,
 	)
 	return i, err

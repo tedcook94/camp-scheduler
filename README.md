@@ -163,9 +163,9 @@ constraints -- the director can see what trade-offs exist between options.
 
 - [x] Add camper table + CRUD
 - [x] Add camper preferences (friend requests, etc.)
-- [ ] Extend solver to handle camper assignments
-- [ ] Additional hard constraints (cabin capacity with campers)
-- [ ] Additional soft constraints (friend requests)
+- [x] Extend solver to handle camper assignments
+- [x] Additional hard constraints (cabin capacity with campers)
+- [x] Additional soft constraints (friend requests)
 
 ### Phase 3: Activity Scheduling
 

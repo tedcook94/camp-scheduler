@@ -88,7 +88,7 @@ func (ctrl *Controller) ListAgeGroups(c *gin.Context) {
 
 	groups, err := ctrl.svc.ListAgeGroups(c.Request.Context(), campID, sessionID)
 	if err != nil {
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -115,7 +115,7 @@ func (ctrl *Controller) GetAgeGroup(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session age group not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -144,7 +144,7 @@ func (ctrl *Controller) CreateAgeGroup(c *gin.Context) {
 
 	group, err := ctrl.svc.CreateAgeGroup(c.Request.Context(), campID, sessionID, req)
 	if err != nil {
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -181,7 +181,7 @@ func (ctrl *Controller) UpdateAgeGroup(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session age group not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -213,7 +213,7 @@ func (ctrl *Controller) DeleteAgeGroup(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session age group not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -242,7 +242,7 @@ func (ctrl *Controller) ListCabins(c *gin.Context) {
 
 	cabins, err := ctrl.svc.ListCabins(c.Request.Context(), campID, sessionID)
 	if err != nil {
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -269,7 +269,7 @@ func (ctrl *Controller) GetCabin(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session cabin not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -298,7 +298,7 @@ func (ctrl *Controller) CreateCabin(c *gin.Context) {
 
 	cabin, err := ctrl.svc.CreateCabin(c.Request.Context(), campID, sessionID, req)
 	if err != nil {
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -339,7 +339,7 @@ func (ctrl *Controller) UpdateCabin(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session cabin not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -371,7 +371,7 @@ func (ctrl *Controller) DeleteCabin(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session cabin not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

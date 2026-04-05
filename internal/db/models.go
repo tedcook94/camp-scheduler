@@ -104,6 +104,8 @@ type Season struct {
 	ID         pgtype.UUID
 	CampID     pgtype.UUID
 	SeasonName string
+	StartDate  pgtype.Date
+	EndDate    pgtype.Date
 }
 
 type Session struct {

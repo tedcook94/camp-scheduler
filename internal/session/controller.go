@@ -53,7 +53,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 
 	sessions, err := ctrl.svc.List(c.Request.Context(), campID)
 	if err != nil {
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -78,7 +78,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -105,7 +105,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 
 	session, err := ctrl.svc.Create(c.Request.Context(), campID, req)
 	if err != nil {
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -136,7 +136,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -162,7 +162,7 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

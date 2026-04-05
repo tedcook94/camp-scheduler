@@ -29,17 +29,23 @@ func (ctrl *Controller) RegisterRoutes(camps *gin.RouterGroup) {
 }
 
 type CreateSeasonRequest struct {
-	Name string `json:"name" binding:"required"`
+	Name      string `json:"name" binding:"required"`
+	StartDate string `json:"start_date" binding:"required"`
+	EndDate   string `json:"end_date" binding:"required"`
 }
 
 type UpdateSeasonRequest struct {
-	Name string `json:"name" binding:"required"`
+	Name      string `json:"name" binding:"required"`
+	StartDate string `json:"start_date" binding:"required"`
+	EndDate   string `json:"end_date" binding:"required"`
 }
 
 type SeasonResponse struct {
-	ID     string `json:"id"`
-	CampID string `json:"camp_id"`
-	Name   string `json:"name"`
+	ID        string `json:"id"`
+	CampID    string `json:"camp_id"`
+	Name      string `json:"name"`
+	StartDate string `json:"start_date"`
+	EndDate   string `json:"end_date"`
 }
 
 func (ctrl *Controller) List(c *gin.Context) {
@@ -47,7 +53,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 
 	seasons, err := ctrl.svc.List(c.Request.Context(), campID)
 	if err != nil {
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -72,7 +78,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "season not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -99,7 +105,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 
 	season, err := ctrl.svc.Create(c.Request.Context(), campID, req)
 	if err != nil {
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -130,7 +136,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "season not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -156,7 +162,7 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "season not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 var ErrNotFound = errors.New("season not found")
@@ -65,9 +68,20 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateSeasonR
 		return SeasonResponse{}, err
 	}
 
+	startDate, err := parseDate(req.StartDate)
+	if err != nil {
+		return SeasonResponse{}, err
+	}
+	endDate, err := parseDate(req.EndDate)
+	if err != nil {
+		return SeasonResponse{}, err
+	}
+
 	season, err := svc.queries.CreateSeason(ctx, db.CreateSeasonParams{
 		CampID:     uid,
 		SeasonName: req.Name,
+		StartDate:  startDate,
+		EndDate:    endDate,
 	})
 	if err != nil {
 		return SeasonResponse{}, fmt.Errorf("error creating season: %w", err)
@@ -87,10 +101,21 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateSea
 		return SeasonResponse{}, err
 	}
 
+	startDate, err := parseDate(req.StartDate)
+	if err != nil {
+		return SeasonResponse{}, err
+	}
+	endDate, err := parseDate(req.EndDate)
+	if err != nil {
+		return SeasonResponse{}, err
+	}
+
 	season, err := svc.queries.UpdateSeason(ctx, db.UpdateSeasonParams{
 		ID:         uid,
 		CampID:     campUUID,
 		SeasonName: req.Name,
+		StartDate:  startDate,
+		EndDate:    endDate,
 	})
 	if err != nil {
 		return SeasonResponse{}, fmt.Errorf("error updating season %s: %w", id, err)
@@ -126,8 +151,18 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 
 func toSeasonResponse(s db.Season) SeasonResponse {
 	return SeasonResponse{
-		ID:     api.UUIDToString(s.ID),
-		CampID: api.UUIDToString(s.CampID),
-		Name:   s.SeasonName,
+		ID:        api.UUIDToString(s.ID),
+		CampID:    api.UUIDToString(s.CampID),
+		Name:      s.SeasonName,
+		StartDate: s.StartDate.Time.Format("2006-01-02"),
+		EndDate:   s.EndDate.Time.Format("2006-01-02"),
 	}
+}
+
+func parseDate(s string) (pgtype.Date, error) {
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		return pgtype.Date{}, fmt.Errorf("error invalid date %q (expected YYYY-MM-DD): %w", s, api.ErrBadInput)
+	}
+	return pgtype.Date{Time: t, Valid: true}, nil
 }

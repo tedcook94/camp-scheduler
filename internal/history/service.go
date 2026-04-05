@@ -8,6 +8,7 @@ import (
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -235,15 +236,15 @@ func (svc *Service) resolveSeasonID(ctx context.Context, campUUID pgtype.UUID, s
 		return api.ParseUUID(*seasonID)
 	}
 
-	seasons, err := svc.queries.ListSeasons(ctx, campUUID)
+	season, err := svc.queries.GetMostRecentSeason(ctx, campUUID)
 	if err != nil {
-		return pgtype.UUID{}, fmt.Errorf("error listing seasons to resolve default: %w", err)
-	}
-	if len(seasons) == 0 {
-		return pgtype.UUID{}, nil
+		if errors.Is(err, pgx.ErrNoRows) {
+			return pgtype.UUID{}, nil
+		}
+		return pgtype.UUID{}, fmt.Errorf("error resolving most recent season: %w", err)
 	}
 
-	return seasons[len(seasons)-1].ID, nil
+	return season.ID, nil
 }
 
 func toHistorySummaryEntry(r db.GetCounselorHistorySummaryRow) HistorySummaryEntry {

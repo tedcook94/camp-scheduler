@@ -117,7 +117,7 @@ func (ctrl *Controller) TriggerRun(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -139,7 +139,7 @@ func (ctrl *Controller) ListRuns(c *gin.Context) {
 
 	runs, err := ctrl.svc.ListRuns(c.Request.Context(), campID, sessionID)
 	if err != nil {
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -165,7 +165,7 @@ func (ctrl *Controller) GetRun(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "assignment run not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -191,7 +191,7 @@ func (ctrl *Controller) DeleteRun(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "assignment run not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -217,7 +217,7 @@ func (ctrl *Controller) GetSolution(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "solution not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -248,7 +248,7 @@ func (ctrl *Controller) SelectSolution(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "solution not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

@@ -12,20 +12,33 @@ import (
 )
 
 const createSeason = `-- name: CreateSeason :one
-INSERT INTO seasons (camp_id, season_name)
-VALUES ($1, $2)
-RETURNING id, camp_id, season_name
+INSERT INTO seasons (camp_id, season_name, start_date, end_date)
+VALUES ($1, $2, $3, $4)
+RETURNING id, camp_id, season_name, start_date, end_date
 `
 
 type CreateSeasonParams struct {
 	CampID     pgtype.UUID
 	SeasonName string
+	StartDate  pgtype.Date
+	EndDate    pgtype.Date
 }
 
 func (q *Queries) CreateSeason(ctx context.Context, arg CreateSeasonParams) (Season, error) {
-	row := q.db.QueryRow(ctx, createSeason, arg.CampID, arg.SeasonName)
+	row := q.db.QueryRow(ctx, createSeason,
+		arg.CampID,
+		arg.SeasonName,
+		arg.StartDate,
+		arg.EndDate,
+	)
 	var i Season
-	err := row.Scan(&i.ID, &i.CampID, &i.SeasonName)
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.SeasonName,
+		&i.StartDate,
+		&i.EndDate,
+	)
 	return i, err
 }
 
@@ -47,8 +60,29 @@ func (q *Queries) DeleteSeason(ctx context.Context, arg DeleteSeasonParams) (int
 	return result.RowsAffected(), nil
 }
 
+const getMostRecentSeason = `-- name: GetMostRecentSeason :one
+SELECT id, camp_id, season_name, start_date, end_date
+FROM seasons
+WHERE camp_id = $1
+ORDER BY start_date DESC
+LIMIT 1
+`
+
+func (q *Queries) GetMostRecentSeason(ctx context.Context, campID pgtype.UUID) (Season, error) {
+	row := q.db.QueryRow(ctx, getMostRecentSeason, campID)
+	var i Season
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.SeasonName,
+		&i.StartDate,
+		&i.EndDate,
+	)
+	return i, err
+}
+
 const getSeason = `-- name: GetSeason :one
-SELECT id, camp_id, season_name
+SELECT id, camp_id, season_name, start_date, end_date
 FROM seasons
 WHERE id = $1 AND camp_id = $2
 `
@@ -61,15 +95,21 @@ type GetSeasonParams struct {
 func (q *Queries) GetSeason(ctx context.Context, arg GetSeasonParams) (Season, error) {
 	row := q.db.QueryRow(ctx, getSeason, arg.ID, arg.CampID)
 	var i Season
-	err := row.Scan(&i.ID, &i.CampID, &i.SeasonName)
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.SeasonName,
+		&i.StartDate,
+		&i.EndDate,
+	)
 	return i, err
 }
 
 const listSeasons = `-- name: ListSeasons :many
-SELECT id, camp_id, season_name
+SELECT id, camp_id, season_name, start_date, end_date
 FROM seasons
 WHERE camp_id = $1
-ORDER BY season_name
+ORDER BY start_date DESC
 `
 
 func (q *Queries) ListSeasons(ctx context.Context, campID pgtype.UUID) ([]Season, error) {
@@ -81,7 +121,13 @@ func (q *Queries) ListSeasons(ctx context.Context, campID pgtype.UUID) ([]Season
 	var items []Season
 	for rows.Next() {
 		var i Season
-		if err := rows.Scan(&i.ID, &i.CampID, &i.SeasonName); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.SeasonName,
+			&i.StartDate,
+			&i.EndDate,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -94,20 +140,34 @@ func (q *Queries) ListSeasons(ctx context.Context, campID pgtype.UUID) ([]Season
 
 const updateSeason = `-- name: UpdateSeason :one
 UPDATE seasons
-SET season_name = $3
+SET season_name = $3, start_date = $4, end_date = $5
 WHERE id = $1 AND camp_id = $2
-RETURNING id, camp_id, season_name
+RETURNING id, camp_id, season_name, start_date, end_date
 `
 
 type UpdateSeasonParams struct {
 	ID         pgtype.UUID
 	CampID     pgtype.UUID
 	SeasonName string
+	StartDate  pgtype.Date
+	EndDate    pgtype.Date
 }
 
 func (q *Queries) UpdateSeason(ctx context.Context, arg UpdateSeasonParams) (Season, error) {
-	row := q.db.QueryRow(ctx, updateSeason, arg.ID, arg.CampID, arg.SeasonName)
+	row := q.db.QueryRow(ctx, updateSeason,
+		arg.ID,
+		arg.CampID,
+		arg.SeasonName,
+		arg.StartDate,
+		arg.EndDate,
+	)
 	var i Season
-	err := row.Scan(&i.ID, &i.CampID, &i.SeasonName)
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.SeasonName,
+		&i.StartDate,
+		&i.EndDate,
+	)
 	return i, err
 }

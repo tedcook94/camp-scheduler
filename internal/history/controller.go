@@ -67,7 +67,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 
 	entries, err := ctrl.svc.List(c.Request.Context(), campID, counselorID)
 	if err != nil {
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -94,7 +94,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session history entry not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -123,7 +123,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 
 	entry, err := ctrl.svc.Create(c.Request.Context(), campID, counselorID, req)
 	if err != nil {
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -160,7 +160,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session history entry not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -192,7 +192,7 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session history entry not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -220,7 +220,7 @@ func (ctrl *Controller) GetHistorySummary(c *gin.Context) {
 
 	entries, err := ctrl.svc.GetHistory(c.Request.Context(), campID, counselorID, seasonID)
 	if err != nil {
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

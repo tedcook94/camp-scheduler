@@ -54,7 +54,7 @@ func (ctrl *AgeGroupController) List(c *gin.Context) {
 
 	prefs, err := ctrl.svc.List(c.Request.Context(), campID, sessionID, counselorID)
 	if err != nil {
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -83,7 +83,7 @@ func (ctrl *AgeGroupController) Get(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "age group preference not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -114,7 +114,7 @@ func (ctrl *AgeGroupController) Create(c *gin.Context) {
 
 	pref, err := ctrl.svc.Create(c.Request.Context(), campID, sessionID, counselorID, req)
 	if err != nil {
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -153,7 +153,7 @@ func (ctrl *AgeGroupController) Update(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "age group preference not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -187,7 +187,7 @@ func (ctrl *AgeGroupController) Delete(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "age group preference not found"})
 			return
 		}
-		if api.IsInvalidUUID(err) {
+		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

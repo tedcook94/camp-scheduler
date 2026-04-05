@@ -161,7 +161,7 @@ constraints -- the director can see what trade-offs exist between options.
 
 ### Phase 2: Camper-to-Cabin Assignment
 
-- [ ] Add camper table + CRUD
+- [x] Add camper table + CRUD
 - [ ] Add camper preferences (friend requests, etc.)
 - [ ] Extend solver to handle camper assignments
 - [ ] Additional hard constraints (cabin capacity with campers)

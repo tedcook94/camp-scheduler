@@ -38,6 +38,12 @@ type Camp struct {
 	CampEnabled  bool
 }
 
+type Camper struct {
+	ID         pgtype.UUID
+	CampID     pgtype.UUID
+	CamperName string
+}
+
 type Counselor struct {
 	ID               pgtype.UUID
 	CampID           pgtype.UUID

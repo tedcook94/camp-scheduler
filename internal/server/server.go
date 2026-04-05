@@ -10,6 +10,7 @@ import (
 	"camp-scheduler/internal/assignment"
 	"camp-scheduler/internal/cabin"
 	"camp-scheduler/internal/camp"
+	"camp-scheduler/internal/camper"
 	"camp-scheduler/internal/config"
 	"camp-scheduler/internal/counselor"
 	"camp-scheduler/internal/db"
@@ -129,6 +130,10 @@ func (s *Server) routes() {
 	sessionConfigService := sessionconfig.NewService(queries)
 	sessionConfigController := sessionconfig.NewController(sessionConfigService)
 	sessionConfigController.RegisterRoutes(camps)
+
+	camperService := camper.NewService(queries)
+	camperController := camper.NewController(camperService)
+	camperController.RegisterRoutes(camps)
 
 	assignmentService := assignment.NewService(queries, s.pool)
 	assignmentController := assignment.NewController(assignmentService)

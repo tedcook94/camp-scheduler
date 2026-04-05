@@ -1,6 +1,9 @@
 package solver
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
 func ScoreSoftConstraints(snapshot SessionSnapshot, assignment Assignment, weights Weights) ScoreResult {
 	var result ScoreResult
@@ -20,6 +23,20 @@ func ScoreSoftConstraints(snapshot SessionSnapshot, assignment Assignment, weigh
 			result.Breakdown = append(result.Breakdown, c)
 		}
 	}
+
+	sort.Slice(result.Breakdown, func(i, j int) bool {
+		a, b := result.Breakdown[i], result.Breakdown[j]
+		if a.CounselorID != b.CounselorID {
+			return a.CounselorID < b.CounselorID
+		}
+		if a.CabinID != b.CabinID {
+			return a.CabinID < b.CabinID
+		}
+		if a.Constraint != b.Constraint {
+			return a.Constraint < b.Constraint
+		}
+		return a.Message < b.Message
+	})
 
 	return result
 }

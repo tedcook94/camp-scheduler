@@ -1,6 +1,9 @@
 package solver
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
 func Explain(snapshot SessionSnapshot, solution Solution) Explanation {
 	cabinsByID := indexCabins(snapshot)
@@ -33,6 +36,16 @@ func Explain(snapshot SessionSnapshot, solution Solution) Explanation {
 	unmet = append(unmet, findUnmetReturningAgeGroup(snapshot, counselorCabin, cabinsByID)...)
 	unmet = append(unmet, findUnmetReturningCabin(snapshot, counselorCabin, cabinsByID)...)
 	unmet = append(unmet, findUnmetCocounselorPreferences(snapshot, counselorCabin, counselorsByID)...)
+
+	sort.Slice(unmet, func(i, j int) bool {
+		if unmet[i].CounselorID != unmet[j].CounselorID {
+			return unmet[i].CounselorID < unmet[j].CounselorID
+		}
+		if unmet[i].Constraint != unmet[j].Constraint {
+			return unmet[i].Constraint < unmet[j].Constraint
+		}
+		return unmet[i].Message < unmet[j].Message
+	})
 
 	return Explanation{
 		Assignments:      assignments,

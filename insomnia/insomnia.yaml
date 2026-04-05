@@ -1477,6 +1477,216 @@ resources:
     settingRebuildPath: true
     settingFollowRedirects: global
     _type: request
+  - _id: fld_assignment_runs_01
+    parentId: fld_0165b0f3641045a88246e473a724a706
+    modified: 1690679000000
+    created: 1690679000000
+    name: assignment-runs
+    description: ""
+    environment:
+      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/sessions/{{ _['cs-test-session'] }}/assignment-runs"
+    environmentPropertyOrder:
+      "&":
+        - cs-endpoint
+    metaSortKey: -1690666698000
+    _type: request_group
+  - _id: req_assignment_runs_trigger
+    parentId: fld_assignment_runs_01
+    modified: 1690679000001
+    created: 1690679000001
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Trigger Run
+    description: ""
+    method: POST
+    body:
+      mimeType: application/json
+      text: "{}"
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690679000006
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_assignment_runs_trigger_custom
+    parentId: fld_assignment_runs_01
+    modified: 1690679000002
+    created: 1690679000002
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Trigger Run (custom config)
+    description: ""
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"max_solutions": 3,
+        	"max_iterations": 50000,
+        	"weights": {
+        		"returning_age_group": 10,
+        		"returning_cabin": 5,
+        		"cocounselor_preference": 5,
+        		"age_group_preference": 5,
+        		"multiple_seniors": 2
+        	}
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690679000005
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_assignment_runs_list
+    parentId: fld_assignment_runs_01
+    modified: 1690679000003
+    created: 1690679000003
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: List Runs
+    description: ""
+    method: GET
+    body: {}
+    parameters: []
+    headers: []
+    authentication: {}
+    metaSortKey: -1690679000004
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_assignment_runs_get
+    parentId: fld_assignment_runs_01
+    modified: 1690679000004
+    created: 1690679000004
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:runId"
+    name: Get Run
+    description: ""
+    method: GET
+    body: {}
+    parameters:
+      - id: pair_assignment_runs_get_id
+        name: runId
+        value: "{{ _['cs-test-assignment-run'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690679000003
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_assignment_runs_delete
+    parentId: fld_assignment_runs_01
+    modified: 1690679000005
+    created: 1690679000005
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:runId"
+    name: Delete Run
+    description: ""
+    method: DELETE
+    body: {}
+    parameters:
+      - id: pair_assignment_runs_delete_id
+        name: runId
+        value: "{{ _['cs-test-assignment-run'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690679000002
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_assignment_runs_get_solution
+    parentId: fld_assignment_runs_01
+    modified: 1690679000006
+    created: 1690679000006
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:runId/solutions/:solutionId"
+    name: Get Solution
+    description: ""
+    method: GET
+    body: {}
+    parameters:
+      - id: pair_assignment_runs_sol_run_id
+        name: runId
+        value: "{{ _['cs-test-assignment-run'] }}"
+        description: ""
+      - id: pair_assignment_runs_sol_id
+        name: solutionId
+        value: "{{ _['cs-test-solution'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690679000001
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_assignment_runs_select_solution
+    parentId: fld_assignment_runs_01
+    modified: 1690679000007
+    created: 1690679000007
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:runId/solutions/:solutionId/select"
+    name: Select Solution
+    description: ""
+    method: POST
+    body: {}
+    parameters:
+      - id: pair_assignment_runs_select_run_id
+        name: runId
+        value: "{{ _['cs-test-assignment-run'] }}"
+        description: ""
+      - id: pair_assignment_runs_select_sol_id
+        name: solutionId
+        value: "{{ _['cs-test-solution'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690679000000
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
   - _id: env_e91cde096b4a48a0bc9cc4a609f73ea7
     parentId: wrk_8335f34c06324aa6888c93fbe4e6e58e
     modified: 1690666916375
@@ -1516,6 +1726,8 @@ resources:
       cs-test-cocounselor-pref: ""
       cs-test-counselor-for-history: ""
       cs-test-session-history: ""
+      cs-test-assignment-run: ""
+      cs-test-solution: ""
     dataPropertyOrder:
       "&":
         - cs-protocol
@@ -1533,6 +1745,8 @@ resources:
         - cs-test-cocounselor-pref
         - cs-test-counselor-for-history
         - cs-test-session-history
+        - cs-test-assignment-run
+        - cs-test-solution
     color: null
     isPrivate: false
     metaSortKey: 1690666718229

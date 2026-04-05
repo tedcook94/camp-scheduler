@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"camp-scheduler/internal/agegroup"
+	"camp-scheduler/internal/assignment"
 	"camp-scheduler/internal/cabin"
 	"camp-scheduler/internal/camp"
 	"camp-scheduler/internal/config"
@@ -112,6 +113,10 @@ func (s *Server) routes() {
 	historyService := history.NewService(queries)
 	historyController := history.NewController(historyService)
 	historyController.RegisterRoutes(camps)
+
+	assignmentService := assignment.NewService(queries, s.pool)
+	assignmentController := assignment.NewController(assignmentService)
+	assignmentController.RegisterRoutes(camps)
 }
 
 func initDB(cfg config.Config) (*pgxpool.Pool, error) {

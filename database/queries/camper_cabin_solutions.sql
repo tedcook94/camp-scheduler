@@ -6,7 +6,7 @@ RETURNING id, camp_id, assignment_run_id, solution_index, score, score_breakdown
 -- name: GetCamperCabinSolution :one
 SELECT id, camp_id, assignment_run_id, solution_index, score, score_breakdown
 FROM camper_cabin_solutions
-WHERE id = $1 AND camp_id = $2;
+WHERE id = $1 AND camp_id = $2 AND assignment_run_id = $3;
 
 -- name: ListCamperCabinSolutionsByRun :many
 SELECT id, camp_id, assignment_run_id, solution_index, score, score_breakdown

@@ -10,6 +10,7 @@ import (
 	"camp-scheduler/internal/solver"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -73,6 +74,25 @@ func (svc *Service) ListRuns(ctx context.Context, campID, sessionID string) ([]R
 	return result, nil
 }
 
+func (svc *Service) TriggerCamperRun(ctx context.Context, campID, sessionID string, cfg solver.CamperSolverConfig) (RunDetailResponse, error) {
+	snapshot, err := solver.BuildCamperCabinSnapshot(ctx, svc.queries, campID, sessionID)
+	if err != nil {
+		return RunDetailResponse{}, fmt.Errorf("error building camper snapshot: %w", err)
+	}
+
+	solutions := solver.SolveCamperCabin(snapshot, cfg)
+	if len(solutions) == 0 {
+		return RunDetailResponse{}, ErrNoSolutions
+	}
+
+	runID, err := solver.StoreCamperSolutions(ctx, svc.pool, campID, sessionID, snapshot, solutions)
+	if err != nil {
+		return RunDetailResponse{}, fmt.Errorf("error storing camper solutions: %w", err)
+	}
+
+	return svc.GetRun(ctx, campID, runID)
+}
+
 func (svc *Service) GetRun(ctx context.Context, campID, runID string) (RunDetailResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {
@@ -104,22 +124,37 @@ func (svc *Service) GetRun(ctx context.Context, campID, runID string) (RunDetail
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return RunDetailResponse{}, fmt.Errorf("error getting selected solution for run %s: %w", runID, err)
 	}
-	if err == nil {
+	if err == nil && sel.SolutionType == run.RunType {
 		s := api.UUIDToString(sel.SolutionID)
 		selectedSolutionID = &s
 	}
 
-	solRows, err := svc.queries.ListCounselorCabinSolutionsByRun(ctx, db.ListCounselorCabinSolutionsByRunParams{
-		AssignmentRunID: runUUID,
-		CampID:          campUUID,
-	})
-	if err != nil {
-		return RunDetailResponse{}, fmt.Errorf("error listing solutions for run %s: %w", runID, err)
-	}
-
-	solutions := make([]SolutionSummaryResponse, len(solRows))
-	for i, s := range solRows {
-		solutions[i] = toSolutionSummaryResponse(s)
+	var solutions []SolutionSummaryResponse
+	switch run.RunType {
+	case "camper_cabin":
+		solRows, err := svc.queries.ListCamperCabinSolutionsByRun(ctx, db.ListCamperCabinSolutionsByRunParams{
+			AssignmentRunID: runUUID,
+			CampID:          campUUID,
+		})
+		if err != nil {
+			return RunDetailResponse{}, fmt.Errorf("error listing camper solutions for run %s: %w", runID, err)
+		}
+		solutions = make([]SolutionSummaryResponse, len(solRows))
+		for i, s := range solRows {
+			solutions[i] = toCamperSolutionSummaryResponse(s)
+		}
+	default:
+		solRows, err := svc.queries.ListCounselorCabinSolutionsByRun(ctx, db.ListCounselorCabinSolutionsByRunParams{
+			AssignmentRunID: runUUID,
+			CampID:          campUUID,
+		})
+		if err != nil {
+			return RunDetailResponse{}, fmt.Errorf("error listing solutions for run %s: %w", runID, err)
+		}
+		solutions = make([]SolutionSummaryResponse, len(solRows))
+		for i, s := range solRows {
+			solutions[i] = toSolutionSummaryResponse(s)
+		}
 	}
 
 	return RunDetailResponse{
@@ -153,20 +188,46 @@ func (svc *Service) DeleteRun(ctx context.Context, campID, runID string) error {
 	return nil
 }
 
-func (svc *Service) GetSolution(ctx context.Context, campID, solutionID string) (SolutionDetailResponse, error) {
+func (svc *Service) GetSolution(ctx context.Context, campID, runID, solutionID string) (SolutionDetailResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {
 		return SolutionDetailResponse{}, err
 	}
 
+	runUUID, err := api.ParseUUID(runID)
+	if err != nil {
+		return SolutionDetailResponse{}, err
+	}
+
+	run, err := svc.queries.GetAssignmentRun(ctx, db.GetAssignmentRunParams{
+		ID:     runUUID,
+		CampID: campUUID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return SolutionDetailResponse{}, ErrRunNotFound
+		}
+		return SolutionDetailResponse{}, fmt.Errorf("error getting assignment run %s: %w", runID, err)
+	}
+
+	switch run.RunType {
+	case "camper_cabin":
+		return svc.getCamperSolution(ctx, campUUID, runUUID, solutionID)
+	default:
+		return svc.getCounselorSolution(ctx, campUUID, runUUID, solutionID)
+	}
+}
+
+func (svc *Service) getCounselorSolution(ctx context.Context, campUUID, runUUID pgtype.UUID, solutionID string) (SolutionDetailResponse, error) {
 	solUUID, err := api.ParseUUID(solutionID)
 	if err != nil {
 		return SolutionDetailResponse{}, err
 	}
 
 	sol, err := svc.queries.GetCounselorCabinSolution(ctx, db.GetCounselorCabinSolutionParams{
-		ID:     solUUID,
-		CampID: campUUID,
+		ID:              solUUID,
+		CampID:          campUUID,
+		AssignmentRunID: runUUID,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -208,6 +269,71 @@ func (svc *Service) GetSolution(ctx context.Context, campID, solutionID string) 
 	}, nil
 }
 
+func (svc *Service) getCamperSolution(ctx context.Context, campUUID, runUUID pgtype.UUID, solutionID string) (SolutionDetailResponse, error) {
+	solUUID, err := api.ParseUUID(solutionID)
+	if err != nil {
+		return SolutionDetailResponse{}, err
+	}
+
+	sol, err := svc.queries.GetCamperCabinSolution(ctx, db.GetCamperCabinSolutionParams{
+		ID:              solUUID,
+		CampID:          campUUID,
+		AssignmentRunID: runUUID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return SolutionDetailResponse{}, ErrSolutionNotFound
+		}
+		return SolutionDetailResponse{}, fmt.Errorf("error getting camper solution %s: %w", solutionID, err)
+	}
+
+	assignments, err := svc.queries.ListCamperCabinAssignmentsBySolution(ctx, db.ListCamperCabinAssignmentsBySolutionParams{
+		SolutionID: solUUID,
+		CampID:     campUUID,
+	})
+	if err != nil {
+		return SolutionDetailResponse{}, fmt.Errorf("error listing camper assignments for solution %s: %w", solutionID, err)
+	}
+
+	explanations, err := svc.queries.ListCamperCabinExplanationsBySolution(ctx, db.ListCamperCabinExplanationsBySolutionParams{
+		SolutionID: solUUID,
+		CampID:     campUUID,
+	})
+	if err != nil {
+		return SolutionDetailResponse{}, fmt.Errorf("error listing camper explanations for solution %s: %w", solutionID, err)
+	}
+
+	assignmentResponses := make([]AssignmentResponse, len(assignments))
+	for i, a := range assignments {
+		assignmentResponses[i] = AssignmentResponse{
+			ID:       api.UUIDToString(a.ID),
+			CamperID: api.UUIDToString(a.CamperID),
+			CabinID:  api.UUIDToString(a.CabinID),
+		}
+	}
+
+	explanationResponses := make([]ExplanationResponse, len(explanations))
+	for i, e := range explanations {
+		var constraintName *string
+		if e.ConstraintName.Valid {
+			constraintName = &e.ConstraintName.String
+		}
+		explanationResponses[i] = ExplanationResponse{
+			ID:              api.UUIDToString(e.ID),
+			CamperID:        api.UUIDToString(e.CamperID),
+			ExplanationType: e.ExplanationType,
+			ConstraintName:  constraintName,
+			Message:         e.Message,
+		}
+	}
+
+	return SolutionDetailResponse{
+		SolutionSummaryResponse: toCamperSolutionSummaryResponse(sol),
+		Assignments:             assignmentResponses,
+		Explanations:            explanationResponses,
+	}, nil
+}
+
 func (svc *Service) SelectSolution(ctx context.Context, campID, runID, solutionID string) (RunResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {
@@ -224,35 +350,71 @@ func (svc *Service) SelectSolution(ctx context.Context, campID, runID, solutionI
 		return RunResponse{}, err
 	}
 
-	// Verify the solution belongs to this run.
-	sol, err := svc.queries.GetCounselorCabinSolution(ctx, db.GetCounselorCabinSolutionParams{
-		ID:     solUUID,
+	// Fetch the run to determine its type.
+	run, err := svc.queries.GetAssignmentRun(ctx, db.GetAssignmentRunParams{
+		ID:     runUUID,
 		CampID: campUUID,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			return RunResponse{}, ErrRunNotFound
+		}
+		return RunResponse{}, fmt.Errorf("error getting assignment run %s: %w", runID, err)
+	}
+
+	// Verify the solution exists and belongs to this run.
+	switch run.RunType {
+	case "camper_cabin":
+		sol, err := svc.queries.GetCamperCabinSolution(ctx, db.GetCamperCabinSolutionParams{
+			ID:              solUUID,
+			CampID:          campUUID,
+			AssignmentRunID: runUUID,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return RunResponse{}, ErrSolutionNotFound
+			}
+			return RunResponse{}, fmt.Errorf("error getting camper solution %s: %w", solutionID, err)
+		}
+		if sol.AssignmentRunID != runUUID {
 			return RunResponse{}, ErrSolutionNotFound
 		}
-		return RunResponse{}, fmt.Errorf("error getting solution %s: %w", solutionID, err)
+	default:
+		sol, err := svc.queries.GetCounselorCabinSolution(ctx, db.GetCounselorCabinSolutionParams{
+			ID:              solUUID,
+			CampID:          campUUID,
+			AssignmentRunID: runUUID,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return RunResponse{}, ErrSolutionNotFound
+			}
+			return RunResponse{}, fmt.Errorf("error getting solution %s: %w", solutionID, err)
+		}
+		if sol.AssignmentRunID != runUUID {
+			return RunResponse{}, ErrSolutionNotFound
+		}
 	}
 
-	if sol.AssignmentRunID != runUUID {
-		return RunResponse{}, ErrSolutionNotFound
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return RunResponse{}, fmt.Errorf("error beginning transaction: %w", err)
 	}
+	defer tx.Rollback(ctx)
 
-	// Insert into the join table.
-	_, err = svc.queries.SelectSolution(ctx, db.SelectSolutionParams{
+	qtx := db.New(tx)
+
+	_, err = qtx.SelectSolution(ctx, db.SelectSolutionParams{
 		CampID:       campUUID,
 		RunID:        runUUID,
 		SolutionID:   solUUID,
-		SolutionType: "counselor_cabin",
+		SolutionType: run.RunType,
 	})
 	if err != nil {
 		return RunResponse{}, fmt.Errorf("error selecting solution %s for run %s: %w", solutionID, runID, err)
 	}
 
-	// Update the run status.
-	run, err := svc.queries.UpdateAssignmentRunStatus(ctx, db.UpdateAssignmentRunStatusParams{
+	updatedRun, err := qtx.UpdateAssignmentRunStatus(ctx, db.UpdateAssignmentRunStatusParams{
 		ID:     runUUID,
 		CampID: campUUID,
 		Status: "selected",
@@ -264,8 +426,12 @@ func (svc *Service) SelectSolution(ctx context.Context, campID, runID, solutionI
 		return RunResponse{}, fmt.Errorf("error updating run status for run %s: %w", runID, err)
 	}
 
+	if err := tx.Commit(ctx); err != nil {
+		return RunResponse{}, fmt.Errorf("error committing solution selection: %w", err)
+	}
+
 	selectedStr := api.UUIDToString(solUUID)
-	return toRunResponseFromGet(run, &selectedStr), nil
+	return toRunResponseFromGet(updatedRun, &selectedStr), nil
 }
 
 func toRunResponse(r db.ListAssignmentRunsBySessionRow) RunResponse {
@@ -322,5 +488,15 @@ func toExplanationResponse(e db.CounselorCabinExplanation) ExplanationResponse {
 		ExplanationType: e.ExplanationType,
 		ConstraintName:  constraintName,
 		Message:         e.Message,
+	}
+}
+
+func toCamperSolutionSummaryResponse(s db.CamperCabinSolution) SolutionSummaryResponse {
+	return SolutionSummaryResponse{
+		ID:              api.UUIDToString(s.ID),
+		AssignmentRunID: api.UUIDToString(s.AssignmentRunID),
+		SolutionIndex:   int(s.SolutionIndex),
+		Score:           s.Score,
+		ScoreBreakdown:  s.ScoreBreakdown,
 	}
 }

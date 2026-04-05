@@ -196,7 +196,7 @@ func (svc *Service) ListCabins(ctx context.Context, campID, sessionID string) ([
 
 	result := make([]SessionCabinResponse, len(rows))
 	for i, r := range rows {
-		result[i] = toSessionCabinResponse(r)
+		result[i] = toSessionCabinResponse(r, sessionID)
 	}
 	return result, nil
 }
@@ -226,7 +226,7 @@ func (svc *Service) GetCabin(ctx context.Context, campID, sessionID, id string) 
 		return SessionCabinResponse{}, fmt.Errorf("error getting session cabin %s: %w", id, err)
 	}
 
-	return toSessionCabinResponse(row), nil
+	return toSessionCabinResponse(row, sessionID), nil
 }
 
 func (svc *Service) CreateCabin(ctx context.Context, campID, sessionID string, req CreateSessionCabinRequest) (SessionCabinResponse, error) {
@@ -272,7 +272,7 @@ func (svc *Service) CreateCabin(ctx context.Context, campID, sessionID string, r
 		return SessionCabinResponse{}, fmt.Errorf("error creating session cabin: %w", err)
 	}
 
-	return toSessionCabinResponse(row), nil
+	return toSessionCabinResponse(row, sessionID), nil
 }
 
 func (svc *Service) UpdateCabin(ctx context.Context, campID, sessionID, id string, req UpdateSessionCabinRequest) (SessionCabinResponse, error) {
@@ -308,7 +308,7 @@ func (svc *Service) UpdateCabin(ctx context.Context, campID, sessionID, id strin
 		return SessionCabinResponse{}, fmt.Errorf("error updating session cabin %s: %w", id, err)
 	}
 
-	return toSessionCabinResponse(row), nil
+	return toSessionCabinResponse(row, sessionID), nil
 }
 
 func (svc *Service) DeleteCabin(ctx context.Context, campID, sessionID, id string) error {
@@ -354,10 +354,11 @@ func toSessionAgeGroupResponse(r db.SessionAgeGroup) SessionAgeGroupResponse {
 	}
 }
 
-func toSessionCabinResponse(r db.SessionAgeGroupCabin) SessionCabinResponse {
+func toSessionCabinResponse(r db.SessionAgeGroupCabin, sessionID string) SessionCabinResponse {
 	return SessionCabinResponse{
 		ID:                 api.UUIDToString(r.ID),
 		CampID:             api.UUIDToString(r.CampID),
+		SessionID:          sessionID,
 		SessionAgeGroupID:  api.UUIDToString(r.SessionAgeGroupID),
 		CabinID:            api.UUIDToString(r.CabinID),
 		GroupSize:          api.FromPgInt4(r.GroupSize),

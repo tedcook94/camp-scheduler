@@ -95,6 +95,20 @@ func (svc *Service) GetRun(ctx context.Context, campID, runID string) (RunDetail
 		return RunDetailResponse{}, fmt.Errorf("error getting assignment run %s: %w", runID, err)
 	}
 
+	// Fetch the selected solution from the join table.
+	var selectedSolutionID *string
+	sel, err := svc.queries.GetSelectedSolution(ctx, db.GetSelectedSolutionParams{
+		RunID:  runUUID,
+		CampID: campUUID,
+	})
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return RunDetailResponse{}, fmt.Errorf("error getting selected solution for run %s: %w", runID, err)
+	}
+	if err == nil {
+		s := api.UUIDToString(sel.SolutionID)
+		selectedSolutionID = &s
+	}
+
 	solRows, err := svc.queries.ListCounselorCabinSolutionsByRun(ctx, db.ListCounselorCabinSolutionsByRunParams{
 		AssignmentRunID: runUUID,
 		CampID:          campUUID,
@@ -109,7 +123,7 @@ func (svc *Service) GetRun(ctx context.Context, campID, runID string) (RunDetail
 	}
 
 	return RunDetailResponse{
-		RunResponse: toRunResponseFromGet(run),
+		RunResponse: toRunResponseFromGet(run, selectedSolutionID),
 		Solutions:   solutions,
 	}, nil
 }
@@ -226,19 +240,32 @@ func (svc *Service) SelectSolution(ctx context.Context, campID, runID, solutionI
 		return RunResponse{}, ErrSolutionNotFound
 	}
 
-	run, err := svc.queries.SelectSolution(ctx, db.SelectSolutionParams{
-		ID:                 runUUID,
-		CampID:             campUUID,
-		SelectedSolutionID: solUUID,
+	// Insert into the join table.
+	_, err = svc.queries.SelectSolution(ctx, db.SelectSolutionParams{
+		CampID:       campUUID,
+		RunID:        runUUID,
+		SolutionID:   solUUID,
+		SolutionType: "counselor_cabin",
+	})
+	if err != nil {
+		return RunResponse{}, fmt.Errorf("error selecting solution %s for run %s: %w", solutionID, runID, err)
+	}
+
+	// Update the run status.
+	run, err := svc.queries.UpdateAssignmentRunStatus(ctx, db.UpdateAssignmentRunStatusParams{
+		ID:     runUUID,
+		CampID: campUUID,
+		Status: "selected",
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return RunResponse{}, ErrRunNotFound
 		}
-		return RunResponse{}, fmt.Errorf("error selecting solution %s for run %s: %w", solutionID, runID, err)
+		return RunResponse{}, fmt.Errorf("error updating run status for run %s: %w", runID, err)
 	}
 
-	return toRunResponseFromSelect(run), nil
+	selectedStr := api.UUIDToString(solUUID)
+	return toRunResponseFromGet(run, &selectedStr), nil
 }
 
 func toRunResponse(r db.ListAssignmentRunsBySessionRow) RunResponse {
@@ -253,26 +280,14 @@ func toRunResponse(r db.ListAssignmentRunsBySessionRow) RunResponse {
 	}
 }
 
-func toRunResponseFromGet(r db.GetAssignmentRunRow) RunResponse {
+func toRunResponseFromGet(r db.AssignmentRun, selectedSolutionID *string) RunResponse {
 	return RunResponse{
 		ID:                 api.UUIDToString(r.ID),
 		CampID:             api.UUIDToString(r.CampID),
 		SessionID:          api.UUIDToString(r.SessionID),
 		RunType:            r.RunType,
 		Status:             r.Status,
-		SelectedSolutionID: api.UUIDToStringPtr(r.SelectedSolutionID),
-		CreatedAt:          r.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-	}
-}
-
-func toRunResponseFromSelect(r db.SelectSolutionRow) RunResponse {
-	return RunResponse{
-		ID:                 api.UUIDToString(r.ID),
-		CampID:             api.UUIDToString(r.CampID),
-		SessionID:          api.UUIDToString(r.SessionID),
-		RunType:            r.RunType,
-		Status:             r.Status,
-		SelectedSolutionID: api.UUIDToStringPtr(r.SelectedSolutionID),
+		SelectedSolutionID: selectedSolutionID,
 		CreatedAt:          r.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
 	}
 }

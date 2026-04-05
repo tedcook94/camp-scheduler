@@ -15,13 +15,19 @@ type AgeGroup struct {
 }
 
 type AssignmentRun struct {
-	ID                 pgtype.UUID
-	CampID             pgtype.UUID
-	SessionID          pgtype.UUID
-	RunType            string
-	Status             string
-	CreatedAt          pgtype.Timestamptz
-	SelectedSolutionID pgtype.UUID
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	SessionID pgtype.UUID
+	RunType   string
+	Status    string
+	CreatedAt pgtype.Timestamptz
+}
+
+type AssignmentRunSelectedSolution struct {
+	CampID       pgtype.UUID
+	RunID        pgtype.UUID
+	SolutionID   pgtype.UUID
+	SolutionType string
 }
 
 type Cabin struct {
@@ -42,6 +48,33 @@ type Camper struct {
 	ID         pgtype.UUID
 	CampID     pgtype.UUID
 	CamperName string
+}
+
+type CamperCabinAssignment struct {
+	ID         pgtype.UUID
+	CampID     pgtype.UUID
+	SolutionID pgtype.UUID
+	CamperID   pgtype.UUID
+	CabinID    pgtype.UUID
+}
+
+type CamperCabinExplanation struct {
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	SolutionID      pgtype.UUID
+	CamperID        pgtype.UUID
+	ExplanationType string
+	ConstraintName  pgtype.Text
+	Message         string
+}
+
+type CamperCabinSolution struct {
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	AssignmentRunID pgtype.UUID
+	SolutionIndex   int32
+	Score           float64
+	ScoreBreakdown  []byte
 }
 
 type CamperFriendPreference struct {

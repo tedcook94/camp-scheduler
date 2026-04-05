@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -35,14 +37,15 @@ func Load() (Config, error) {
 }
 
 func (c DatabaseConfig) DSN() string {
-	return fmt.Sprintf(
-		"postgres://%s:%s@%s:%d/%s?sslmode=%s&connect_timeout=%d",
-		c.User,
-		c.Password,
-		c.Host,
-		c.Port,
-		c.Name,
-		c.SSLMode,
-		int(c.Timeout.Seconds()),
-	)
+	u := &url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(c.User, c.Password),
+		Host:   fmt.Sprintf("%s:%d", c.Host, c.Port),
+		Path:   c.Name,
+	}
+	q := u.Query()
+	q.Set("sslmode", c.SSLMode)
+	q.Set("connect_timeout", strconv.Itoa(int(c.Timeout.Seconds())))
+	u.RawQuery = q.Encode()
+	return u.String()
 }

@@ -77,6 +77,10 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateSeasonR
 		return SeasonResponse{}, err
 	}
 
+	if startDate.Time.After(endDate.Time) {
+		return SeasonResponse{}, fmt.Errorf("error start_date must be on or before end_date: %w", api.ErrBadInput)
+	}
+
 	season, err := svc.queries.CreateSeason(ctx, db.CreateSeasonParams{
 		CampID:     uid,
 		SeasonName: req.Name,
@@ -108,6 +112,10 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateSea
 	endDate, err := parseDate(req.EndDate)
 	if err != nil {
 		return SeasonResponse{}, err
+	}
+
+	if startDate.Time.After(endDate.Time) {
+		return SeasonResponse{}, fmt.Errorf("error start_date must be on or before end_date: %w", api.ErrBadInput)
 	}
 
 	season, err := svc.queries.UpdateSeason(ctx, db.UpdateSeasonParams{

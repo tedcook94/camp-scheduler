@@ -1,6 +1,13 @@
 DATABASE_URL := postgres://$(DATABASE_USER):$(DATABASE_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(DATABASE_NAME)?sslmode=$(DATABASE_SSL_MODE)
+DATABASE_URL_TEST := postgres://$(DATABASE_USER):$(DATABASE_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(DATABASE_NAME)_test?sslmode=$(DATABASE_SSL_MODE)
 
-.PHONY: dev build sqlc migrate migration test test-integration
+ifdef v
+MIGRATE_CMD = goto $(v)
+else
+MIGRATE_CMD = up
+endif
+
+.PHONY: dev build sqlc migrate migrate-test migrate-all migration test test-integration
 
 dev:
 	go run ./cmd/server
@@ -18,7 +25,14 @@ sqlc:
 	sqlc generate
 
 migrate:
-	migrate -path database/migrations -database "$(DATABASE_URL)" goto $(v)
+	migrate -path database/migrations -database "$(DATABASE_URL)" $(MIGRATE_CMD)
+
+migrate-test:
+	migrate -path database/migrations -database "$(DATABASE_URL_TEST)" $(MIGRATE_CMD)
+
+migrate-all:
+	migrate -path database/migrations -database "$(DATABASE_URL)" $(MIGRATE_CMD)
+	migrate -path database/migrations -database "$(DATABASE_URL_TEST)" $(MIGRATE_CMD)
 
 migration:
 	migrate create -dir database/migrations -ext sql -seq $(name)

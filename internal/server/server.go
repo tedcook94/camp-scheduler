@@ -125,18 +125,7 @@ func (s *Server) routes() {
 }
 
 func initDB(cfg config.Config) (*pgxpool.Pool, error) {
-	dsn := fmt.Sprintf(
-		"postgres://%s:%s@%s:%d/%s?sslmode=%s&connect_timeout=%d",
-		cfg.Database.User,
-		cfg.Database.Password,
-		cfg.Database.Host,
-		cfg.Database.Port,
-		cfg.Database.Name,
-		cfg.Database.SSLMode,
-		int(cfg.Database.Timeout.Seconds()),
-	)
-
-	poolCfg, err := pgxpool.ParseConfig(dsn)
+	poolCfg, err := pgxpool.ParseConfig(cfg.Database.DSN())
 	if err != nil {
 		return nil, fmt.Errorf("error parsing database config: %w", err)
 	}

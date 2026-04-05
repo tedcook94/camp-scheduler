@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -31,4 +32,17 @@ func Load() (Config, error) {
 	var cfg Config
 	err := envconfig.Process("", &cfg)
 	return cfg, err
+}
+
+func (c DatabaseConfig) DSN() string {
+	return fmt.Sprintf(
+		"postgres://%s:%s@%s:%d/%s?sslmode=%s&connect_timeout=%d",
+		c.User,
+		c.Password,
+		c.Host,
+		c.Port,
+		c.Name,
+		c.SSLMode,
+		int(c.Timeout.Seconds()),
+	)
 }

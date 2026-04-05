@@ -8,6 +8,9 @@ To set up a local database, run the setup script from the project root:
 cd database/local-setup && ./local-setup.sh
 ```
 
+This creates both the `camp_scheduler` development database and the
+`camp_scheduler_test` database used by integration tests.
+
 To tear it down:
 
 ```sh
@@ -27,6 +30,9 @@ From the project root:
 ```sh
 # Run migrations to a specific version
 make migrate v=3
+
+# Run migrations on both dev and test databases
+make migrate-all v=3
 
 # Create a new migration
 make migration name=add_camper_table

@@ -1,4 +1,5 @@
 DROP DATABASE IF EXISTS camp_scheduler;
+DROP DATABASE IF EXISTS camp_scheduler_test;
 
 DO
 $$BEGIN

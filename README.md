@@ -72,29 +72,34 @@ New tables:
 - `counselor_cocounselor_preferences` -- per-session ranked co-counselor preferences (directional)
 - `counselor_session_history` -- tracks which cabin/age group a counselor was in previously
 - `assignment_runs` -- metadata about each solver run (type, status, timestamp); shared across solver types
+- `assignment_run_selected_solutions` -- tracks which solution was selected for a run (normalized join table supporting multiple solver types)
 - `counselor_cabin_solutions` -- ranked solutions from a counselor-cabin solver run (score + breakdown)
 - `counselor_cabin_assignments` -- solver output: counselor -> cabin within a solution
 - `counselor_cabin_explanations` -- per-assignment reasoning trail and unmet preferences
 
 ### Schema Changes (Phase 2+)
 
-- `campers` -- individual camper records (name, age, gender, etc.)
-- `camper_preferences` -- friend requests, cabin requests
-- `camper_cabin_assignments` -- solver output: camper -> cabin
-- `activities` -- activity definitions with capacity, certifications required
-- `time_slots` -- scheduling blocks within sessions
-- `counselor_certifications` -- join table: counselor has certification
-- `activity_schedule` -- solver output: activity + time slot + counselor(s)
+- `campers` -- individual camper records
+- `camper_session_enrollments` -- links campers to session age groups; includes denormalized `session_id` for uniqueness enforcement (one enrollment per camper per session)
+- `camper_friend_preferences` -- per-session directional ranked friend requests
+- `camper_cabin_solutions` -- ranked solutions from a camper-cabin solver run (score + breakdown)
+- `camper_cabin_assignments` -- solver output: camper -> cabin within a solution
+- `camper_cabin_explanations` -- per-assignment reasoning trail and unmet preferences
+- `activities` -- activity definitions with capacity, certifications required (Phase 3+)
+- `time_slots` -- scheduling blocks within sessions (Phase 3+)
+- `counselor_certifications` -- join table: counselor has certification (Phase 3+)
+- `activity_schedule` -- solver output: activity + time slot + counselor(s) (Phase 3+)
 
 ## Constraints
 
 ### Hard Constraints (must be satisfied)
 
-- Cabin capacity cannot be exceeded
+- Cabin capacity cannot be exceeded (counselors and campers)
 - A cabin must have at least one senior (non-junior) counselor assigned
-- Counselors must have required certification for an activity (Phase 2+)
-- A counselor cannot be double-booked in the same time slot (Phase 2+)
-- Activity capacity cannot be exceeded (Phase 2+)
+- Campers can only be assigned to cabins within their enrolled age group
+- Counselors must have required certification for an activity (Phase 3+)
+- A counselor cannot be double-booked in the same time slot (Phase 3+)
+- Activity capacity cannot be exceeded (Phase 3+)
 
 ### Soft Constraints (optimized, weighted)
 
@@ -103,8 +108,8 @@ New tables:
 - Counselor co-counselor preference (weight: medium)
 - Counselor village/age-group preference (weight: medium)
 - Prefer multiple senior counselors per cabin over one senior with many juniors (weight: low)
-- Counselor activity preferences (Phase 2+, weight: high)
-- Camper friend requests -- be in same cabin (Phase 2+, weight: high)
+- Camper friend requests -- be in same cabin (weight: high)
+- Counselor activity preferences (Phase 3+, weight: high)
 
 ## Solver Design
 

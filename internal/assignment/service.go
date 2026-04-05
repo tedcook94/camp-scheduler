@@ -2,7 +2,6 @@ package assignment
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -279,9 +278,6 @@ func toRunResponseFromSelect(r db.SelectSolutionRow) RunResponse {
 }
 
 func toSolutionSummaryResponse(s db.CounselorCabinSolution) SolutionSummaryResponse {
-	var breakdown []json.RawMessage
-	_ = json.Unmarshal(s.ScoreBreakdown, &breakdown)
-
 	return SolutionSummaryResponse{
 		ID:              api.UUIDToString(s.ID),
 		AssignmentRunID: api.UUIDToString(s.AssignmentRunID),

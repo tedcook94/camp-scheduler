@@ -223,7 +223,7 @@ func (svc *Service) SelectSolution(ctx context.Context, campID, runID, solutionI
 		return RunResponse{}, fmt.Errorf("error getting solution %s: %w", solutionID, err)
 	}
 
-	if api.UUIDToString(sol.AssignmentRunID) != runID {
+	if sol.AssignmentRunID != runUUID {
 		return RunResponse{}, ErrSolutionNotFound
 	}
 

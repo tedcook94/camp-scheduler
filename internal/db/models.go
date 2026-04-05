@@ -44,6 +44,15 @@ type Camper struct {
 	CamperName string
 }
 
+type CamperFriendPreference struct {
+	ID                pgtype.UUID
+	CampID            pgtype.UUID
+	CamperID          pgtype.UUID
+	SessionID         pgtype.UUID
+	PreferredCamperID pgtype.UUID
+	Rank              int32
+}
+
 type CamperSessionEnrollment struct {
 	ID                pgtype.UUID
 	CampID            pgtype.UUID

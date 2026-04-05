@@ -18,6 +18,11 @@ func IsUniqueViolation(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
+func IsCheckViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23514"
+}
+
 var ErrBadInput = errors.New("bad input")
 
 var ErrInvalidUUID = fmt.Errorf("invalid uuid: %w", ErrBadInput)

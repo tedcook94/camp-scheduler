@@ -1931,6 +1931,157 @@ resources:
     settingRebuildPath: true
     settingFollowRedirects: global
     _type: request
+  - _id: fld_camper_friend_prefs_01
+    parentId: fld_0165b0f3641045a88246e473a724a706
+    modified: 1690684000000
+    created: 1690684000000
+    name: camper-friend-preferences
+    description: ""
+    environment:
+      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/sessions/{{ _['cs-test-session'] }}/campers/{{ _['cs-test-camper'] }}/friend-preferences"
+    environmentPropertyOrder:
+      "&":
+        - cs-endpoint
+    metaSortKey: -1690666695500
+    _type: request_group
+  - _id: req_camper_friend_prefs_list
+    parentId: fld_camper_friend_prefs_01
+    modified: 1690684000001
+    created: 1690684000001
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Get
+    description: ""
+    method: GET
+    body: {}
+    parameters: []
+    headers: []
+    authentication: {}
+    metaSortKey: -1690684000005
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_camper_friend_prefs_get
+    parentId: fld_camper_friend_prefs_01
+    modified: 1690684000002
+    created: 1690684000002
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Get By ID
+    description: ""
+    method: GET
+    body: {}
+    parameters:
+      - id: pair_camper_friend_prefs_get_id
+        name: id
+        value: "{{ _['cs-test-camper-friend-pref'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690684000004
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_camper_friend_prefs_create
+    parentId: fld_camper_friend_prefs_01
+    modified: 1690684000003
+    created: 1690684000003
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Create
+    description: ""
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"preferred_camper_id": "{{ _['cs-test-camper'] }}",
+        	"rank": 1
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690684000003
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_camper_friend_prefs_update
+    parentId: fld_camper_friend_prefs_01
+    modified: 1690684000004
+    created: 1690684000004
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Update
+    description: ""
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"preferred_camper_id": "{{ _['cs-test-camper'] }}",
+        	"rank": 2
+        }
+    parameters:
+      - id: pair_camper_friend_prefs_update_id
+        name: id
+        value: "{{ _['cs-test-camper-friend-pref'] }}"
+        description: ""
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690684000002
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_camper_friend_prefs_delete
+    parentId: fld_camper_friend_prefs_01
+    modified: 1690684000005
+    created: 1690684000005
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Delete
+    description: ""
+    method: DELETE
+    body: {}
+    parameters:
+      - id: pair_camper_friend_prefs_delete_id
+        name: id
+        value: "{{ _['cs-test-camper-friend-pref'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690684000001
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
   - _id: fld_enrollments_01
     parentId: fld_0165b0f3641045a88246e473a724a706
     modified: 1690683000000
@@ -2303,6 +2454,7 @@ resources:
       cs-test-session-cabin: ""
       cs-test-camper: ""
       cs-test-enrollment: ""
+      cs-test-camper-friend-pref: ""
     dataPropertyOrder:
       "&":
         - cs-protocol
@@ -2326,6 +2478,7 @@ resources:
         - cs-test-session-cabin
         - cs-test-camper
         - cs-test-enrollment
+        - cs-test-camper-friend-pref
     color: null
     isPrivate: false
     metaSortKey: 1690666718229

@@ -1931,6 +1931,123 @@ resources:
     settingRebuildPath: true
     settingFollowRedirects: global
     _type: request
+  - _id: fld_enrollments_01
+    parentId: fld_0165b0f3641045a88246e473a724a706
+    modified: 1690683000000
+    created: 1690683000000
+    name: enrollments
+    description: ""
+    environment:
+      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/sessions/{{ _['cs-test-session'] }}/enrollments"
+    environmentPropertyOrder:
+      "&":
+        - cs-endpoint
+    metaSortKey: -1690666696000
+    _type: request_group
+  - _id: req_enrollments_list
+    parentId: fld_enrollments_01
+    modified: 1690683000001
+    created: 1690683000001
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Get
+    description: ""
+    method: GET
+    body: {}
+    parameters: []
+    headers: []
+    authentication: {}
+    metaSortKey: -1690683000004
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_enrollments_get
+    parentId: fld_enrollments_01
+    modified: 1690683000002
+    created: 1690683000002
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Get By ID
+    description: ""
+    method: GET
+    body: {}
+    parameters:
+      - id: pair_enrollments_get_id
+        name: id
+        value: "{{ _['cs-test-enrollment'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690683000003
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_enrollments_create
+    parentId: fld_enrollments_01
+    modified: 1690683000003
+    created: 1690683000003
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
+    name: Create
+    description: ""
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"camper_id": "{{ _['cs-test-camper'] }}",
+        	"session_age_group_id": "{{ _['cs-test-session-age-group'] }}"
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -1690683000002
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_enrollments_delete
+    parentId: fld_enrollments_01
+    modified: 1690683000004
+    created: 1690683000004
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+    name: Delete
+    description: ""
+    method: DELETE
+    body: {}
+    parameters:
+      - id: pair_enrollments_delete_id
+        name: id
+        value: "{{ _['cs-test-enrollment'] }}"
+        description: ""
+    headers: []
+    authentication: {}
+    metaSortKey: -1690683000001
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
   - _id: fld_assignment_runs_01
     parentId: fld_0165b0f3641045a88246e473a724a706
     modified: 1690679000000
@@ -2185,6 +2302,7 @@ resources:
       cs-test-session-age-group: ""
       cs-test-session-cabin: ""
       cs-test-camper: ""
+      cs-test-enrollment: ""
     dataPropertyOrder:
       "&":
         - cs-protocol
@@ -2207,6 +2325,7 @@ resources:
         - cs-test-session-age-group
         - cs-test-session-cabin
         - cs-test-camper
+        - cs-test-enrollment
     color: null
     isPrivate: false
     metaSortKey: 1690666718229

@@ -65,6 +65,10 @@ func (ctrl *Controller) Get(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "camp not found"})
 			return
 		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		slog.
 			With("id", id).
 			With("error", err).
@@ -108,6 +112,10 @@ func (ctrl *Controller) Update(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "camp not found"})
 			return
 		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		slog.
 			With("id", id).
 			With("error", err).
@@ -126,6 +134,10 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "camp not found"})
+			return
+		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		if api.IsFKViolation(err) {

@@ -67,6 +67,10 @@ func (ctrl *Controller) List(c *gin.Context) {
 
 	entries, err := ctrl.svc.List(c.Request.Context(), campID, counselorID)
 	if err != nil {
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		slog.
 			With("camp_id", campID).
 			With("counselor_id", counselorID).
@@ -88,6 +92,10 @@ func (ctrl *Controller) Get(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session history entry not found"})
+			return
+		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		slog.
@@ -115,6 +123,10 @@ func (ctrl *Controller) Create(c *gin.Context) {
 
 	entry, err := ctrl.svc.Create(c.Request.Context(), campID, counselorID, req)
 	if err != nil {
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if api.IsFKViolation(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
 			return
@@ -148,6 +160,10 @@ func (ctrl *Controller) Update(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session history entry not found"})
 			return
 		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if api.IsFKViolation(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
 			return
@@ -176,6 +192,10 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session history entry not found"})
 			return
 		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		slog.
 			With("camp_id", campID).
 			With("counselor_id", counselorID).
@@ -200,6 +220,10 @@ func (ctrl *Controller) GetHistorySummary(c *gin.Context) {
 
 	entries, err := ctrl.svc.GetHistory(c.Request.Context(), campID, counselorID, seasonID)
 	if err != nil {
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		slog.
 			With("camp_id", campID).
 			With("counselor_id", counselorID).

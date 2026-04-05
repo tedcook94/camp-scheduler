@@ -52,6 +52,10 @@ func (ctrl *Controller) List(c *gin.Context) {
 
 	counselors, err := ctrl.svc.List(c.Request.Context(), campID)
 	if err != nil {
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		slog.
 			With("camp_id", campID).
 			With("error", err).
@@ -71,6 +75,10 @@ func (ctrl *Controller) Get(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "counselor not found"})
+			return
+		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		slog.
@@ -96,6 +104,10 @@ func (ctrl *Controller) Create(c *gin.Context) {
 
 	counselor, err := ctrl.svc.Create(c.Request.Context(), campID, req)
 	if err != nil {
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		slog.
 			With("camp_id", campID).
 			With("error", err).
@@ -123,6 +135,10 @@ func (ctrl *Controller) Update(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "counselor not found"})
 			return
 		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		slog.
 			With("camp_id", campID).
 			With("id", id).
@@ -143,6 +159,10 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "counselor not found"})
+			return
+		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		if api.IsFKViolation(err) {

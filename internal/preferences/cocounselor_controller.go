@@ -54,6 +54,10 @@ func (ctrl *CocounselorController) List(c *gin.Context) {
 
 	prefs, err := ctrl.svc.List(c.Request.Context(), campID, sessionID, counselorID)
 	if err != nil {
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		slog.
 			With("camp_id", campID).
 			With("session_id", sessionID).
@@ -77,6 +81,10 @@ func (ctrl *CocounselorController) Get(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "co-counselor preference not found"})
+			return
+		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		slog.
@@ -106,6 +114,10 @@ func (ctrl *CocounselorController) Create(c *gin.Context) {
 
 	pref, err := ctrl.svc.Create(c.Request.Context(), campID, sessionID, counselorID, req)
 	if err != nil {
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if api.IsFKViolation(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
 			return
@@ -141,6 +153,10 @@ func (ctrl *CocounselorController) Update(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "co-counselor preference not found"})
 			return
 		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if api.IsFKViolation(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
 			return
@@ -169,6 +185,10 @@ func (ctrl *CocounselorController) Delete(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, ErrCocounselorPreferenceNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "co-counselor preference not found"})
+			return
+		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		slog.

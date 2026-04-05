@@ -13,10 +13,16 @@ func IsFKViolation(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "23503"
 }
 
+var ErrInvalidUUID = errors.New("invalid uuid")
+
+func IsInvalidUUID(err error) bool {
+	return errors.Is(err, ErrInvalidUUID)
+}
+
 func ParseUUID(s string) (pgtype.UUID, error) {
 	var uid pgtype.UUID
 	if err := uid.Scan(s); err != nil {
-		return uid, fmt.Errorf("error invalid uuid %q: %w", s, err)
+		return uid, fmt.Errorf("error invalid uuid %q: %w", s, ErrInvalidUUID)
 	}
 	return uid, nil
 }

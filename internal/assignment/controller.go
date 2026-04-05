@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/solver"
 
 	"github.com/gin-gonic/gin"
@@ -116,6 +117,10 @@ func (ctrl *Controller) TriggerRun(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
 			return
 		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		slog.
 			With("camp_id", campID).
 			With("session_id", sessionID).
@@ -134,6 +139,10 @@ func (ctrl *Controller) ListRuns(c *gin.Context) {
 
 	runs, err := ctrl.svc.ListRuns(c.Request.Context(), campID, sessionID)
 	if err != nil {
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		slog.
 			With("camp_id", campID).
 			With("session_id", sessionID).
@@ -154,6 +163,10 @@ func (ctrl *Controller) GetRun(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, ErrRunNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "assignment run not found"})
+			return
+		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		slog.
@@ -178,6 +191,10 @@ func (ctrl *Controller) DeleteRun(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "assignment run not found"})
 			return
 		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		slog.
 			With("camp_id", campID).
 			With("run_id", runID).
@@ -198,6 +215,10 @@ func (ctrl *Controller) GetSolution(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, ErrSolutionNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "solution not found"})
+			return
+		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		slog.
@@ -225,6 +246,10 @@ func (ctrl *Controller) SelectSolution(c *gin.Context) {
 		}
 		if errors.Is(err, ErrSolutionNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "solution not found"})
+			return
+		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		slog.

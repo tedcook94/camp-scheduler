@@ -88,6 +88,10 @@ func (ctrl *Controller) ListAgeGroups(c *gin.Context) {
 
 	groups, err := ctrl.svc.ListAgeGroups(c.Request.Context(), campID, sessionID)
 	if err != nil {
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		slog.
 			With("camp_id", campID).
 			With("session_id", sessionID).
@@ -109,6 +113,10 @@ func (ctrl *Controller) GetAgeGroup(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session age group not found"})
+			return
+		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		slog.
@@ -136,6 +144,10 @@ func (ctrl *Controller) CreateAgeGroup(c *gin.Context) {
 
 	group, err := ctrl.svc.CreateAgeGroup(c.Request.Context(), campID, sessionID, req)
 	if err != nil {
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if api.IsFKViolation(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
 			return
@@ -169,6 +181,10 @@ func (ctrl *Controller) UpdateAgeGroup(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session age group not found"})
 			return
 		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if api.IsFKViolation(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
 			return
@@ -197,6 +213,10 @@ func (ctrl *Controller) DeleteAgeGroup(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session age group not found"})
 			return
 		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if api.IsFKViolation(err) {
 			c.JSON(http.StatusConflict, gin.H{"error": "session age group has dependent records and cannot be deleted"})
 			return
@@ -222,6 +242,10 @@ func (ctrl *Controller) ListCabins(c *gin.Context) {
 
 	cabins, err := ctrl.svc.ListCabins(c.Request.Context(), campID, sessionID)
 	if err != nil {
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		slog.
 			With("camp_id", campID).
 			With("session_id", sessionID).
@@ -243,6 +267,10 @@ func (ctrl *Controller) GetCabin(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session cabin not found"})
+			return
+		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		slog.
@@ -270,6 +298,10 @@ func (ctrl *Controller) CreateCabin(c *gin.Context) {
 
 	cabin, err := ctrl.svc.CreateCabin(c.Request.Context(), campID, sessionID, req)
 	if err != nil {
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "session age group not found for this session"})
 			return
@@ -307,6 +339,10 @@ func (ctrl *Controller) UpdateCabin(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session cabin not found"})
 			return
 		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if api.IsFKViolation(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
 			return
@@ -333,6 +369,10 @@ func (ctrl *Controller) DeleteCabin(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, ErrCabinNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session cabin not found"})
+			return
+		}
+		if api.IsInvalidUUID(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		if api.IsFKViolation(err) {

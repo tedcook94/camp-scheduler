@@ -3,6 +3,10 @@ package solver
 import "sort"
 
 func Solve(snapshot SessionSnapshot, config SolverConfig) []Solution {
+	if config.MaxSolutions <= 0 || config.MaxIterations <= 0 {
+		return nil
+	}
+
 	s := &searchState{
 		snapshot:   snapshot,
 		config:     config,

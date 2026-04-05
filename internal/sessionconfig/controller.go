@@ -39,12 +39,12 @@ func (ctrl *Controller) RegisterRoutes(camps *gin.RouterGroup) {
 
 type CreateSessionAgeGroupRequest struct {
 	AgeGroupID string `json:"age_group_id" binding:"required"`
-	GroupSize  *int   `json:"group_size"`
+	GroupSize  *int32 `json:"group_size"`
 }
 
 type UpdateSessionAgeGroupRequest struct {
 	AgeGroupID string `json:"age_group_id" binding:"required"`
-	GroupSize  *int   `json:"group_size"`
+	GroupSize  *int32 `json:"group_size"`
 }
 
 type SessionAgeGroupResponse struct {
@@ -52,7 +52,7 @@ type SessionAgeGroupResponse struct {
 	CampID     string `json:"camp_id"`
 	SessionID  string `json:"session_id"`
 	AgeGroupID string `json:"age_group_id"`
-	GroupSize  *int   `json:"group_size"`
+	GroupSize  *int32 `json:"group_size"`
 }
 
 // Session cabin types
@@ -60,14 +60,14 @@ type SessionAgeGroupResponse struct {
 type CreateSessionCabinRequest struct {
 	SessionAgeGroupID  string `json:"session_age_group_id" binding:"required"`
 	CabinID            string `json:"cabin_id" binding:"required"`
-	GroupSize          *int   `json:"group_size"`
-	RequiredCounselors *int   `json:"required_counselors"`
+	GroupSize          *int32 `json:"group_size"`
+	RequiredCounselors *int32 `json:"required_counselors"`
 }
 
 type UpdateSessionCabinRequest struct {
 	CabinID            string `json:"cabin_id" binding:"required"`
-	GroupSize          *int   `json:"group_size"`
-	RequiredCounselors *int   `json:"required_counselors"`
+	GroupSize          *int32 `json:"group_size"`
+	RequiredCounselors *int32 `json:"required_counselors"`
 }
 
 type SessionCabinResponse struct {
@@ -75,8 +75,8 @@ type SessionCabinResponse struct {
 	CampID             string `json:"camp_id"`
 	SessionAgeGroupID  string `json:"session_age_group_id"`
 	CabinID            string `json:"cabin_id"`
-	GroupSize          *int   `json:"group_size"`
-	RequiredCounselors *int   `json:"required_counselors"`
+	GroupSize          *int32 `json:"group_size"`
+	RequiredCounselors *int32 `json:"required_counselors"`
 }
 
 // Session age group handlers

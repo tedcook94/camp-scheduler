@@ -21,10 +21,10 @@ func NewController(svc *Service) *Controller {
 
 func (ctrl *Controller) RegisterRoutes(camps *gin.RouterGroup) {
 	camps.GET("", ctrl.List)
-	camps.GET("/:id", ctrl.Get)
+	camps.GET("/:campId", ctrl.Get)
 	camps.POST("", ctrl.Create)
-	camps.PUT("/:id", ctrl.Update)
-	camps.DELETE("/:id", ctrl.Delete)
+	camps.PUT("/:campId", ctrl.Update)
+	camps.DELETE("/:campId", ctrl.Delete)
 }
 
 type CreateCampRequest struct {
@@ -57,7 +57,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 }
 
 func (ctrl *Controller) Get(c *gin.Context) {
-	id := c.Param("id")
+	id := c.Param("campId")
 
 	camp, err := ctrl.svc.GetByID(c.Request.Context(), id)
 	if err != nil {
@@ -94,7 +94,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 }
 
 func (ctrl *Controller) Update(c *gin.Context) {
-	id := c.Param("id")
+	id := c.Param("campId")
 
 	var req UpdateCampRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -120,7 +120,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 }
 
 func (ctrl *Controller) Delete(c *gin.Context) {
-	id := c.Param("id")
+	id := c.Param("campId")
 
 	err := ctrl.svc.Delete(c.Request.Context(), id)
 	if err != nil {

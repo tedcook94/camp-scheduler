@@ -22,10 +22,10 @@ func NewController(svc *Service) *Controller {
 func (ctrl *Controller) RegisterRoutes(camps *gin.RouterGroup) {
 	sessions := camps.Group("/:campId/sessions")
 	sessions.GET("", ctrl.List)
-	sessions.GET("/:id", ctrl.Get)
+	sessions.GET("/:sessionId", ctrl.Get)
 	sessions.POST("", ctrl.Create)
-	sessions.PUT("/:id", ctrl.Update)
-	sessions.DELETE("/:id", ctrl.Delete)
+	sessions.PUT("/:sessionId", ctrl.Update)
+	sessions.DELETE("/:sessionId", ctrl.Delete)
 }
 
 type CreateSessionRequest struct {
@@ -66,7 +66,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 
 func (ctrl *Controller) Get(c *gin.Context) {
 	campID := c.Param("campId")
-	id := c.Param("id")
+	id := c.Param("sessionId")
 
 	session, err := ctrl.svc.GetByID(c.Request.Context(), campID, id)
 	if err != nil {
@@ -110,7 +110,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 
 func (ctrl *Controller) Update(c *gin.Context) {
 	campID := c.Param("campId")
-	id := c.Param("id")
+	id := c.Param("sessionId")
 
 	var req UpdateSessionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -138,7 +138,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 
 func (ctrl *Controller) Delete(c *gin.Context) {
 	campID := c.Param("campId")
-	id := c.Param("id")
+	id := c.Param("sessionId")
 
 	err := ctrl.svc.Delete(c.Request.Context(), campID, id)
 	if err != nil {

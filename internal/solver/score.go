@@ -103,6 +103,9 @@ func scoreCocounselorPreference(snapshot SessionSnapshot, assignment Assignment,
 			continue
 		}
 		for _, pref := range prefs {
+			if pref.Rank <= 0 {
+				continue
+			}
 			prefCabinID, ok := counselorCabin[pref.TargetID]
 			if !ok {
 				continue
@@ -141,6 +144,9 @@ func scoreAgeGroupPreference(snapshot SessionSnapshot, assignment Assignment, we
 		}
 		cabin := cabinsByID[cabinID]
 		for _, pref := range prefs {
+			if pref.Rank <= 0 {
+				continue
+			}
 			if cabin.AgeGroupID == pref.TargetID {
 				score := weights.AgeGroupPreference / float64(pref.Rank)
 				components = append(components, ScoreComponent{

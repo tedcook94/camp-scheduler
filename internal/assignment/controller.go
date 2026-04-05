@@ -3,6 +3,7 @@ package assignment
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -99,7 +100,11 @@ func (ctrl *Controller) TriggerRun(c *gin.Context) {
 		}
 	}
 
-	cfg := buildSolverConfig(req)
+	cfg, err := buildSolverConfig(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	run, err := ctrl.svc.TriggerRun(c.Request.Context(), campID, sessionID, cfg)
 	if err != nil {
@@ -235,13 +240,19 @@ func (ctrl *Controller) SelectSolution(c *gin.Context) {
 	c.JSON(http.StatusOK, run)
 }
 
-func buildSolverConfig(req TriggerRunRequest) solver.SolverConfig {
+func buildSolverConfig(req TriggerRunRequest) (solver.SolverConfig, error) {
 	cfg := solver.DefaultSolverConfig()
 
 	if req.MaxSolutions != nil {
+		if *req.MaxSolutions <= 0 {
+			return cfg, fmt.Errorf("max_solutions must be greater than 0")
+		}
 		cfg.MaxSolutions = *req.MaxSolutions
 	}
 	if req.MaxIterations != nil {
+		if *req.MaxIterations <= 0 {
+			return cfg, fmt.Errorf("max_iterations must be greater than 0")
+		}
 		cfg.MaxIterations = *req.MaxIterations
 	}
 	if req.Weights != nil {
@@ -262,5 +273,5 @@ func buildSolverConfig(req TriggerRunRequest) solver.SolverConfig {
 		}
 	}
 
-	return cfg
+	return cfg, nil
 }

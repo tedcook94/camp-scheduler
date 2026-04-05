@@ -245,7 +245,8 @@ func (svc *Service) CreateCabin(ctx context.Context, campID, sessionID string, r
 		return SessionCabinResponse{}, err
 	}
 
-	// Verify the session age group belongs to this camp and session.
+	// Verify the session age group belongs to this session.
+	// The composite FK enforces camp-scoping, but not session-scoping.
 	_, err = svc.queries.GetSessionAgeGroup(ctx, db.GetSessionAgeGroupParams{
 		ID:        sessionAgeGroupUUID,
 		CampID:    campUUID,

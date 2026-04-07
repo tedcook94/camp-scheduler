@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"camp-scheduler/internal/config"
@@ -155,6 +156,7 @@ func asMap(v any) map[string]any {
 func TestSolverIntegration(t *testing.T) {
 	t.Run("simple_camp", testSimpleCamp)
 	t.Run("complex_camp", testComplexCamp)
+	t.Run("repeated_unmet_preference_boost", testRepeatedUnmetPreferenceBoost)
 }
 
 func TestCamperSolverIntegration(t *testing.T) {
@@ -1514,4 +1516,165 @@ func testCamperRunInvalidSession(t *testing.T) {
 	runURL := apiURL(ts, "/camps/"+campID+"/sessions/"+fakeSessionID+"/assignment-runs")
 
 	doRawRequest(t, http.MethodPost, runURL, map[string]any{"run_type": "camper_cabin"}, http.StatusNotFound)
+}
+
+// testRepeatedUnmetPreferenceBoost exercises the full flow of:
+// 1. Run session 1 solver with conflicting preferences (some go unmet)
+// 2. Select the session 1 solution
+// 3. Run session 2 solver with the same preferences
+// 4. Verify the session 2 score breakdown reflects the "(previously unmet)" boost
+//
+// Scenario: 2 age groups, 2 cabins, 3 counselors. Alice and Bob both prefer
+// Young, but only one Young cabin exists, so one must go to Old. In session 2,
+// the counselor whose Young preference was unmet gets a score boost.
+func testRepeatedUnmetPreferenceBoost(t *testing.T) {
+	ts := mustSetupServer(t)
+
+	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{
+		"name": "Camp Boost",
+	})
+	campID := str(campResp, "id")
+	base := "/camps/" + campID
+
+	// Create age groups.
+	young := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Young"})
+	youngID := str(young, "id")
+
+	old := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Old"})
+	oldID := str(old, "id")
+
+	// Create cabins.
+	pine := mustPost(t, apiURL(ts, base+"/cabins"), map[string]any{
+		"name": "Pine", "age_group_id": youngID,
+	})
+	pineID := str(pine, "id")
+
+	oak := mustPost(t, apiURL(ts, base+"/cabins"), map[string]any{
+		"name": "Oak", "age_group_id": oldID,
+	})
+	oakID := str(oak, "id")
+
+	// Create season and sessions.
+	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{
+		"name": "Summer 2025", "start_date": "2025-06-01", "end_date": "2025-08-31",
+	})
+	seasonID := str(season, "id")
+
+	session1 := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{
+		"name": "Session 1", "season_id": seasonID,
+	})
+	session1ID := str(session1, "id")
+
+	session2 := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{
+		"name":                "Session 2",
+		"season_id":           seasonID,
+		"previous_session_id": session1ID,
+	})
+	session2ID := str(session2, "id")
+
+	// Create 2 senior counselors. Both prefer Young, but only one Young cabin
+	// exists so the solver must leave one preference unmet.
+	type counselorInfo struct {
+		id   string
+		name string
+	}
+	var counselors []counselorInfo
+	for _, name := range []string{"Alice", "Bob"} {
+		resp := mustPost(t, apiURL(ts, base+"/counselors"), map[string]any{
+			"name":             name,
+			"junior_counselor": false,
+		})
+		counselors = append(counselors, counselorInfo{id: str(resp, "id"), name: name})
+	}
+	alice, bob := counselors[0], counselors[1]
+
+	// Configure session 1 cabins (1 required counselor each).
+	configureCabins := func(sessionID string) {
+		sagYoung := mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/age-groups"), map[string]any{
+			"age_group_id": youngID,
+		})
+		sagOld := mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/age-groups"), map[string]any{
+			"age_group_id": oldID,
+		})
+		mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/cabins"), map[string]any{
+			"session_age_group_id": str(sagYoung, "id"),
+			"cabin_id":             pineID,
+			"required_counselors":  1,
+		})
+		mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/cabins"), map[string]any{
+			"session_age_group_id": str(sagOld, "id"),
+			"cabin_id":             oakID,
+			"required_counselors":  1,
+		})
+	}
+
+	configureCabins(session1ID)
+	configureCabins(session2ID)
+
+	// Set preferences: both Alice and Bob want Young.
+	setPreferences := func(sessionID string) {
+		prefBase := base + "/sessions/" + sessionID + "/counselors/"
+		mustPost(t, apiURL(ts, prefBase+alice.id+"/age-group-preferences"), map[string]any{
+			"age_group_id": youngID, "rank": 1,
+		})
+		mustPost(t, apiURL(ts, prefBase+bob.id+"/age-group-preferences"), map[string]any{
+			"age_group_id": youngID, "rank": 1,
+		})
+	}
+
+	setPreferences(session1ID)
+
+	// Trigger session 1 run.
+	run1URL := apiURL(ts, base+"/sessions/"+session1ID+"/assignment-runs")
+	run1Resp := mustPost(t, run1URL, nil)
+	run1ID := str(run1Resp, "id")
+
+	solutions1 := list(run1Resp, "solutions")
+	if len(solutions1) == 0 {
+		t.Fatal("expected at least one solution for session 1")
+	}
+	sol1ID := str(asMap(solutions1[0]), "id")
+
+	// Select the top solution for session 1.
+	doRequest(t, http.MethodPost,
+		run1URL+"/"+run1ID+"/solutions/"+sol1ID+"/select", nil, http.StatusOK)
+
+	// Set the same preferences for session 2.
+	setPreferences(session2ID)
+
+	// Trigger session 2 run.
+	run2URL := apiURL(ts, base+"/sessions/"+session2ID+"/assignment-runs")
+	run2Resp := mustPost(t, run2URL, nil)
+	run2ID := str(run2Resp, "id")
+
+	solutions2 := list(run2Resp, "solutions")
+	if len(solutions2) == 0 {
+		t.Fatal("expected at least one solution for session 2")
+	}
+	sol2ID := str(asMap(solutions2[0]), "id")
+
+	// Fetch the session 2 solution detail and verify the boost.
+	sol2Detail := mustGet(t, run2URL+"/"+run2ID+"/solutions/"+sol2ID)
+
+	breakdown := list(sol2Detail, "score_breakdown")
+	if len(breakdown) == 0 {
+		t.Fatal("expected non-empty score_breakdown")
+	}
+
+	hasPreviouslyUnmet := false
+	for _, b := range breakdown {
+		bm := asMap(b)
+		msg := str(bm, "Message")
+		if strings.Contains(msg, "previously unmet") {
+			hasPreviouslyUnmet = true
+			break
+		}
+	}
+	if !hasPreviouslyUnmet {
+		t.Fatal("expected at least one score component with '(previously unmet)' boost in session 2")
+	}
+
+	// Clean up.
+	mustDelete(t, run1URL+"/"+run1ID)
+	mustDelete(t, run2URL+"/"+run2ID)
 }

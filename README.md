@@ -174,15 +174,16 @@ constraints -- the director can see what trade-offs exist between options.
 
 ### Phase 3: Activity Scheduling
 
-- [ ] Add activity, time slot, certification tables + CRUD
-- [ ] Add counselor certifications
-- [ ] Extend solver for counselor-to-activity-to-timeslot assignments
-- [ ] Time conflict detection
-- [ ] Activity capacity constraints
+- [x] Add activity, time slot, certification tables + CRUD
+- [x] Add counselor certifications
+- [x] Extend solver for counselor-to-activity-to-timeslot assignments
+- [x] Time conflict detection
+- [x] Activity capacity constraints
 
 ### Phase 4: Polish & Integration
 
 - [ ] Reward repeated preferences that were previously unmet
+- [ ] Docker Compose for local dev
 - [ ] JWT authentication
   - [ ] Remove camp_id from REST endpoint paths; derive camp context from JWT
 - [ ] Web frontend

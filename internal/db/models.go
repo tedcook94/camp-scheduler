@@ -8,6 +8,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Activity struct {
+	ID           pgtype.UUID
+	CampID       pgtype.UUID
+	ActivityName string
+}
+
+type ActivityCertification struct {
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	ActivityID      pgtype.UUID
+	CertificationID pgtype.UUID
+}
+
 type AgeGroup struct {
 	ID           pgtype.UUID
 	CampID       pgtype.UUID
@@ -92,6 +105,12 @@ type CamperSessionEnrollment struct {
 	CamperID          pgtype.UUID
 	SessionID         pgtype.UUID
 	SessionAgeGroupID pgtype.UUID
+}
+
+type Certification struct {
+	ID                pgtype.UUID
+	CampID            pgtype.UUID
+	CertificationName string
 }
 
 type Counselor struct {
@@ -187,4 +206,10 @@ type SessionAgeGroupCabin struct {
 	CabinID            pgtype.UUID
 	GroupSize          pgtype.Int4
 	RequiredCounselors pgtype.Int4
+}
+
+type TimeSlot struct {
+	ID           pgtype.UUID
+	CampID       pgtype.UUID
+	TimeSlotName string
 }

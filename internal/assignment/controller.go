@@ -34,11 +34,12 @@ func (ctrl *Controller) RegisterRoutes(camps *gin.RouterGroup) {
 }
 
 type TriggerRunRequest struct {
-	RunType       string                `json:"run_type"`
-	MaxSolutions  *int                  `json:"max_solutions"`
-	MaxIterations *int                  `json:"max_iterations"`
-	Weights       *Weights              `json:"weights"`
-	CamperWeights *CamperWeightsRequest `json:"camper_weights"`
+	RunType         string                  `json:"run_type"`
+	MaxSolutions    *int                    `json:"max_solutions"`
+	MaxIterations   *int                    `json:"max_iterations"`
+	Weights         *Weights                `json:"weights"`
+	CamperWeights   *CamperWeightsRequest   `json:"camper_weights"`
+	ActivityWeights *ActivityWeightsRequest `json:"activity_weights"`
 }
 
 type Weights struct {
@@ -51,6 +52,10 @@ type Weights struct {
 
 type CamperWeightsRequest struct {
 	FriendPreference *float64 `json:"friend_preference"`
+}
+
+type ActivityWeightsRequest struct {
+	ActivityPreference *float64 `json:"activity_preference"`
 }
 
 type RunResponse struct {
@@ -83,10 +88,11 @@ type SolutionDetailResponse struct {
 }
 
 type AssignmentResponse struct {
-	ID          string `json:"id"`
-	CounselorID string `json:"counselor_id,omitempty"`
-	CamperID    string `json:"camper_id,omitempty"`
-	CabinID     string `json:"cabin_id"`
+	ID                string `json:"id"`
+	CounselorID       string `json:"counselor_id,omitempty"`
+	CamperID          string `json:"camper_id,omitempty"`
+	CabinID           string `json:"cabin_id,omitempty"`
+	SessionActivityID string `json:"session_activity_id,omitempty"`
 }
 
 type ExplanationResponse struct {
@@ -137,6 +143,21 @@ func (ctrl *Controller) TriggerRun(c *gin.Context) {
 		}
 
 		run, err := ctrl.svc.TriggerCamperRun(c.Request.Context(), campID, sessionID, cfg)
+		if err != nil {
+			ctrl.handleTriggerError(c, campID, sessionID, err)
+			return
+		}
+
+		c.JSON(http.StatusCreated, run)
+
+	case "activity_schedule":
+		cfg, err := buildActivitySolverConfig(req)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		run, err := ctrl.svc.TriggerActivityRun(c.Request.Context(), campID, sessionID, cfg)
 		if err != nil {
 			ctrl.handleTriggerError(c, campID, sessionID, err)
 			return
@@ -361,6 +382,30 @@ func buildCamperSolverConfig(req TriggerRunRequest) (solver.CamperSolverConfig, 
 	if req.CamperWeights != nil {
 		if req.CamperWeights.FriendPreference != nil {
 			cfg.Weights.FriendPreference = *req.CamperWeights.FriendPreference
+		}
+	}
+
+	return cfg, nil
+}
+
+func buildActivitySolverConfig(req TriggerRunRequest) (solver.ActivitySolverConfig, error) {
+	cfg := solver.DefaultActivitySolverConfig()
+
+	if req.MaxSolutions != nil {
+		if *req.MaxSolutions <= 0 {
+			return cfg, fmt.Errorf("max_solutions must be greater than 0")
+		}
+		cfg.MaxSolutions = *req.MaxSolutions
+	}
+	if req.MaxIterations != nil {
+		if *req.MaxIterations <= 0 {
+			return cfg, fmt.Errorf("max_iterations must be greater than 0")
+		}
+		cfg.MaxIterations = *req.MaxIterations
+	}
+	if req.ActivityWeights != nil {
+		if req.ActivityWeights.ActivityPreference != nil {
+			cfg.Weights.ActivityPreference = *req.ActivityWeights.ActivityPreference
 		}
 	}
 

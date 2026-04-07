@@ -143,6 +143,10 @@ func (s *Server) routes() {
 	sessionConfigController := sessionconfig.NewController(sessionConfigService)
 	sessionConfigController.RegisterRoutes(camps)
 
+	activityConfigService := sessionconfig.NewActivityService(queries)
+	activityConfigController := sessionconfig.NewActivityController(activityConfigService)
+	activityConfigController.RegisterRoutes(camps)
+
 	camperService := camper.NewService(queries)
 	camperController := camper.NewController(camperService)
 	camperController.RegisterRoutes(camps)

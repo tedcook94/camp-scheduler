@@ -198,6 +198,15 @@ type Session struct {
 	PreviousSession pgtype.UUID
 }
 
+type SessionActivity struct {
+	ID                 pgtype.UUID
+	CampID             pgtype.UUID
+	SessionTimeSlotID  pgtype.UUID
+	ActivityID         pgtype.UUID
+	Capacity           int32
+	RequiredCounselors int32
+}
+
 type SessionAgeGroup struct {
 	ID         pgtype.UUID
 	CampID     pgtype.UUID
@@ -213,6 +222,14 @@ type SessionAgeGroupCabin struct {
 	CabinID            pgtype.UUID
 	GroupSize          pgtype.Int4
 	RequiredCounselors pgtype.Int4
+}
+
+type SessionTimeSlot struct {
+	ID         pgtype.UUID
+	CampID     pgtype.UUID
+	SessionID  pgtype.UUID
+	TimeSlotID pgtype.UUID
+	SortOrder  int32
 }
 
 type TimeSlot struct {

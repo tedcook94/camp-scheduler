@@ -131,6 +131,10 @@ func (s *Server) routes() {
 	counselorCertController := preferences.NewCounselorCertificationController(counselorCertService)
 	counselorCertController.RegisterRoutes(camps)
 
+	activityPrefService := preferences.NewActivityPreferenceService(queries)
+	activityPrefController := preferences.NewActivityPreferenceController(activityPrefService)
+	activityPrefController.RegisterRoutes(camps)
+
 	camperFriendPrefService := preferences.NewCamperFriendService(queries)
 	camperFriendPrefController := preferences.NewCamperFriendController(camperFriendPrefService)
 	camperFriendPrefController.RegisterRoutes(camps)

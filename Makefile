@@ -7,13 +7,18 @@ else
 MIGRATE_CMD = up
 endif
 
-.PHONY: dev build sqlc migrate migrate-test migrate-all migration test test-integration
+.PHONY: deps dev build sqlc migrate migrate-test migrate-all migration test test-integration
+
+deps:
+	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 
 dev:
 	go run ./cmd/server
 
 build:
 	go build -o bin/server ./cmd/server
+
 
 test:
 	go test ./...

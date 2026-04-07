@@ -14,11 +14,38 @@ type Activity struct {
 	ActivityName string
 }
 
+type ActivityAssignment struct {
+	ID                pgtype.UUID
+	CampID            pgtype.UUID
+	SolutionID        pgtype.UUID
+	CounselorID       pgtype.UUID
+	SessionActivityID pgtype.UUID
+}
+
 type ActivityCertification struct {
 	ID              pgtype.UUID
 	CampID          pgtype.UUID
 	ActivityID      pgtype.UUID
 	CertificationID pgtype.UUID
+}
+
+type ActivityExplanation struct {
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	SolutionID      pgtype.UUID
+	CounselorID     pgtype.UUID
+	ExplanationType string
+	ConstraintName  pgtype.Text
+	Message         string
+}
+
+type ActivitySolution struct {
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	AssignmentRunID pgtype.UUID
+	SolutionIndex   int32
+	Score           float64
+	ScoreBreakdown  []byte
 }
 
 type AgeGroup struct {

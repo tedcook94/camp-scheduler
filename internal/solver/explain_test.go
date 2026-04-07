@@ -293,7 +293,7 @@ func TestExplain(t *testing.T) {
 		}
 	})
 
-	t.Run("unassigned counselors excluded", func(t *testing.T) {
+	t.Run("unassigned counselors have unmet preferences", func(t *testing.T) {
 		snapshot := SessionSnapshot{
 			Cabins: []Cabin{
 				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1},
@@ -320,10 +320,17 @@ func TestExplain(t *testing.T) {
 		if len(explanation.Assignments) != 1 {
 			t.Errorf("expected 1 assignment explanation, got %d", len(explanation.Assignments))
 		}
+		found := false
 		for _, u := range explanation.UnmetPreferences {
-			if u.CounselorID == "sr2" {
-				t.Error("unassigned counselor sr2 should not have unmet preferences")
+			if u.CounselorID == "sr2" && u.Constraint == "age_group_preference" {
+				found = true
+				if !strings.Contains(u.Message, "not assigned to any cabin") {
+					t.Errorf("expected unassigned detail in message, got %q", u.Message)
+				}
 			}
+		}
+		if !found {
+			t.Error("expected unmet age group preference for unassigned counselor sr2")
 		}
 	})
 }

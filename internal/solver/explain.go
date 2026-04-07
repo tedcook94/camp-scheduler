@@ -69,12 +69,11 @@ func findUnmetAgeGroupPreferences(snapshot SessionSnapshot, counselorCabin map[s
 	var unmet []UnmetPreference
 	for counselorID, prefs := range snapshot.AgeGroupPreferences {
 		cabinID, assigned := counselorCabin[counselorID]
-		if !assigned {
-			continue
-		}
 
-		cabin := cabinsByID[cabinID]
-		assignedAgeGroup := cabin.AgeGroupID
+		var assignedAgeGroup string
+		if assigned {
+			assignedAgeGroup = cabinsByID[cabinID].AgeGroupID
+		}
 
 		var topPrefAgeGroup string
 		for _, p := range prefs {
@@ -88,23 +87,29 @@ func findUnmetAgeGroupPreferences(snapshot SessionSnapshot, counselorCabin map[s
 			continue
 		}
 
-		var rankMsg string
-		for _, p := range prefs {
-			if p.TargetID == assignedAgeGroup {
-				rankMsg = fmt.Sprintf("rank %d of %d preferences", p.Rank, len(prefs))
-				break
+		var detail string
+		if !assigned {
+			detail = "not assigned to any cabin"
+		} else {
+			var rankMsg string
+			for _, p := range prefs {
+				if p.TargetID == assignedAgeGroup {
+					rankMsg = fmt.Sprintf("rank %d of %d preferences", p.Rank, len(prefs))
+					break
+				}
 			}
-		}
-		if rankMsg == "" {
-			rankMsg = "not ranked"
+			if rankMsg == "" {
+				rankMsg = "not ranked"
+			}
+			detail = fmt.Sprintf("assigned to age group %q (%s)", assignedAgeGroup, rankMsg)
 		}
 
 		unmet = append(unmet, UnmetPreference{
 			CounselorID: counselorID,
 			Constraint:  "age_group_preference",
 			Message: fmt.Sprintf(
-				"preferred age group %q but assigned to age group %q (%s)",
-				topPrefAgeGroup, assignedAgeGroup, rankMsg,
+				"preferred age group %q but %s",
+				topPrefAgeGroup, detail,
 			),
 		})
 	}
@@ -172,20 +177,17 @@ func findUnmetReturningCabin(snapshot SessionSnapshot, counselorCabin map[string
 func findUnmetCocounselorPreferences(snapshot SessionSnapshot, counselorCabin map[string]string, counselorsByID map[string]Counselor) []UnmetPreference {
 	var unmet []UnmetPreference
 	for counselorID, prefs := range snapshot.CocounselorPreferences {
-		cabinID, assigned := counselorCabin[counselorID]
-		if !assigned {
-			continue
-		}
+		cabinID := counselorCabin[counselorID]
 
 		for _, pref := range prefs {
-			prefCabinID, prefAssigned := counselorCabin[pref.TargetID]
-			if !prefAssigned || prefCabinID != cabinID {
+			prefCabinID := counselorCabin[pref.TargetID]
+			if cabinID == "" || prefCabinID == "" || prefCabinID != cabinID {
 				prefName := counselorsByID[pref.TargetID].Name
 				unmet = append(unmet, UnmetPreference{
 					CounselorID: counselorID,
 					Constraint:  "cocounselor_preference",
 					Message: fmt.Sprintf(
-						"preferred co-counselor %q but placed in different cabins",
+						"preferred co-counselor %q but not placed together",
 						prefName,
 					),
 				})

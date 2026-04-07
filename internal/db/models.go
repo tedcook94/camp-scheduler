@@ -157,6 +157,13 @@ type CounselorCabinSolution struct {
 	ScoreBreakdown  []byte
 }
 
+type CounselorCertification struct {
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	CounselorID     pgtype.UUID
+	CertificationID pgtype.UUID
+}
+
 type CounselorCocounselorPreference struct {
 	ID                   pgtype.UUID
 	CampID               pgtype.UUID

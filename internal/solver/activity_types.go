@@ -19,10 +19,11 @@ type ActivityCounselor struct {
 }
 
 type ActivitySnapshot struct {
-	SessionID           string
-	Slots               []ActivitySlot
-	Counselors          []ActivityCounselor
-	ActivityPreferences map[string][]RankedPreference
+	SessionID                string
+	Slots                    []ActivitySlot
+	Counselors               []ActivityCounselor
+	ActivityPreferences      map[string][]RankedPreference
+	UnmetActivityPreferences map[string]map[string]bool
 }
 
 type ActivityAssignment struct {
@@ -31,11 +32,13 @@ type ActivityAssignment struct {
 
 type ActivityWeights struct {
 	ActivityPreference float64
+	RepeatedUnmetBoost float64
 }
 
 func DefaultActivityWeights() ActivityWeights {
 	return ActivityWeights{
 		ActivityPreference: 10.0,
+		RepeatedUnmetBoost: 1.5,
 	}
 }
 

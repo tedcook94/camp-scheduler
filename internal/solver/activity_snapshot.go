@@ -2,11 +2,13 @@ package solver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -21,7 +23,7 @@ func BuildActivitySnapshot(ctx context.Context, queries *db.Queries, campID, ses
 		return ActivitySnapshot{}, err
 	}
 
-	_, err = queries.GetSession(ctx, db.GetSessionParams{
+	session, err := queries.GetSession(ctx, db.GetSessionParams{
 		ID:     sessionUUID,
 		CampID: campUUID,
 	})
@@ -44,11 +46,17 @@ func BuildActivitySnapshot(ctx context.Context, queries *db.Queries, campID, ses
 		return ActivitySnapshot{}, err
 	}
 
+	unmetPrefs, err := loadPreviouslyUnmetActivityPreferences(ctx, queries, session, campUUID)
+	if err != nil {
+		return ActivitySnapshot{}, err
+	}
+
 	return ActivitySnapshot{
-		SessionID:           sessionID,
-		Slots:               slots,
-		Counselors:          counselors,
-		ActivityPreferences: prefs,
+		SessionID:                sessionID,
+		Slots:                    slots,
+		Counselors:               counselors,
+		ActivityPreferences:      prefs,
+		UnmetActivityPreferences: unmetPrefs,
 	}, nil
 }
 
@@ -148,4 +156,80 @@ func loadActivityPreferences(ctx context.Context, queries *db.Queries, sessionID
 		})
 	}
 	return prefs, nil
+}
+
+func loadPreviouslyUnmetActivityPreferences(ctx context.Context, queries *db.Queries, session db.Session, campID pgtype.UUID) (map[string]map[string]bool, error) {
+	if !session.PreviousSession.Valid {
+		return nil, nil
+	}
+
+	solutionID, err := queries.GetSelectedActivitySolutionBySession(ctx, db.GetSelectedActivitySolutionBySessionParams{
+		SessionID: session.PreviousSession,
+		CampID:    campID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("error getting previous session selected activity solution: %w", err)
+	}
+
+	prevPrefs, err := loadActivityPreferences(ctx, queries, session.PreviousSession, campID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(prevPrefs) == 0 {
+		return nil, nil
+	}
+
+	assignments, err := queries.ListActivityAssignmentsBySolution(ctx, db.ListActivityAssignmentsBySolutionParams{
+		SolutionID: solutionID,
+		CampID:     campID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error listing previous activity solution assignments: %w", err)
+	}
+
+	prevSlots, err := loadActivitySlots(ctx, queries, session.PreviousSession, campID)
+	if err != nil {
+		return nil, err
+	}
+
+	slotActivity := make(map[string]string, len(prevSlots))
+	for _, s := range prevSlots {
+		slotActivity[s.ID] = s.ActivityID
+	}
+
+	// Build counselor -> set of activity IDs they were assigned to.
+	counselorActivities := make(map[string]map[string]bool)
+	for _, a := range assignments {
+		cID := api.UUIDToString(a.CounselorID)
+		actID := slotActivity[api.UUIDToString(a.SessionActivityID)]
+		if counselorActivities[cID] == nil {
+			counselorActivities[cID] = make(map[string]bool)
+		}
+		counselorActivities[cID][actID] = true
+	}
+
+	return diffActivityPreferences(prevPrefs, counselorActivities), nil
+}
+
+func diffActivityPreferences(prefs map[string][]RankedPreference, counselorActivities map[string]map[string]bool) map[string]map[string]bool {
+	result := make(map[string]map[string]bool)
+	for counselorID, prefList := range prefs {
+		activities := counselorActivities[counselorID]
+		for _, pref := range prefList {
+			if !activities[pref.TargetID] {
+				if result[counselorID] == nil {
+					result[counselorID] = make(map[string]bool)
+				}
+				result[counselorID][pref.TargetID] = true
+			}
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
 }

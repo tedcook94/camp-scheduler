@@ -182,7 +182,7 @@ constraints -- the director can see what trade-offs exist between options.
 
 ### Phase 4: Polish & Integration
 
-- [ ] Reward repeated preferences that were previously unmet
+- [x] Reward repeated preferences that were previously unmet
 - [ ] Docker Compose for local dev
 - [ ] JWT authentication
   - [ ] Remove camp_id from REST endpoint paths; derive camp context from JWT

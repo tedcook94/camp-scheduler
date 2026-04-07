@@ -683,3 +683,289 @@ func TestScoreSoftConstraints(t *testing.T) {
 		}
 	})
 }
+
+func TestRepeatedUnmetAgeGroupBoost(t *testing.T) {
+	weights := DefaultWeights()
+
+	snapshot := SessionSnapshot{
+		Cabins: []Cabin{
+			{ID: "c1", Name: "Pine", AgeGroupID: "ag1"},
+			{ID: "c2", Name: "Oak", AgeGroupID: "ag2"},
+		},
+		AgeGroupPreferences: map[string][]RankedPreference{
+			"co1": {{TargetID: "ag1", Rank: 1}},
+			"co2": {{TargetID: "ag2", Rank: 1}},
+		},
+		UnmetAgeGroupPreferences: map[string]map[string]bool{
+			"co1": {"ag1": true},
+		},
+	}
+
+	assignment := Assignment{
+		CabinCounselors: map[string][]string{
+			"c1": {"co1"},
+			"c2": {"co2"},
+		},
+	}
+
+	components := scoreAgeGroupPreference(snapshot, assignment, weights)
+	if len(components) != 2 {
+		t.Fatalf("got %d components, want 2", len(components))
+	}
+
+	// Find scores by counselor.
+	scores := make(map[string]float64)
+	messages := make(map[string]string)
+	for _, c := range components {
+		scores[c.CounselorID] = c.Score
+		messages[c.CounselorID] = c.Message
+	}
+
+	// co1 had a previously unmet preference -- should be boosted.
+	wantBoosted := weights.AgeGroupPreference * weights.RepeatedUnmetBoost
+	if !floatEqual(scores["co1"], wantBoosted) {
+		t.Errorf("co1: got score %f, want %f (boosted)", scores["co1"], wantBoosted)
+	}
+	if got := messages["co1"]; got == "" || !contains(got, "previously unmet") {
+		t.Errorf("co1: expected message to contain 'previously unmet', got %q", got)
+	}
+
+	// co2 had no unmet preference -- should be normal.
+	if !floatEqual(scores["co2"], weights.AgeGroupPreference) {
+		t.Errorf("co2: got score %f, want %f (normal)", scores["co2"], weights.AgeGroupPreference)
+	}
+	if got := messages["co2"]; contains(got, "previously unmet") {
+		t.Errorf("co2: expected message without 'previously unmet', got %q", got)
+	}
+}
+
+func TestRepeatedUnmetCocounselorBoost(t *testing.T) {
+	weights := DefaultWeights()
+
+	snapshot := SessionSnapshot{
+		Cabins: []Cabin{
+			{ID: "c1", Name: "Pine"},
+		},
+		CocounselorPreferences: map[string][]RankedPreference{
+			"co1": {{TargetID: "co2", Rank: 1}},
+		},
+		UnmetCocounselorPreferences: map[string]map[string]bool{
+			"co1": {"co2": true},
+		},
+	}
+
+	assignment := Assignment{
+		CabinCounselors: map[string][]string{
+			"c1": {"co1", "co2"},
+		},
+	}
+
+	components := scoreCocounselorPreference(snapshot, assignment, weights)
+	if len(components) != 1 {
+		t.Fatalf("got %d components, want 1", len(components))
+	}
+
+	wantScore := weights.CocounselorPreference * weights.RepeatedUnmetBoost
+	if !floatEqual(components[0].Score, wantScore) {
+		t.Errorf("got score %f, want %f", components[0].Score, wantScore)
+	}
+	if !contains(components[0].Message, "previously unmet") {
+		t.Errorf("expected message to contain 'previously unmet', got %q", components[0].Message)
+	}
+}
+
+func TestRepeatedUnmetActivityBoost(t *testing.T) {
+	weights := DefaultActivityWeights()
+
+	snapshot := ActivitySnapshot{
+		Slots: []ActivitySlot{
+			{ID: "s1", ActivityID: "act1", ActivityName: "Swimming", TimeSlotID: "ts1"},
+		},
+		ActivityPreferences: map[string][]RankedPreference{
+			"co1": {{TargetID: "act1", Rank: 1}},
+			"co2": {{TargetID: "act1", Rank: 1}},
+		},
+		UnmetActivityPreferences: map[string]map[string]bool{
+			"co1": {"act1": true},
+		},
+	}
+
+	assignment := ActivityAssignment{
+		SlotCounselors: map[string][]string{
+			"s1": {"co1", "co2"},
+		},
+	}
+
+	components := scoreActivityPreference(snapshot, assignment, weights)
+	if len(components) != 2 {
+		t.Fatalf("got %d components, want 2", len(components))
+	}
+
+	scores := make(map[string]float64)
+	messages := make(map[string]string)
+	for _, c := range components {
+		scores[c.CounselorID] = c.Score
+		messages[c.CounselorID] = c.Message
+	}
+
+	wantBoosted := weights.ActivityPreference * weights.RepeatedUnmetBoost
+	if !floatEqual(scores["co1"], wantBoosted) {
+		t.Errorf("co1: got score %f, want %f (boosted)", scores["co1"], wantBoosted)
+	}
+	if !contains(messages["co1"], "previously unmet") {
+		t.Errorf("co1: expected message to contain 'previously unmet', got %q", messages["co1"])
+	}
+
+	if !floatEqual(scores["co2"], weights.ActivityPreference) {
+		t.Errorf("co2: got score %f, want %f (normal)", scores["co2"], weights.ActivityPreference)
+	}
+}
+
+func TestEffectiveBoost(t *testing.T) {
+	if got := effectiveBoost(0); got != 1.0 {
+		t.Errorf("effectiveBoost(0) = %f, want 1.0", got)
+	}
+	if got := effectiveBoost(1.5); got != 1.5 {
+		t.Errorf("effectiveBoost(1.5) = %f, want 1.5", got)
+	}
+	if got := effectiveBoost(2.0); got != 2.0 {
+		t.Errorf("effectiveBoost(2.0) = %f, want 2.0", got)
+	}
+}
+
+func TestDiffAgeGroupPreferences(t *testing.T) {
+	prefs := map[string][]RankedPreference{
+		"co1": {
+			{TargetID: "ag1", Rank: 1},
+			{TargetID: "ag2", Rank: 2},
+		},
+		"co2": {
+			{TargetID: "ag1", Rank: 1},
+		},
+		"co3": {
+			{TargetID: "ag2", Rank: 1},
+			{TargetID: "ag1", Rank: 2},
+		},
+	}
+	counselorCabin := map[string]string{
+		"co1": "c1",
+		"co2": "c2",
+		"co3": "c1",
+	}
+	cabinAgeGroup := map[string]string{
+		"c1": "ag1",
+		"c2": "ag1",
+	}
+
+	result := diffAgeGroupPreferences(prefs, counselorCabin, cabinAgeGroup)
+
+	// co1 got ag1 which is their rank-1 pref -> nothing unmet.
+	if result["co1"] != nil {
+		t.Errorf("expected co1 to have no unmet prefs, got %v", result["co1"])
+	}
+	// co2 got ag1 which is their rank-1 pref -> nothing unmet.
+	if result["co2"] != nil {
+		t.Errorf("expected co2 to have no unmet prefs, got %v", result["co2"])
+	}
+	// co3 got ag1 but their rank-1 pref is ag2 -> ag2 is unmet.
+	if !result["co3"]["ag2"] {
+		t.Error("expected co3 ag2 to be unmet")
+	}
+}
+
+func TestDiffAgeGroupPreferencesUnassigned(t *testing.T) {
+	prefs := map[string][]RankedPreference{
+		"co1": {
+			{TargetID: "ag1", Rank: 1},
+			{TargetID: "ag2", Rank: 2},
+		},
+	}
+	counselorCabin := map[string]string{}
+	cabinAgeGroup := map[string]string{}
+
+	result := diffAgeGroupPreferences(prefs, counselorCabin, cabinAgeGroup)
+
+	// Only rank-1 preference is tracked as unmet.
+	if !result["co1"]["ag1"] {
+		t.Error("expected co1 ag1 (rank 1) to be unmet when unassigned")
+	}
+	if result["co1"]["ag2"] {
+		t.Error("expected co1 ag2 (rank 2) to NOT be tracked as unmet")
+	}
+}
+
+func TestDiffCocounselorPreferences(t *testing.T) {
+	prefs := map[string][]RankedPreference{
+		"co1": {
+			{TargetID: "co2", Rank: 1},
+			{TargetID: "co3", Rank: 2},
+		},
+	}
+	counselorCabin := map[string]string{
+		"co1": "c1",
+		"co2": "c1",
+		"co3": "c2",
+	}
+
+	result := diffCocounselorPreferences(prefs, counselorCabin)
+
+	// co1 and co2 are in the same cabin, so co2 pref is met.
+	if result["co1"]["co2"] {
+		t.Error("expected co1->co2 to NOT be unmet")
+	}
+	// co1 and co3 are in different cabins, so co3 pref is unmet.
+	if !result["co1"]["co3"] {
+		t.Error("expected co1->co3 to be unmet")
+	}
+}
+
+func TestDiffCocounselorPreferencesUnassigned(t *testing.T) {
+	prefs := map[string][]RankedPreference{
+		"co1": {
+			{TargetID: "co2", Rank: 1},
+		},
+	}
+	counselorCabin := map[string]string{
+		"co2": "c1",
+	}
+
+	result := diffCocounselorPreferences(prefs, counselorCabin)
+
+	if !result["co1"]["co2"] {
+		t.Error("expected co1->co2 to be unmet when co1 is unassigned")
+	}
+}
+
+func TestDiffActivityPreferences(t *testing.T) {
+	prefs := map[string][]RankedPreference{
+		"co1": {
+			{TargetID: "act1", Rank: 1},
+			{TargetID: "act2", Rank: 2},
+		},
+	}
+	counselorActivities := map[string]map[string]bool{
+		"co1": {"act1": true},
+	}
+
+	result := diffActivityPreferences(prefs, counselorActivities)
+
+	if result["co1"]["act1"] {
+		t.Error("expected co1->act1 to NOT be unmet (assigned)")
+	}
+	if !result["co1"]["act2"] {
+		t.Error("expected co1->act2 to be unmet (not assigned)")
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && searchString(s, substr)
+}
+
+func searchString(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}

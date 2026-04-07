@@ -31,6 +31,8 @@ type SessionSnapshot struct {
 	CounselorPreviousPlacements map[string]CounselorPreviousPlacement
 	CocounselorPreferences      map[string][]RankedPreference
 	AgeGroupPreferences         map[string][]RankedPreference
+	UnmetAgeGroupPreferences    map[string]map[string]bool
+	UnmetCocounselorPreferences map[string]map[string]bool
 }
 
 type Assignment struct {
@@ -51,6 +53,7 @@ type Weights struct {
 	CocounselorPreference float64
 	AgeGroupPreference    float64
 	MultipleSeniors       float64
+	RepeatedUnmetBoost    float64
 }
 
 func DefaultWeights() Weights {
@@ -60,6 +63,7 @@ func DefaultWeights() Weights {
 		CocounselorPreference: 5.0,
 		AgeGroupPreference:    5.0,
 		MultipleSeniors:       2.0,
+		RepeatedUnmetBoost:    1.5,
 	}
 }
 

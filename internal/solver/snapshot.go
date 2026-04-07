@@ -2,11 +2,13 @@ package solver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -54,6 +56,11 @@ func BuildSnapshot(ctx context.Context, queries *db.Queries, campID, sessionID s
 		return SessionSnapshot{}, err
 	}
 
+	unmetAG, unmetCo, err := loadPreviouslyUnmetCounselorPreferences(ctx, queries, session, campUUID)
+	if err != nil {
+		return SessionSnapshot{}, err
+	}
+
 	return SessionSnapshot{
 		SessionID:                   sessionID,
 		Cabins:                      cabins,
@@ -61,6 +68,8 @@ func BuildSnapshot(ctx context.Context, queries *db.Queries, campID, sessionID s
 		AgeGroupPreferences:         ageGroupPrefs,
 		CocounselorPreferences:      cocounselorPrefs,
 		CounselorPreviousPlacements: placements,
+		UnmetAgeGroupPreferences:    unmetAG,
+		UnmetCocounselorPreferences: unmetCo,
 	}, nil
 }
 
@@ -198,4 +207,118 @@ func loadPreviousPlacements(ctx context.Context, queries *db.Queries, session db
 		}
 	}
 	return placements, nil
+}
+
+// loadPreviouslyUnmetCounselorPreferences finds preferences from the previous
+// session's selected solution that were submitted but not satisfied. It returns
+// two maps: unmet age group preferences and unmet cocounselor preferences,
+// each keyed by counselor ID -> set of target IDs.
+func loadPreviouslyUnmetCounselorPreferences(ctx context.Context, queries *db.Queries, session db.Session, campID pgtype.UUID) (map[string]map[string]bool, map[string]map[string]bool, error) {
+	if !session.PreviousSession.Valid {
+		return nil, nil, nil
+	}
+
+	solutionID, err := queries.GetSelectedCounselorCabinSolutionBySession(ctx, db.GetSelectedCounselorCabinSolutionBySessionParams{
+		SessionID: session.PreviousSession,
+		CampID:    campID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil, nil
+		}
+		return nil, nil, fmt.Errorf("error getting previous session selected solution: %w", err)
+	}
+
+	prevAGPrefs, err := loadAgeGroupPreferences(ctx, queries, session.PreviousSession, campID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	prevCoPrefs, err := loadCocounselorPreferences(ctx, queries, session.PreviousSession, campID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if len(prevAGPrefs) == 0 && len(prevCoPrefs) == 0 {
+		return nil, nil, nil
+	}
+
+	assignments, err := queries.ListCounselorCabinAssignmentsBySolution(ctx, db.ListCounselorCabinAssignmentsBySolutionParams{
+		SolutionID: solutionID,
+		CampID:     campID,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("error listing previous solution assignments: %w", err)
+	}
+
+	prevCabins, err := loadCabins(ctx, queries, session.PreviousSession, campID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	cabinAgeGroup := make(map[string]string, len(prevCabins))
+	for _, c := range prevCabins {
+		cabinAgeGroup[c.ID] = c.AgeGroupID
+	}
+
+	counselorCabin := make(map[string]string)
+	for _, a := range assignments {
+		cID := api.UUIDToString(a.CounselorID)
+		cabID := api.UUIDToString(a.CabinID)
+		counselorCabin[cID] = cabID
+	}
+
+	unmetAG := diffAgeGroupPreferences(prevAGPrefs, counselorCabin, cabinAgeGroup)
+	unmetCo := diffCocounselorPreferences(prevCoPrefs, counselorCabin)
+
+	return unmetAG, unmetCo, nil
+}
+
+func diffAgeGroupPreferences(prefs map[string][]RankedPreference, counselorCabin map[string]string, cabinAgeGroup map[string]string) map[string]map[string]bool {
+	result := make(map[string]map[string]bool)
+	for counselorID, prefList := range prefs {
+		if len(prefList) == 0 {
+			continue
+		}
+
+		cabinID, assigned := counselorCabin[counselorID]
+		assignedAG := ""
+		if assigned {
+			assignedAG = cabinAgeGroup[cabinID]
+		}
+
+		// Only the top-ranked preference is considered unmet, consistent
+		// with findUnmetAgeGroupPreferences in explain.go.
+		topPref := prefList[0]
+		if topPref.TargetID != assignedAG {
+			if result[counselorID] == nil {
+				result[counselorID] = make(map[string]bool)
+			}
+			result[counselorID][topPref.TargetID] = true
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
+func diffCocounselorPreferences(prefs map[string][]RankedPreference, counselorCabin map[string]string) map[string]map[string]bool {
+	result := make(map[string]map[string]bool)
+	for counselorID, prefList := range prefs {
+		cabinID := counselorCabin[counselorID]
+		for _, pref := range prefList {
+			prefCabinID := counselorCabin[pref.TargetID]
+			if cabinID == "" || prefCabinID == "" || prefCabinID != cabinID {
+				if result[counselorID] == nil {
+					result[counselorID] = make(map[string]bool)
+				}
+				result[counselorID][pref.TargetID] = true
+			}
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
 }

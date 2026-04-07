@@ -112,6 +112,7 @@ func scoreCocounselorPreference(snapshot SessionSnapshot, assignment Assignment,
 	}
 
 	counselorCabin := invertAssignment(assignment)
+	boost := effectiveBoost(weights.RepeatedUnmetBoost)
 
 	var components []ScoreComponent
 	for counselorID, prefs := range snapshot.CocounselorPreferences {
@@ -129,15 +130,20 @@ func scoreCocounselorPreference(snapshot SessionSnapshot, assignment Assignment,
 			}
 			if cabinID == prefCabinID {
 				score := weights.CocounselorPreference / float64(pref.Rank)
+				msg := fmt.Sprintf(
+					"paired with preferred co-counselor (rank %d)",
+					pref.Rank,
+				)
+				if snapshot.UnmetCocounselorPreferences[counselorID][pref.TargetID] {
+					score *= boost
+					msg += " (previously unmet)"
+				}
 				components = append(components, ScoreComponent{
 					Constraint:  "cocounselor_preference",
 					Score:       score,
 					CounselorID: counselorID,
 					CabinID:     cabinID,
-					Message: fmt.Sprintf(
-						"paired with preferred co-counselor (rank %d)",
-						pref.Rank,
-					),
+					Message:     msg,
 				})
 			}
 		}
@@ -152,6 +158,7 @@ func scoreAgeGroupPreference(snapshot SessionSnapshot, assignment Assignment, we
 
 	cabinsByID := indexCabins(snapshot)
 	counselorCabin := invertAssignment(assignment)
+	boost := effectiveBoost(weights.RepeatedUnmetBoost)
 
 	var components []ScoreComponent
 	for counselorID, prefs := range snapshot.AgeGroupPreferences {
@@ -166,15 +173,20 @@ func scoreAgeGroupPreference(snapshot SessionSnapshot, assignment Assignment, we
 			}
 			if cabin.AgeGroupID == pref.TargetID {
 				score := weights.AgeGroupPreference / float64(pref.Rank)
+				msg := fmt.Sprintf(
+					"assigned to preferred age group (rank %d) in cabin %q",
+					pref.Rank, cabin.Name,
+				)
+				if snapshot.UnmetAgeGroupPreferences[counselorID][pref.TargetID] {
+					score *= boost
+					msg += " (previously unmet)"
+				}
 				components = append(components, ScoreComponent{
 					Constraint:  "age_group_preference",
 					Score:       score,
 					CounselorID: counselorID,
 					CabinID:     cabinID,
-					Message: fmt.Sprintf(
-						"assigned to preferred age group (rank %d) in cabin %q",
-						pref.Rank, cabin.Name,
-					),
+					Message:     msg,
 				})
 				break
 			}
@@ -233,4 +245,13 @@ func counselorWantsToReturn(counselorID string, snapshot SessionSnapshot) bool {
 		}
 	}
 	return false
+}
+
+// effectiveBoost returns the boost multiplier, defaulting to 1.0 (no boost)
+// when the configured value is zero.
+func effectiveBoost(boost float64) float64 {
+	if boost == 0 {
+		return 1.0
+	}
+	return boost
 }

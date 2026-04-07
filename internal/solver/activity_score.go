@@ -37,6 +37,7 @@ func scoreActivityPreference(snapshot ActivitySnapshot, assignment ActivityAssig
 	}
 
 	slotsByID := indexActivitySlots(snapshot)
+	boost := effectiveBoost(weights.RepeatedUnmetBoost)
 
 	// Build counselor -> list of (slotID, activityID) from assignment.
 	type slotActivity struct {
@@ -69,15 +70,20 @@ func scoreActivityPreference(snapshot ActivitySnapshot, assignment ActivityAssig
 				if sa.ActivityID == pref.TargetID {
 					slot := slotsByID[sa.SlotID]
 					score := weights.ActivityPreference / float64(pref.Rank)
+					msg := fmt.Sprintf(
+						"assigned to preferred activity %s (rank %d)",
+						slot.ActivityName, pref.Rank,
+					)
+					if snapshot.UnmetActivityPreferences[counselorID][pref.TargetID] {
+						score *= boost
+						msg += " (previously unmet)"
+					}
 					components = append(components, ScoreComponent{
 						Constraint:  "activity_preference",
 						Score:       score,
 						CounselorID: counselorID,
 						SlotID:      sa.SlotID,
-						Message: fmt.Sprintf(
-							"assigned to preferred activity %s (rank %d)",
-							slot.ActivityName, pref.Rank,
-						),
+						Message:     msg,
 					})
 				}
 			}

@@ -6,11 +6,13 @@ import (
 	"log/slog"
 	"net/http"
 
+	"camp-scheduler/internal/activity"
 	"camp-scheduler/internal/agegroup"
 	"camp-scheduler/internal/assignment"
 	"camp-scheduler/internal/cabin"
 	"camp-scheduler/internal/camp"
 	"camp-scheduler/internal/camper"
+	"camp-scheduler/internal/certification"
 	"camp-scheduler/internal/config"
 	"camp-scheduler/internal/counselor"
 	"camp-scheduler/internal/db"
@@ -20,6 +22,7 @@ import (
 	"camp-scheduler/internal/season"
 	"camp-scheduler/internal/session"
 	"camp-scheduler/internal/sessionconfig"
+	"camp-scheduler/internal/timeslot"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -143,6 +146,18 @@ func (s *Server) routes() {
 	enrollmentService := enrollment.NewService(queries)
 	enrollmentController := enrollment.NewController(enrollmentService)
 	enrollmentController.RegisterRoutes(camps)
+
+	certificationService := certification.NewService(queries)
+	certificationController := certification.NewController(certificationService)
+	certificationController.RegisterRoutes(camps)
+
+	activityService := activity.NewService(queries)
+	activityController := activity.NewController(activityService)
+	activityController.RegisterRoutes(camps)
+
+	timeSlotService := timeslot.NewService(queries)
+	timeSlotController := timeslot.NewController(timeSlotService)
+	timeSlotController.RegisterRoutes(camps)
 
 	assignmentService := assignment.NewService(queries, s.pool)
 	assignmentController := assignment.NewController(assignmentService)

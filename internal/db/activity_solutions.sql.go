@@ -71,6 +71,30 @@ func (q *Queries) GetActivitySolution(ctx context.Context, arg GetActivitySoluti
 	return i, err
 }
 
+const getSelectedActivitySolutionBySession = `-- name: GetSelectedActivitySolutionBySession :one
+SELECT arss.solution_id
+FROM assignment_runs ar
+JOIN assignment_run_selected_solutions arss
+    ON arss.run_id = ar.id AND arss.camp_id = ar.camp_id
+WHERE ar.session_id = $1
+    AND ar.camp_id = $2
+    AND ar.run_type = 'activity_schedule'
+ORDER BY ar.created_at DESC
+LIMIT 1
+`
+
+type GetSelectedActivitySolutionBySessionParams struct {
+	SessionID pgtype.UUID
+	CampID    pgtype.UUID
+}
+
+func (q *Queries) GetSelectedActivitySolutionBySession(ctx context.Context, arg GetSelectedActivitySolutionBySessionParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, getSelectedActivitySolutionBySession, arg.SessionID, arg.CampID)
+	var solution_id pgtype.UUID
+	err := row.Scan(&solution_id)
+	return solution_id, err
+}
+
 const listActivitySolutionsByRun = `-- name: ListActivitySolutionsByRun :many
 SELECT id, camp_id, assignment_run_id, solution_index, score, score_breakdown
 FROM activity_solutions

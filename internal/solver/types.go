@@ -75,6 +75,7 @@ type ScoreComponent struct {
 	CabinID     string
 	CounselorID string
 	CamperID    string
+	SlotID      string
 }
 
 type SolverConfig struct {

@@ -74,6 +74,25 @@ func (svc *Service) ListRuns(ctx context.Context, campID, sessionID string) ([]R
 	return result, nil
 }
 
+func (svc *Service) TriggerActivityRun(ctx context.Context, campID, sessionID string, cfg solver.ActivitySolverConfig) (RunDetailResponse, error) {
+	snapshot, err := solver.BuildActivitySnapshot(ctx, svc.queries, campID, sessionID)
+	if err != nil {
+		return RunDetailResponse{}, fmt.Errorf("error building activity snapshot: %w", err)
+	}
+
+	solutions := solver.SolveActivity(snapshot, cfg)
+	if len(solutions) == 0 {
+		return RunDetailResponse{}, ErrNoSolutions
+	}
+
+	runID, err := solver.StoreActivitySolutions(ctx, svc.pool, campID, sessionID, snapshot, solutions)
+	if err != nil {
+		return RunDetailResponse{}, fmt.Errorf("error storing activity solutions: %w", err)
+	}
+
+	return svc.GetRun(ctx, campID, runID)
+}
+
 func (svc *Service) TriggerCamperRun(ctx context.Context, campID, sessionID string, cfg solver.CamperSolverConfig) (RunDetailResponse, error) {
 	snapshot, err := solver.BuildCamperCabinSnapshot(ctx, svc.queries, campID, sessionID)
 	if err != nil {
@@ -142,6 +161,18 @@ func (svc *Service) GetRun(ctx context.Context, campID, runID string) (RunDetail
 		solutions = make([]SolutionSummaryResponse, len(solRows))
 		for i, s := range solRows {
 			solutions[i] = toCamperSolutionSummaryResponse(s)
+		}
+	case "activity_schedule":
+		solRows, err := svc.queries.ListActivitySolutionsByRun(ctx, db.ListActivitySolutionsByRunParams{
+			AssignmentRunID: runUUID,
+			CampID:          campUUID,
+		})
+		if err != nil {
+			return RunDetailResponse{}, fmt.Errorf("error listing activity solutions for run %s: %w", runID, err)
+		}
+		solutions = make([]SolutionSummaryResponse, len(solRows))
+		for i, s := range solRows {
+			solutions[i] = toActivitySolutionSummaryResponse(s)
 		}
 	default:
 		solRows, err := svc.queries.ListCounselorCabinSolutionsByRun(ctx, db.ListCounselorCabinSolutionsByRunParams{
@@ -213,6 +244,8 @@ func (svc *Service) GetSolution(ctx context.Context, campID, runID, solutionID s
 	switch run.RunType {
 	case "camper_cabin":
 		return svc.getCamperSolution(ctx, campUUID, runUUID, solutionID)
+	case "activity_schedule":
+		return svc.getActivitySolution(ctx, campUUID, runUUID, solutionID)
 	default:
 		return svc.getCounselorSolution(ctx, campUUID, runUUID, solutionID)
 	}
@@ -379,6 +412,21 @@ func (svc *Service) SelectSolution(ctx context.Context, campID, runID, solutionI
 		if sol.AssignmentRunID != runUUID {
 			return RunResponse{}, ErrSolutionNotFound
 		}
+	case "activity_schedule":
+		sol, err := svc.queries.GetActivitySolution(ctx, db.GetActivitySolutionParams{
+			ID:              solUUID,
+			CampID:          campUUID,
+			AssignmentRunID: runUUID,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return RunResponse{}, ErrSolutionNotFound
+			}
+			return RunResponse{}, fmt.Errorf("error getting activity solution %s: %w", solutionID, err)
+		}
+		if sol.AssignmentRunID != runUUID {
+			return RunResponse{}, ErrSolutionNotFound
+		}
 	default:
 		sol, err := svc.queries.GetCounselorCabinSolution(ctx, db.GetCounselorCabinSolutionParams{
 			ID:              solUUID,
@@ -499,4 +547,79 @@ func toCamperSolutionSummaryResponse(s db.CamperCabinSolution) SolutionSummaryRe
 		Score:           s.Score,
 		ScoreBreakdown:  s.ScoreBreakdown,
 	}
+}
+
+func toActivitySolutionSummaryResponse(s db.ActivitySolution) SolutionSummaryResponse {
+	return SolutionSummaryResponse{
+		ID:              api.UUIDToString(s.ID),
+		AssignmentRunID: api.UUIDToString(s.AssignmentRunID),
+		SolutionIndex:   int(s.SolutionIndex),
+		Score:           s.Score,
+		ScoreBreakdown:  s.ScoreBreakdown,
+	}
+}
+
+func (svc *Service) getActivitySolution(ctx context.Context, campUUID, runUUID pgtype.UUID, solutionID string) (SolutionDetailResponse, error) {
+	solUUID, err := api.ParseUUID(solutionID)
+	if err != nil {
+		return SolutionDetailResponse{}, err
+	}
+
+	sol, err := svc.queries.GetActivitySolution(ctx, db.GetActivitySolutionParams{
+		ID:              solUUID,
+		CampID:          campUUID,
+		AssignmentRunID: runUUID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return SolutionDetailResponse{}, ErrSolutionNotFound
+		}
+		return SolutionDetailResponse{}, fmt.Errorf("error getting activity solution %s: %w", solutionID, err)
+	}
+
+	assignments, err := svc.queries.ListActivityAssignmentsBySolution(ctx, db.ListActivityAssignmentsBySolutionParams{
+		SolutionID: solUUID,
+		CampID:     campUUID,
+	})
+	if err != nil {
+		return SolutionDetailResponse{}, fmt.Errorf("error listing activity assignments for solution %s: %w", solutionID, err)
+	}
+
+	explanations, err := svc.queries.ListActivityExplanationsBySolution(ctx, db.ListActivityExplanationsBySolutionParams{
+		SolutionID: solUUID,
+		CampID:     campUUID,
+	})
+	if err != nil {
+		return SolutionDetailResponse{}, fmt.Errorf("error listing activity explanations for solution %s: %w", solutionID, err)
+	}
+
+	assignmentResponses := make([]AssignmentResponse, len(assignments))
+	for i, a := range assignments {
+		assignmentResponses[i] = AssignmentResponse{
+			ID:                api.UUIDToString(a.ID),
+			CounselorID:       api.UUIDToString(a.CounselorID),
+			SessionActivityID: api.UUIDToString(a.SessionActivityID),
+		}
+	}
+
+	explanationResponses := make([]ExplanationResponse, len(explanations))
+	for i, e := range explanations {
+		var constraintName *string
+		if e.ConstraintName.Valid {
+			constraintName = &e.ConstraintName.String
+		}
+		explanationResponses[i] = ExplanationResponse{
+			ID:              api.UUIDToString(e.ID),
+			CounselorID:     api.UUIDToString(e.CounselorID),
+			ExplanationType: e.ExplanationType,
+			ConstraintName:  constraintName,
+			Message:         e.Message,
+		}
+	}
+
+	return SolutionDetailResponse{
+		SolutionSummaryResponse: toActivitySolutionSummaryResponse(sol),
+		Assignments:             assignmentResponses,
+		Explanations:            explanationResponses,
+	}, nil
 }

@@ -171,6 +171,246 @@ func TestReviewFixes(t *testing.T) {
 	t.Run("camper_run_invalid_session", testCamperRunInvalidSession)
 }
 
+func TestActivitySchedulingSolver(t *testing.T) {
+	t.Run("activity_scheduling", testActivityScheduling)
+}
+
+func testActivityScheduling(t *testing.T) {
+	ts := mustSetupServer(t)
+
+	// Create camp.
+	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{
+		"name": "Camp Activities",
+	})
+	campID := str(campResp, "id")
+	base := "/camps/" + campID
+
+	// Create certifications.
+	lifeguard := mustPost(t, apiURL(ts, base+"/certifications"), map[string]any{
+		"name": "Lifeguard",
+	})
+	lifeguardID := str(lifeguard, "id")
+
+	archeryInstructor := mustPost(t, apiURL(ts, base+"/certifications"), map[string]any{
+		"name": "Archery Instructor",
+	})
+	archeryInstructorID := str(archeryInstructor, "id")
+
+	// Create activities.
+	swimming := mustPost(t, apiURL(ts, base+"/activities"), map[string]any{
+		"name": "Swimming",
+	})
+	swimmingID := str(swimming, "id")
+
+	archery := mustPost(t, apiURL(ts, base+"/activities"), map[string]any{
+		"name": "Archery",
+	})
+	archeryID := str(archery, "id")
+
+	artsCrafts := mustPost(t, apiURL(ts, base+"/activities"), map[string]any{
+		"name": "Arts & Crafts",
+	})
+	artsCraftsID := str(artsCrafts, "id")
+
+	// Add certifications to activities.
+	mustPost(t, apiURL(ts, base+"/activities/"+swimmingID+"/certifications"), map[string]any{
+		"certification_id": lifeguardID,
+	})
+	mustPost(t, apiURL(ts, base+"/activities/"+archeryID+"/certifications"), map[string]any{
+		"certification_id": archeryInstructorID,
+	})
+
+	// Create counselors.
+	type counselorInfo struct {
+		id   string
+		name string
+	}
+	counselorDefs := []struct {
+		name   string
+		junior bool
+	}{
+		{"Alice", false}, // lifeguard + archery
+		{"Bob", false},   // lifeguard
+		{"Carol", false}, // archery
+		{"Dave", false},  // no certs
+		{"Eve", false},   // no certs
+	}
+	counselors := make([]counselorInfo, len(counselorDefs))
+	for i, c := range counselorDefs {
+		resp := mustPost(t, apiURL(ts, base+"/counselors"), map[string]any{
+			"name":             c.name,
+			"junior_counselor": c.junior,
+		})
+		counselors[i] = counselorInfo{id: str(resp, "id"), name: c.name}
+	}
+
+	alice, bob, carol, dave, eve := counselors[0], counselors[1], counselors[2], counselors[3], counselors[4]
+
+	// Add certifications to counselors.
+	// Alice: lifeguard + archery instructor
+	mustPost(t, apiURL(ts, base+"/counselors/"+alice.id+"/certifications"), map[string]any{
+		"certification_id": lifeguardID,
+	})
+	mustPost(t, apiURL(ts, base+"/counselors/"+alice.id+"/certifications"), map[string]any{
+		"certification_id": archeryInstructorID,
+	})
+	// Bob: lifeguard
+	mustPost(t, apiURL(ts, base+"/counselors/"+bob.id+"/certifications"), map[string]any{
+		"certification_id": lifeguardID,
+	})
+	// Carol: archery instructor
+	mustPost(t, apiURL(ts, base+"/counselors/"+carol.id+"/certifications"), map[string]any{
+		"certification_id": archeryInstructorID,
+	})
+
+	// Create season and session.
+	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{
+		"name": "Summer 2026", "start_date": "2026-06-01", "end_date": "2026-08-31",
+	})
+	seasonID := str(season, "id")
+
+	session := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	})
+	sessionID := str(session, "id")
+	sessionBase := base + "/sessions/" + sessionID
+
+	// Create time slots.
+	period1 := mustPost(t, apiURL(ts, base+"/time-slots"), map[string]any{
+		"name": "Period 1",
+	})
+	period1ID := str(period1, "id")
+
+	period2 := mustPost(t, apiURL(ts, base+"/time-slots"), map[string]any{
+		"name": "Period 2",
+	})
+	period2ID := str(period2, "id")
+
+	// Create session time slots.
+	sts1 := mustPost(t, apiURL(ts, sessionBase+"/time-slots"), map[string]any{
+		"time_slot_id": period1ID,
+		"sort_order":   1,
+	})
+	sts1ID := str(sts1, "id")
+
+	sts2 := mustPost(t, apiURL(ts, sessionBase+"/time-slots"), map[string]any{
+		"time_slot_id": period2ID,
+		"sort_order":   2,
+	})
+	sts2ID := str(sts2, "id")
+
+	// Create session activities.
+	// Swimming in Period 1 (requires lifeguard, 1 counselor, capacity 2)
+	mustPost(t, apiURL(ts, sessionBase+"/time-slots/"+sts1ID+"/activities"), map[string]any{
+		"activity_id":         swimmingID,
+		"capacity":            2,
+		"required_counselors": 1,
+	})
+
+	// Archery in Period 1 (requires archery instructor, 1 counselor, capacity 2)
+	mustPost(t, apiURL(ts, sessionBase+"/time-slots/"+sts1ID+"/activities"), map[string]any{
+		"activity_id":         archeryID,
+		"capacity":            2,
+		"required_counselors": 1,
+	})
+
+	// Arts & Crafts in Period 2 (no cert required, 1 counselor, capacity 3)
+	mustPost(t, apiURL(ts, sessionBase+"/time-slots/"+sts2ID+"/activities"), map[string]any{
+		"activity_id":         artsCraftsID,
+		"capacity":            3,
+		"required_counselors": 1,
+	})
+
+	// Set activity preferences.
+	prefBase := sessionBase + "/counselors/"
+	// Alice prefers Swimming
+	mustPost(t, apiURL(ts, prefBase+alice.id+"/activity-preferences"), map[string]any{
+		"activity_id": swimmingID, "rank": 1,
+	})
+	// Bob prefers Swimming
+	mustPost(t, apiURL(ts, prefBase+bob.id+"/activity-preferences"), map[string]any{
+		"activity_id": swimmingID, "rank": 1,
+	})
+	// Carol prefers Archery
+	mustPost(t, apiURL(ts, prefBase+carol.id+"/activity-preferences"), map[string]any{
+		"activity_id": archeryID, "rank": 1,
+	})
+	// Dave prefers Arts & Crafts
+	mustPost(t, apiURL(ts, prefBase+dave.id+"/activity-preferences"), map[string]any{
+		"activity_id": artsCraftsID, "rank": 1,
+	})
+	// Eve prefers Arts & Crafts
+	mustPost(t, apiURL(ts, prefBase+eve.id+"/activity-preferences"), map[string]any{
+		"activity_id": artsCraftsID, "rank": 1,
+	})
+
+	// Trigger activity_schedule run.
+	runURL := apiURL(ts, sessionBase+"/assignment-runs")
+	runResp := mustPost(t, runURL, map[string]any{
+		"run_type": "activity_schedule",
+	})
+
+	if str(runResp, "run_type") != "activity_schedule" {
+		t.Fatalf("expected run_type activity_schedule, got %s", str(runResp, "run_type"))
+	}
+	if str(runResp, "status") != "completed" {
+		t.Fatalf("expected status completed, got %s", str(runResp, "status"))
+	}
+
+	solutions := list(runResp, "solutions")
+	if len(solutions) == 0 {
+		t.Fatal("expected at least one solution")
+	}
+
+	// Get the top solution.
+	topSolution := asMap(solutions[0])
+	topSolutionID := str(topSolution, "id")
+	runID := str(runResp, "id")
+
+	solDetail := mustGet(t, runURL+"/"+runID+"/solutions/"+topSolutionID)
+
+	assignments := list(solDetail, "assignments")
+	if len(assignments) == 0 {
+		t.Fatal("expected assignments in activity solution detail")
+	}
+
+	// Verify each assignment has counselor_id and session_activity_id.
+	for _, a := range assignments {
+		am := asMap(a)
+		if str(am, "counselor_id") == "" {
+			t.Fatal("expected counselor_id in activity assignment")
+		}
+		if str(am, "session_activity_id") == "" {
+			t.Fatal("expected session_activity_id in activity assignment")
+		}
+	}
+
+	explanations := list(solDetail, "explanations")
+	if len(explanations) == 0 {
+		t.Fatal("expected explanations in activity solution detail")
+	}
+
+	// Select the solution.
+	selectResp := doRequest(t, http.MethodPost,
+		runURL+"/"+runID+"/solutions/"+topSolutionID+"/select", nil, http.StatusOK)
+	selectedID := str(selectResp, "selected_solution_id")
+	if selectedID != topSolutionID {
+		t.Fatalf("expected selected_solution_id %q, got %q", topSolutionID, selectedID)
+	}
+	if str(selectResp, "status") != "selected" {
+		t.Fatalf("expected status 'selected', got %q", str(selectResp, "status"))
+	}
+
+	// Verify via GetRun.
+	updatedRun := mustGet(t, runURL+"/"+runID)
+	if str(updatedRun, "selected_solution_id") != topSolutionID {
+		t.Fatal("run detail does not reflect selected activity solution")
+	}
+
+	// Clean up.
+	mustDelete(t, runURL+"/"+runID)
+}
+
 // testSimpleCamp exercises the full API -> DB -> Solver -> Results flow with a
 // small, realistic camp: 2 age groups, 4 cabins, 6 counselors.
 func testSimpleCamp(t *testing.T) {

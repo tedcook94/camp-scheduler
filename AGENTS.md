@@ -2,17 +2,19 @@
 
 ## Project
 
-Camp Scheduler -- a Go web application for automating summer camp scheduling
+Camp Scheduler — a Go web application for automating summer camp scheduling
 (counselor-to-cabin, camper-to-cabin, counselor-to-activity assignments) using
-a constraint satisfaction solver. See `README.md` for the full project plan.
+a constraint satisfaction solver. See `README.md` for a high-level overview and
+`docs/roadmap.md` for current status and planned work.
 
 ## Tech Stack
 
-- Go 1.24+, Gin, sqlc, PostgreSQL, golang-migrate
+- Go 1.26, Gin, sqlc, PostgreSQL 18, golang-migrate
+- Local dev: mise (tooling + tasks), air (hot-reload), Docker Compose
 
 ## Architecture
 
-- Layered domain-driven: Controller -> Service -> sqlc queries -> PostgreSQL
+- Layered domain-driven: Controller → Service → sqlc queries → PostgreSQL
 - Constraint solver reads state via sqlc, produces ranked solutions with explanations
 - Project structure: `cmd/server/` (entrypoint), `internal/` (app code), `database/` (migrations, sqlc queries)
 
@@ -20,7 +22,7 @@ a constraint satisfaction solver. See `README.md` for the full project plan.
 
 - **Comments:** Minimal but purposeful. Document public API boundaries, complex
   algorithms, and non-obvious "why" decisions. Do not add comments that restate
-  what the code does -- code should be self-documenting through naming.
+  what the code does — code should be self-documenting through naming.
 - **Error handling:** Use stdlib error wrapping (`fmt.Errorf` with `%w`). No
   third-party error libraries. Error format strings should start with "error"
   (e.g., `fmt.Errorf("error listing camps: %w", err)`), matching the logging
@@ -37,7 +39,7 @@ a constraint satisfaction solver. See `README.md` for the full project plan.
   // single field
   slog.With("error", err).Error("error loading config")
 
-  // multiple fields -- context first, error last, one per line
+  // multiple fields — context first, error last, one per line
   slog.
       With("id", id).
       With("error", err).
@@ -51,8 +53,14 @@ a constraint satisfaction solver. See `README.md` for the full project plan.
   or thin wrapper functions.
 - DO write tests for: solver logic, complex constraint evaluation, non-obvious
   business rules, edge cases that have caused or could cause bugs.
-- Integration tests that exercise real flows (API -> DB -> solver -> results) are
+- Integration tests that exercise real flows (API → DB → solver → results) are
   preferred over isolated unit tests with heavy mocking.
+
+## Dev Workflow
+
+- Tool versions are pinned in `mise.toml`. Run `mise install` to set up.
+- `mise run dev` starts everything (Postgres + migrations + server with hot-reload).
+- See `docs/development.md` for full setup and all available tasks.
 
 ## API Testing
 
@@ -63,11 +71,13 @@ a constraint satisfaction solver. See `README.md` for the full project plan.
 
 - Excessive boilerplate comments (e.g., `// Create creates a new camp`)
 - Unit tests on every function just for coverage numbers
-- Heavy mocking -- prefer integration tests with a real test database
-- Over-abstraction -- keep things simple until complexity is proven necessary
+- Heavy mocking — prefer integration tests with a real test database
+- Over-abstraction — keep things simple until complexity is proven necessary
 
 ## Documentation
 
-- Keep `README.md`, `database/README.md`, and other docs up to date when making
-  changes that affect project structure, setup steps, or developer workflows.
+- Keep `README.md`, `docs/`, `database/README.md`, and other docs up to date
+  when making changes that affect project structure, setup steps, or developer
+  workflows.
 - Keep `insomnia/` API definitions in sync with endpoint changes.
+- Keep `docs/roadmap.md` up to date when completing or adding development phases.

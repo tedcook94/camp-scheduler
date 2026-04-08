@@ -1,21 +1,21 @@
-# camp-scheduler
+# Camp Scheduler
 
-A web application for automating summer camp scheduling: assigning counselors to
-cabins, campers to cabins, and counselors to activities. The system uses a
+A Go web application for automating summer camp scheduling: assigning counselors
+to cabins, campers to cabins, and counselors to activities. The system uses a
 constraint satisfaction solver to produce ranked, fully-explainable assignment
 solutions that respect hard constraints and optimize soft preferences.
 
 ## Tech Stack
 
-| Layer      | Technology                                  |
-| ---------- | ------------------------------------------- |
-| Language   | Go 1.24+                                    |
-| HTTP       | Gin                                         |
-| Database   | PostgreSQL                                  |
-| Query Layer| sqlc (type-safe SQL code generation)        |
-| Migrations | golang-migrate                              |
-| Solver     | Custom Go constraint satisfaction engine    |
-| Future     | LLM conversational layer (MCP) for Q&A over assignments |
+| Layer       | Technology                               |
+| ----------- | ---------------------------------------- |
+| Language    | Go 1.26                                  |
+| HTTP        | Gin                                      |
+| Database    | PostgreSQL 18                            |
+| Query Layer | sqlc (type-safe SQL code generation)     |
+| Migrations  | golang-migrate                           |
+| Solver      | Custom Go constraint satisfaction engine |
+| Dev Tooling | mise, air (hot-reload), Docker Compose   |
 
 ## Architecture
 
@@ -37,163 +37,75 @@ solutions that respect hard constraints and optimize soft preferences.
                     └─────────────┘
 ```
 
-**Request flow:** API controller -> Service -> sqlc queries -> PostgreSQL
+**Request flow:** Controller → Service → sqlc queries → PostgreSQL
 
-**Solver flow:** Solver reads a snapshot of current state via sqlc, runs
-constraint satisfaction, produces ranked solutions with explanations, stores
-the selected solution back.
+**Solver flow:** Reads a snapshot of current state via sqlc, runs constraint
+satisfaction search, produces ranked solutions with per-assignment explanations,
+and stores the selected solution back.
 
 ## Domain Model
 
-### Core Entities (existing)
+- **Camp** — top-level org; all entities are scoped to a camp
+- **Age Group** (village) — grouping of campers by age range
+- **Cabin** — physical cabin, belongs to an age group
+- **Season / Session** — time hierarchy (e.g., "Summer 2026" → week-long sessions)
+- **Counselor** — staff member (may be junior); has preferences and certifications
+- **Camper** — individual camper with age, gender, and friend preferences
+- **Activity** — e.g., "Archery", with capacity and certification requirements
+- **Time Slot** — scheduling block within a session for activities
+- **Assignment Results** — stored solver output with scores and explanations
 
-- **Camp** -- top-level org; all entities scoped to a camp
-- **Age Group** (aka "village") -- grouping of campers by age range
-- **Cabin** -- physical cabin, belongs to an age group
-- **Season** -- e.g., "Summer 2026"
-- **Session** -- a time period within a season (linked list via `previous_session`)
-- **Counselor** -- staff member, may be junior
+## Solver
 
-### New Entities (to add)
+The solver is a constraint satisfaction + optimization engine that handles three
+assignment types:
 
-- **Camper** -- individual camper with age, gender, preferences
-- **Activity** -- e.g., "Archery", "Swimming", with capacity and certification requirements
-- **Time Slot** -- scheduling block within a session for activities
-- **Counselor Preferences** -- per-session ranked age group preferences, co-counselor preferences
-- **Camper Preferences** -- friend requests, activity preferences
-- **Certification** -- what a counselor is qualified to teach
-- **Assignment Results** -- stored solver output with scores and explanations
+1. **Counselor-to-Cabin** — assign counselors to cabins respecting capacity,
+   seniority, and age group constraints while optimizing for preferences
+2. **Camper-to-Cabin** — assign campers to cabins within their enrolled age
+   group while honoring friend requests
+3. **Activity Scheduling** — assign counselors to activities in time slots
+   respecting certifications and avoiding conflicts
 
-### Schema Changes (Phase 1)
+Each solver run produces top-N ranked solutions with full score breakdowns and
+per-assignment explanations, allowing camp directors to compare viable
+configurations and understand trade-offs.
 
-New tables:
+## Project Structure
 
-- `counselor_age_group_preferences` -- per-session ranked age group preferences for a counselor
-- `counselor_cocounselor_preferences` -- per-session ranked co-counselor preferences (directional)
-- `counselor_session_history` -- tracks which cabin/age group a counselor was in previously
-- `assignment_runs` -- metadata about each solver run (type, status, timestamp); shared across solver types
-- `assignment_run_selected_solutions` -- tracks which solution was selected for a run (normalized join table supporting multiple solver types)
-- `counselor_cabin_solutions` -- ranked solutions from a counselor-cabin solver run (score + breakdown)
-- `counselor_cabin_assignments` -- solver output: counselor -> cabin within a solution
-- `counselor_cabin_explanations` -- per-assignment reasoning trail and unmet preferences
+```
+cmd/server/          → Application entrypoint
+internal/            → All application code
+  server/            → HTTP server setup and routing
+  config/            → Configuration (env-based via envconfig)
+  solver/            → Constraint satisfaction solver (3 solver types)
+  db/                → sqlc-generated database code
+  api/               → Shared API helpers
+  assignment/        → Assignment run orchestration
+  <domain>/          → Domain packages (camp, cabin, counselor, camper, etc.)
+database/
+  migrations/        → SQL migration files (golang-migrate)
+  queries/           → SQL query files (sqlc)
+  local-setup/       → Local Postgres initialization scripts
+insomnia/            → API workspace export (Insomnia)
+docs/                → Development and roadmap documentation
+```
 
-### Schema Changes (Phase 2+)
+## Documentation
 
-- `campers` -- individual camper records
-- `camper_session_enrollments` -- links campers to session age groups; includes denormalized `session_id` for uniqueness enforcement (one enrollment per camper per session)
-- `camper_friend_preferences` -- per-session directional ranked friend requests
-- `camper_cabin_solutions` -- ranked solutions from a camper-cabin solver run (score + breakdown)
-- `camper_cabin_assignments` -- solver output: camper -> cabin within a solution
-- `camper_cabin_explanations` -- per-assignment reasoning trail and unmet preferences
-- `activities` -- activity definitions with capacity, certifications required (Phase 3+)
-- `time_slots` -- scheduling blocks within sessions (Phase 3+)
-- `counselor_certifications` -- join table: counselor has certification (Phase 3+)
-- `activity_schedule` -- solver output: activity + time slot + counselor(s) (Phase 3+)
+| Document                              | Contents                             |
+| ------------------------------------- | ------------------------------------ |
+| [docs/development.md](docs/development.md) | Local setup, dev workflow, tooling  |
+| [docs/roadmap.md](docs/roadmap.md)    | Product roadmap and development phases |
+| [database/README.md](database/README.md) | Database setup, migrations, reset  |
+| [insomnia/README.md](insomnia/README.md) | API testing with Insomnia          |
+| [AGENTS.md](AGENTS.md)               | Coding conventions for AI agents     |
 
-## Constraints
+## Quick Start
 
-### Hard Constraints (must be satisfied)
+```sh
+mise install       # Install pinned tool versions
+mise run dev       # Start Postgres + Go server with hot-reload
+```
 
-- Cabin capacity cannot be exceeded (counselors and campers)
-- A cabin must have at least one senior (non-junior) counselor assigned
-- Campers can only be assigned to cabins within their enrolled age group
-- Counselors must have required certification for an activity (Phase 3+)
-- A counselor cannot be double-booked in the same time slot (Phase 3+)
-- Activity capacity cannot be exceeded (Phase 3+)
-
-### Soft Constraints (optimized, weighted)
-
-- Returning counselor prefers same village (weight: high)
-- Returning counselor prefers same cabin (weight: medium)
-- Counselor co-counselor preference (weight: medium)
-- Counselor village/age-group preference (weight: medium)
-- Prefer multiple senior counselors per cabin over one senior with many juniors (weight: low)
-- Camper friend requests -- be in same cabin (weight: high)
-- Counselor activity preferences (Phase 3+, weight: high)
-
-## Solver Design
-
-The solver is a constraint satisfaction + optimization engine:
-
-1. **Input:** Snapshot of all entities, preferences, and constraints for a given session
-2. **Search:** Backtracking search with heuristic ordering (most-constrained-first)
-3. **Scoring:** Each candidate solution scored by weighted sum of satisfied soft constraints
-4. **Output:** Top N solutions ranked by score, each with:
-   - Full assignment map (counselor -> cabin)
-   - Total score + breakdown by constraint category
-   - Per-assignment explanation (e.g., "Counselor X assigned to Cabin Y because:
-     returning to same village (+10), co-counselor preference satisfied (+5)")
-   - List of unsatisfied soft constraints with reasons (if any)
-
-The system always presents multiple ranked alternatives so the director can
-compare viable configurations. This is especially valuable when several
-solutions satisfy all hard constraints and score equally well on soft
-constraints -- the director can see what trade-offs exist between options.
-
-## Development Phases
-
-### Phase 0: Foundation Refresh
-
-- [x] Upgrade to Go 1.24+
-- [x] Replace Bun ORM with sqlc
-- [x] Switch HTTP framework to Gin
-- [x] Replace `pkg/errors` with stdlib errors (Go 1.13+ wrapping)
-- [x] Replace logrus with `log/slog`
-- [x] Update project structure (`cmd/server/`, `internal/`, `database/queries/`)
-- [x] Re-implement Camp CRUD with new stack
-- [x] Set up basic test infrastructure
-
-### Phase 1: Counselor-to-Cabin Solver (MVP)
-
-- [x] Implement CRUD for all existing entities (age groups, cabins, seasons, sessions, counselors)
-- [x] Determine delete behavior for entities with FK dependencies (block, cascade, reassign, etc.)
-- [x] Add camp_id scoping to Get/Update/Delete queries for camp-owned entities
-  - Ensures entities can only be accessed within their owning camp
-  - Will align with JWT-based camp scoping when auth is implemented
-- [x] Add counselor preference tables + CRUD
-- [x] Add counselor session history tracking
-- [x] Implement the constraint solver engine
-  - [x] Hard constraint validation
-  - [x] Soft constraint scoring with configurable weights
-  - [x] Backtracking search with heuristics
-  - [x] Solution ranking
-- [x] Implement explanation/audit trail generation
-- [x] Load `SessionSnapshot` from database (bulk queries + snapshot builder)
-- [x] Persist assignments to database
-- [x] Add assignment run management (trigger, view results, select solution)
-- [x] API endpoints for solver: trigger run, get results, select/apply solution
-- [x] Integration tests with realistic camp data
-
-### Phase 2: Camper-to-Cabin Assignment
-
-- [x] Add camper table + CRUD
-- [x] Add camper preferences (friend requests, etc.)
-- [x] Extend solver to handle camper assignments
-- [x] Additional hard constraints (cabin capacity with campers)
-- [x] Additional soft constraints (friend requests)
-
-### Phase 3: Activity Scheduling
-
-- [x] Add activity, time slot, certification tables + CRUD
-- [x] Add counselor certifications
-- [x] Extend solver for counselor-to-activity-to-timeslot assignments
-- [x] Time conflict detection
-- [x] Activity capacity constraints
-
-### Phase 4: Polish & Integration
-
-- [x] Reward repeated preferences that were previously unmet
-- [ ] Docker Compose for local dev
-- [ ] JWT authentication
-  - [ ] Remove camp_id from REST endpoint paths; derive camp context from JWT
-- [ ] Web frontend
-- [ ] Overrides (locking assignment)
-- [ ] Data import (CSV/spreadsheet)
-- [ ] External system integration (Campminder, etc.)
-- [ ] LLM conversational layer (MCP) for "why was X assigned to Y?" queries
-
-## API Testing
-
-API definitions are maintained in the `insomnia/` directory as an Insomnia
-workspace export. These definitions should be kept up to date as endpoints are
-added or changed.
+See [docs/development.md](docs/development.md) for full setup instructions.

@@ -1,20 +1,30 @@
 # camp-scheduler Database
 
-## Local Setup
+## Overview
 
-To set up a local database, run the setup script from the project root:
+The local PostgreSQL database runs in a Docker container managed by Docker
+Compose. On first start, the container automatically runs `local-setup.sql` to
+create the `camp_scheduler` user and both the dev and test databases.
+
+`mise run dev` handles everything automatically: it starts Postgres, runs all
+pending migrations on both databases, and starts the Go server with hot-reload.
+
+## First-Time Setup
 
 ```sh
-cd database/local-setup && ./local-setup.sh
+mise install       # Install pinned tool versions
+mise run dev       # Start everything (Postgres + migrations + server)
 ```
 
-This creates both the `camp_scheduler` development database and the
-`camp_scheduler_test` database used by integration tests.
+No additional database setup commands are required.
 
-To tear it down:
+## Resetting the Database
+
+To destroy all local data and start fresh:
 
 ```sh
-cd database/local-setup && ./local-drop.sh
+mise run db:reset  # Stops containers and removes all volumes
+mise run dev       # Reinitializes everything from scratch
 ```
 
 ## Migrations
@@ -22,18 +32,26 @@ cd database/local-setup && ./local-drop.sh
 Migrations are managed with [golang-migrate](https://github.com/golang-migrate/migrate).
 Migration files live in `database/migrations/`.
 
-The database connection URL is built automatically from the `DATABASE_*`
-variables in `.env` (host, port, user, password, name, sslmode).
-
-From the project root:
+The database connection URLs are constructed from the environment variables
+defined in `mise.toml`.
 
 ```sh
-# Run migrations to a specific version
-make migrate v=3
+# Run all pending migrations on the dev database
+mise run migrate
+
+# Migrate to a specific version
+mise run migrate -- --version 3
 
 # Run migrations on both dev and test databases
-make migrate-all v=3
+mise run migrate:all
 
 # Create a new migration
-make migration name=add_camper_table
+mise run migration add_camper_table
 ```
+
+Note: the standalone `migrate` tasks assume Postgres is already running. When
+using `mise run dev`, migrations are run automatically inside the Docker
+container before the server starts.
+
+See [docs/development.md](../docs/development.md) for full dev workflow
+documentation.

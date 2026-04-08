@@ -1,0 +1,20 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  entrypoint = "./bin/server"
+  cmd = "go build -o ./bin/server ./cmd/server"
+  exclude_dir = ["bin", "database", "docs", "images", "insomnia", "tmp", "vendor"]
+  exclude_regex = ["_test\\.go$"]
+  include_ext = ["go"]
+  delay = 1000
+  stop_on_error = true
+  send_interrupt = true
+  kill_delay = 500
+
+[log]
+  time = true
+  main_only = true
+
+[misc]
+  clean_on_exit = true

@@ -1,0 +1,84 @@
+[tools]
+go = "1.26.0"
+"go:github.com/air-verse/air" = "latest"
+gomigrate = "latest"
+"go:github.com/sqlc-dev/sqlc/cmd/sqlc" = "latest"
+
+[env]
+PORT = "9100"
+MODE = "local"
+LOG_LEVEL = "info"
+DATABASE_HOST = "localhost"
+DATABASE_PORT = "5432"
+DATABASE_USER = "camp_scheduler"
+DATABASE_PASSWORD = "p@ss123"
+DATABASE_SSL_MODE = "disable"
+DATABASE_NAME = "camp_scheduler"
+DATABASE_TIMEOUT = "10s"
+
+# Constructed URLs for golang-migrate
+DATABASE_URL = "postgres://{{env.DATABASE_USER}}:{{env.DATABASE_PASSWORD}}@{{env.DATABASE_HOST}}:{{env.DATABASE_PORT}}/{{env.DATABASE_NAME}}?sslmode={{env.DATABASE_SSL_MODE}}"
+DATABASE_URL_TEST = "postgres://{{env.DATABASE_USER}}:{{env.DATABASE_PASSWORD}}@{{env.DATABASE_HOST}}:{{env.DATABASE_PORT}}/{{env.DATABASE_NAME}}_test?sslmode={{env.DATABASE_SSL_MODE}}"
+
+# Override any of these values in mise.local.toml (gitignored) for personal preferences.
+
+[tasks.dev]
+description = "Start Postgres and the Go server with hot-reload"
+run = "docker compose up"
+
+[tasks.server]
+description = "Run the Go server with hot-reload (standalone, assumes Postgres is already running)"
+run = "air"
+
+[tasks.build]
+description = "Build the server binary"
+run = "go build -o bin/server ./cmd/server"
+
+[tasks.test]
+description = "Run unit tests"
+run = "go test ./..."
+
+[tasks."test:integration"]
+description = "Run integration tests (requires local database)"
+run = "go test -tags integration ./..."
+
+[tasks.sqlc]
+description = "Generate Go code from SQL queries"
+run = "sqlc generate"
+
+[tasks.migrate]
+description = "Run migrations on the dev database"
+usage = 'flag "--version <version>" help="Migrate to a specific version (omit to run all up)"'
+run = """
+#!/usr/bin/env bash
+if [ -n "${usage_version:-}" ]; then
+  migrate -database "$DATABASE_URL" -path database/migrations goto "$usage_version"
+else
+  migrate -database "$DATABASE_URL" -path database/migrations up
+fi
+"""
+
+[tasks."migrate:test"]
+description = "Run migrations on the test database"
+usage = 'flag "--version <version>" help="Migrate to a specific version (omit to run all up)"'
+run = """
+#!/usr/bin/env bash
+if [ -n "${usage_version:-}" ]; then
+  migrate -database "$DATABASE_URL_TEST" -path database/migrations goto "$usage_version"
+else
+  migrate -database "$DATABASE_URL_TEST" -path database/migrations up
+fi
+"""
+
+[tasks."migrate:all"]
+description = "Run migrations on both dev and test databases"
+depends = ["migrate", "migrate:test"]
+
+[tasks.migration]
+description = "Create a new migration file"
+usage = 'arg "<name>" help="Name of the migration"'
+run = "migrate create -ext sql -dir database/migrations -seq \"${usage_name:?}\""
+
+[tasks."db:reset"]
+description = "Destroy and recreate the local databases (next 'mise run dev' reinitializes)"
+run = "docker compose down -v"

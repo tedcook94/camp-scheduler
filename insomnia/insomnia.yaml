@@ -40,6 +40,9 @@ resources:
     environmentPropertyOrder:
       "&":
         - cs-endpoint
+    authentication:
+      type: bearer
+      token: "{{ _['cs-access-token'] }}"
     metaSortKey: -1690666707017
     _type: request_group
   - _id: fld_0165b0f3641045a88246e473a724a706
@@ -55,6 +58,88 @@ resources:
         - cs-api-version
     metaSortKey: -1690667822566
     _type: request_group
+  - _id: fld_auth_01
+    parentId: fld_0165b0f3641045a88246e473a724a706
+    modified: 1690690000000
+    created: 1690690000000
+    name: auth
+    description: ""
+    environment:
+      cs-endpoint: auth
+    environmentPropertyOrder:
+      "&":
+        - cs-endpoint
+    metaSortKey: -1690666708000
+    _type: request_group
+  - _id: req_auth_login
+    parentId: fld_auth_01
+    modified: 1690690000001
+    created: 1690690000001
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/login"
+    name: Login
+    description: ""
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"username": "admin",
+        	"password": "password"
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    afterResponseScript: |-
+      const jsonBody = insomnia.response.json();
+      if (insomnia.response.status === 200 && jsonBody.access_token) {
+        insomnia.environment.set("cs-access-token", jsonBody.access_token);
+      }
+    metaSortKey: -1690690000002
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_auth_refresh
+    parentId: fld_auth_01
+    modified: 1690690000002
+    created: 1690690000002
+    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/refresh"
+    name: Refresh
+    description: ""
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"refresh_token": "paste-refresh-token-here"
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    afterResponseScript: |-
+      const jsonBody = insomnia.response.json();
+      if (insomnia.response.status === 200 && jsonBody.access_token) {
+        insomnia.environment.set("cs-access-token", jsonBody.access_token);
+      }
+    metaSortKey: -1690690000001
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
   - _id: wrk_8335f34c06324aa6888c93fbe4e6e58e
     parentId: null
     modified: 1690669589166
@@ -2455,11 +2540,13 @@ resources:
       cs-test-camper: ""
       cs-test-enrollment: ""
       cs-test-camper-friend-pref: ""
+      cs-access-token: ""
     dataPropertyOrder:
       "&":
         - cs-protocol
         - cs-host
         - cs-port
+        - cs-access-token
         - cs-test-camp
         - cs-test-age-group
         - cs-test-cabin

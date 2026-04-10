@@ -9,6 +9,7 @@ import (
 	"camp-scheduler/internal/activity"
 	"camp-scheduler/internal/agegroup"
 	"camp-scheduler/internal/assignment"
+	"camp-scheduler/internal/auth"
 	"camp-scheduler/internal/cabin"
 	"camp-scheduler/internal/camp"
 	"camp-scheduler/internal/camper"
@@ -94,7 +95,17 @@ func (s *Server) routes() {
 
 	v1 := s.router.Group("/api/v1")
 
+	authenticator := auth.NewJWTAuthenticator(queries, auth.JWTConfig{
+		SigningKey:      []byte(s.cfg.JWT.Secret),
+		AccessTokenTTL:  s.cfg.JWT.AccessTokenTTL,
+		RefreshTokenTTL: s.cfg.JWT.RefreshTokenTTL,
+	})
+
+	authController := auth.NewController(authenticator)
+	authController.RegisterRoutes(v1)
+
 	camps := v1.Group("/camps")
+	camps.Use(auth.Middleware(authenticator))
 	campService := camp.NewService(queries)
 	campController := camp.NewController(campService)
 	campController.RegisterRoutes(camps)

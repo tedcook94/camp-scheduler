@@ -4,19 +4,24 @@ package internal_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"camp-scheduler/internal/config"
 	"camp-scheduler/internal/server"
 	"camp-scheduler/internal/testutil"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/crypto/bcrypt"
 )
 
-func mustSetupServer(t *testing.T) *httptest.Server {
+func mustSetupServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
 	t.Helper()
 
 	pool := testutil.MustOpenDB(t)
@@ -24,11 +29,49 @@ func mustSetupServer(t *testing.T) *httptest.Server {
 
 	cfg := config.Config{
 		Server: config.ServerConfig{Mode: "test"},
+		JWT: config.JWTConfig{
+			Secret:          "test-secret",
+			AccessTokenTTL:  15 * time.Minute,
+			RefreshTokenTTL: 168 * time.Hour,
+		},
 	}
 	srv := server.NewWithPool(cfg, pool)
 	ts := httptest.NewServer(srv)
 	t.Cleanup(ts.Close)
-	return ts
+	return ts, pool
+}
+
+const testPassword = "password"
+
+// mustLogin creates a test user for the given camp and returns an access token.
+func mustLogin(t *testing.T, ts *httptest.Server, pool *pgxpool.Pool, campID string) string {
+	t.Helper()
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("hashing password: %v", err)
+	}
+
+	_, err = pool.Exec(context.Background(),
+		`INSERT INTO users (camp_id, username, email, password_hash, first_name, last_name, role)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		 ON CONFLICT (username) DO NOTHING`,
+		campID, "admin-"+campID[:8], "admin-"+campID[:8]+"@test.com",
+		string(hash), "Test", "Admin", "admin",
+	)
+	if err != nil {
+		t.Fatalf("inserting test user: %v", err)
+	}
+
+	resp := doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
+		map[string]any{"username": "admin-" + campID[:8], "password": testPassword},
+		http.StatusOK, "")
+
+	token := str(resp, "access_token")
+	if token == "" {
+		t.Fatal("expected access_token in login response")
+	}
+	return token
 }
 
 // apiURL builds a full URL from the test server base and a path suffix.
@@ -36,19 +79,19 @@ func apiURL(ts *httptest.Server, path string) string {
 	return ts.URL + "/api/v1" + path
 }
 
-func mustPost(t *testing.T, url string, body any) map[string]any {
+func mustPost(t *testing.T, url string, body any, token string) map[string]any {
 	t.Helper()
-	return doRequest(t, http.MethodPost, url, body, http.StatusCreated)
+	return doRequest(t, http.MethodPost, url, body, http.StatusCreated, token)
 }
 
-func mustGet(t *testing.T, url string) map[string]any {
+func mustGet(t *testing.T, url string, token string) map[string]any {
 	t.Helper()
-	return doRequest(t, http.MethodGet, url, nil, http.StatusOK)
+	return doRequest(t, http.MethodGet, url, nil, http.StatusOK, token)
 }
 
-func mustGetList(t *testing.T, url string) []any {
+func mustGetList(t *testing.T, url string, token string) []any {
 	t.Helper()
-	resp := doRawRequest(t, http.MethodGet, url, nil, http.StatusOK)
+	resp := doRawRequest(t, http.MethodGet, url, nil, http.StatusOK, token)
 	var result []any
 	if err := json.Unmarshal(resp, &result); err != nil {
 		t.Fatalf("unmarshaling list response: %v", err)
@@ -56,14 +99,14 @@ func mustGetList(t *testing.T, url string) []any {
 	return result
 }
 
-func mustDelete(t *testing.T, url string) {
+func mustDelete(t *testing.T, url string, token string) {
 	t.Helper()
-	doRawRequest(t, http.MethodDelete, url, nil, http.StatusOK)
+	doRawRequest(t, http.MethodDelete, url, nil, http.StatusOK, token)
 }
 
-func doRequest(t *testing.T, method, url string, body any, expectedStatus int) map[string]any {
+func doRequest(t *testing.T, method, url string, body any, expectedStatus int, token string) map[string]any {
 	t.Helper()
-	raw := doRawRequest(t, method, url, body, expectedStatus)
+	raw := doRawRequest(t, method, url, body, expectedStatus, token)
 	var result map[string]any
 	if err := json.Unmarshal(raw, &result); err != nil {
 		t.Fatalf("unmarshaling response from %s %s: %v\nbody: %s", method, url, err, string(raw))
@@ -71,7 +114,7 @@ func doRequest(t *testing.T, method, url string, body any, expectedStatus int) m
 	return result
 }
 
-func doRawRequest(t *testing.T, method, url string, body any, expectedStatus int) []byte {
+func doRawRequest(t *testing.T, method, url string, body any, expectedStatus int, token string) []byte {
 	t.Helper()
 
 	var bodyReader io.Reader
@@ -89,6 +132,9 @@ func doRawRequest(t *testing.T, method, url string, body any, expectedStatus int
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
 	resp, err := http.DefaultClient.Do(req)
@@ -177,50 +223,233 @@ func TestActivitySchedulingSolver(t *testing.T) {
 	t.Run("activity_scheduling", testActivityScheduling)
 }
 
-func testActivityScheduling(t *testing.T) {
-	ts := mustSetupServer(t)
+func TestAuth(t *testing.T) {
+	t.Run("login_success", testLoginSuccess)
+	t.Run("login_bad_password", testLoginBadPassword)
+	t.Run("login_nonexistent_user", testLoginNonexistentUser)
+	t.Run("refresh_success", testRefreshSuccess)
+	t.Run("refresh_revokes_old_token", testRefreshRevokesOldToken)
+	t.Run("protected_route_no_token", testProtectedRouteNoToken)
+	t.Run("protected_route_invalid_token", testProtectedRouteInvalidToken)
+}
 
-	// Create camp.
-	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{
-		"name": "Camp Activities",
-	})
-	campID := str(campResp, "id")
+func testLoginSuccess(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var directCampID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Auth Test").Scan(&directCampID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte("secret123"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("hashing password: %v", err)
+	}
+
+	_, err = pool.Exec(context.Background(),
+		`INSERT INTO users (camp_id, username, email, password_hash, first_name, last_name, role)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		directCampID, "testuser", "testuser@test.com", string(hash), "Test", "User", "admin",
+	)
+	if err != nil {
+		t.Fatalf("inserting user: %v", err)
+	}
+
+	resp := doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
+		map[string]any{"username": "testuser", "password": "secret123"},
+		http.StatusOK, "")
+
+	if str(resp, "access_token") == "" {
+		t.Fatal("expected access_token in response")
+	}
+	if str(resp, "refresh_token") == "" {
+		t.Fatal("expected refresh_token in response")
+	}
+}
+
+func testLoginBadPassword(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Bad PW").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte("correct"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("hashing password: %v", err)
+	}
+
+	_, err = pool.Exec(context.Background(),
+		`INSERT INTO users (camp_id, username, email, password_hash, first_name, last_name, role)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		campID, "badpwuser", "badpw@test.com", string(hash), "Test", "User", "admin",
+	)
+	if err != nil {
+		t.Fatalf("inserting user: %v", err)
+	}
+
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
+		map[string]any{"username": "badpwuser", "password": "wrong"},
+		http.StatusUnauthorized, "")
+}
+
+func testLoginNonexistentUser(t *testing.T) {
+	ts, _ := mustSetupServer(t)
+
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
+		map[string]any{"username": "ghost", "password": "whatever"},
+		http.StatusUnauthorized, "")
+}
+
+func testRefreshSuccess(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Refresh").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("hashing password: %v", err)
+	}
+
+	_, err = pool.Exec(context.Background(),
+		`INSERT INTO users (camp_id, username, email, password_hash, first_name, last_name, role)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		campID, "refreshuser", "refresh@test.com", string(hash), "Test", "User", "admin",
+	)
+	if err != nil {
+		t.Fatalf("inserting user: %v", err)
+	}
+
+	loginResp := doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
+		map[string]any{"username": "refreshuser", "password": testPassword},
+		http.StatusOK, "")
+
+	refreshToken := str(loginResp, "refresh_token")
+	if refreshToken == "" {
+		t.Fatal("expected refresh_token in login response")
+	}
+
+	refreshResp := doRequest(t, http.MethodPost, apiURL(ts, "/auth/refresh"),
+		map[string]any{"refresh_token": refreshToken},
+		http.StatusOK, "")
+
+	if str(refreshResp, "access_token") == "" {
+		t.Fatal("expected access_token in refresh response")
+	}
+	if str(refreshResp, "refresh_token") == "" {
+		t.Fatal("expected refresh_token in refresh response")
+	}
+}
+
+func testRefreshRevokesOldToken(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Revoke").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("hashing password: %v", err)
+	}
+
+	_, err = pool.Exec(context.Background(),
+		`INSERT INTO users (camp_id, username, email, password_hash, first_name, last_name, role)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		campID, "revokeuser", "revoke@test.com", string(hash), "Test", "User", "admin",
+	)
+	if err != nil {
+		t.Fatalf("inserting user: %v", err)
+	}
+
+	loginResp := doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
+		map[string]any{"username": "revokeuser", "password": testPassword},
+		http.StatusOK, "")
+
+	refreshToken := str(loginResp, "refresh_token")
+
+	// Use the refresh token once — should succeed.
+	doRequest(t, http.MethodPost, apiURL(ts, "/auth/refresh"),
+		map[string]any{"refresh_token": refreshToken},
+		http.StatusOK, "")
+
+	// Reuse the same refresh token — should fail (already revoked).
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/auth/refresh"),
+		map[string]any{"refresh_token": refreshToken},
+		http.StatusUnauthorized, "")
+}
+
+func testProtectedRouteNoToken(t *testing.T) {
+	ts, _ := mustSetupServer(t)
+
+	doRawRequest(t, http.MethodGet, apiURL(ts, "/camps"), nil, http.StatusUnauthorized, "")
+}
+
+func testProtectedRouteInvalidToken(t *testing.T) {
+	ts, _ := mustSetupServer(t)
+
+	doRawRequest(t, http.MethodGet, apiURL(ts, "/camps"), nil, http.StatusUnauthorized, "garbage-token")
+}
+
+func testActivityScheduling(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Activities").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
 	base := "/camps/" + campID
 
 	// Create certifications.
 	lifeguard := mustPost(t, apiURL(ts, base+"/certifications"), map[string]any{
 		"name": "Lifeguard",
-	})
+	}, token)
 	lifeguardID := str(lifeguard, "id")
 
 	archeryInstructor := mustPost(t, apiURL(ts, base+"/certifications"), map[string]any{
 		"name": "Archery Instructor",
-	})
+	}, token)
 	archeryInstructorID := str(archeryInstructor, "id")
 
 	// Create activities.
 	swimming := mustPost(t, apiURL(ts, base+"/activities"), map[string]any{
 		"name": "Swimming",
-	})
+	}, token)
 	swimmingID := str(swimming, "id")
 
 	archery := mustPost(t, apiURL(ts, base+"/activities"), map[string]any{
 		"name": "Archery",
-	})
+	}, token)
 	archeryID := str(archery, "id")
 
 	artsCrafts := mustPost(t, apiURL(ts, base+"/activities"), map[string]any{
 		"name": "Arts & Crafts",
-	})
+	}, token)
 	artsCraftsID := str(artsCrafts, "id")
 
 	// Add certifications to activities.
 	mustPost(t, apiURL(ts, base+"/activities/"+swimmingID+"/certifications"), map[string]any{
 		"certification_id": lifeguardID,
-	})
+	}, token)
 	mustPost(t, apiURL(ts, base+"/activities/"+archeryID+"/certifications"), map[string]any{
 		"certification_id": archeryInstructorID,
-	})
+	}, token)
 
 	// Create counselors.
 	type counselorInfo struct {
@@ -242,7 +471,7 @@ func testActivityScheduling(t *testing.T) {
 		resp := mustPost(t, apiURL(ts, base+"/counselors"), map[string]any{
 			"name":             c.name,
 			"junior_counselor": c.junior,
-		})
+		}, token)
 		counselors[i] = counselorInfo{id: str(resp, "id"), name: c.name}
 	}
 
@@ -252,53 +481,53 @@ func testActivityScheduling(t *testing.T) {
 	// Alice: lifeguard + archery instructor
 	mustPost(t, apiURL(ts, base+"/counselors/"+alice.id+"/certifications"), map[string]any{
 		"certification_id": lifeguardID,
-	})
+	}, token)
 	mustPost(t, apiURL(ts, base+"/counselors/"+alice.id+"/certifications"), map[string]any{
 		"certification_id": archeryInstructorID,
-	})
+	}, token)
 	// Bob: lifeguard
 	mustPost(t, apiURL(ts, base+"/counselors/"+bob.id+"/certifications"), map[string]any{
 		"certification_id": lifeguardID,
-	})
+	}, token)
 	// Carol: archery instructor
 	mustPost(t, apiURL(ts, base+"/counselors/"+carol.id+"/certifications"), map[string]any{
 		"certification_id": archeryInstructorID,
-	})
+	}, token)
 
 	// Create season and session.
 	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{
 		"name": "Summer 2026", "start_date": "2026-06-01", "end_date": "2026-08-31",
-	})
+	}, token)
 	seasonID := str(season, "id")
 
 	session := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{
 		"name": "Week 1", "season_id": seasonID,
-	})
+	}, token)
 	sessionID := str(session, "id")
 	sessionBase := base + "/sessions/" + sessionID
 
 	// Create time slots.
 	period1 := mustPost(t, apiURL(ts, base+"/time-slots"), map[string]any{
 		"name": "Period 1",
-	})
+	}, token)
 	period1ID := str(period1, "id")
 
 	period2 := mustPost(t, apiURL(ts, base+"/time-slots"), map[string]any{
 		"name": "Period 2",
-	})
+	}, token)
 	period2ID := str(period2, "id")
 
 	// Create session time slots.
 	sts1 := mustPost(t, apiURL(ts, sessionBase+"/time-slots"), map[string]any{
 		"time_slot_id": period1ID,
 		"sort_order":   1,
-	})
+	}, token)
 	sts1ID := str(sts1, "id")
 
 	sts2 := mustPost(t, apiURL(ts, sessionBase+"/time-slots"), map[string]any{
 		"time_slot_id": period2ID,
 		"sort_order":   2,
-	})
+	}, token)
 	sts2ID := str(sts2, "id")
 
 	// Create session activities.
@@ -307,50 +536,50 @@ func testActivityScheduling(t *testing.T) {
 		"activity_id":         swimmingID,
 		"capacity":            2,
 		"required_counselors": 1,
-	})
+	}, token)
 
 	// Archery in Period 1 (requires archery instructor, 1 counselor, capacity 2)
 	mustPost(t, apiURL(ts, sessionBase+"/time-slots/"+sts1ID+"/activities"), map[string]any{
 		"activity_id":         archeryID,
 		"capacity":            2,
 		"required_counselors": 1,
-	})
+	}, token)
 
 	// Arts & Crafts in Period 2 (no cert required, 1 counselor, capacity 3)
 	mustPost(t, apiURL(ts, sessionBase+"/time-slots/"+sts2ID+"/activities"), map[string]any{
 		"activity_id":         artsCraftsID,
 		"capacity":            3,
 		"required_counselors": 1,
-	})
+	}, token)
 
 	// Set activity preferences.
 	prefBase := sessionBase + "/counselors/"
 	// Alice prefers Swimming
 	mustPost(t, apiURL(ts, prefBase+alice.id+"/activity-preferences"), map[string]any{
 		"activity_id": swimmingID, "rank": 1,
-	})
+	}, token)
 	// Bob prefers Swimming
 	mustPost(t, apiURL(ts, prefBase+bob.id+"/activity-preferences"), map[string]any{
 		"activity_id": swimmingID, "rank": 1,
-	})
+	}, token)
 	// Carol prefers Archery
 	mustPost(t, apiURL(ts, prefBase+carol.id+"/activity-preferences"), map[string]any{
 		"activity_id": archeryID, "rank": 1,
-	})
+	}, token)
 	// Dave prefers Arts & Crafts
 	mustPost(t, apiURL(ts, prefBase+dave.id+"/activity-preferences"), map[string]any{
 		"activity_id": artsCraftsID, "rank": 1,
-	})
+	}, token)
 	// Eve prefers Arts & Crafts
 	mustPost(t, apiURL(ts, prefBase+eve.id+"/activity-preferences"), map[string]any{
 		"activity_id": artsCraftsID, "rank": 1,
-	})
+	}, token)
 
 	// Trigger activity_schedule run.
 	runURL := apiURL(ts, sessionBase+"/assignment-runs")
 	runResp := mustPost(t, runURL, map[string]any{
 		"run_type": "activity_schedule",
-	})
+	}, token)
 
 	if str(runResp, "run_type") != "activity_schedule" {
 		t.Fatalf("expected run_type activity_schedule, got %s", str(runResp, "run_type"))
@@ -369,7 +598,7 @@ func testActivityScheduling(t *testing.T) {
 	topSolutionID := str(topSolution, "id")
 	runID := str(runResp, "id")
 
-	solDetail := mustGet(t, runURL+"/"+runID+"/solutions/"+topSolutionID)
+	solDetail := mustGet(t, runURL+"/"+runID+"/solutions/"+topSolutionID, token)
 
 	assignments := list(solDetail, "assignments")
 	if len(assignments) == 0 {
@@ -394,7 +623,7 @@ func testActivityScheduling(t *testing.T) {
 
 	// Select the solution.
 	selectResp := doRequest(t, http.MethodPost,
-		runURL+"/"+runID+"/solutions/"+topSolutionID+"/select", nil, http.StatusOK)
+		runURL+"/"+runID+"/solutions/"+topSolutionID+"/select", nil, http.StatusOK, token)
 	selectedID := str(selectResp, "selected_solution_id")
 	if selectedID != topSolutionID {
 		t.Fatalf("expected selected_solution_id %q, got %q", topSolutionID, selectedID)
@@ -404,78 +633,81 @@ func testActivityScheduling(t *testing.T) {
 	}
 
 	// Verify via GetRun.
-	updatedRun := mustGet(t, runURL+"/"+runID)
+	updatedRun := mustGet(t, runURL+"/"+runID, token)
 	if str(updatedRun, "selected_solution_id") != topSolutionID {
 		t.Fatal("run detail does not reflect selected activity solution")
 	}
 
 	// Clean up.
-	mustDelete(t, runURL+"/"+runID)
+	mustDelete(t, runURL+"/"+runID, token)
 }
 
 // testSimpleCamp exercises the full API -> DB -> Solver -> Results flow with a
 // small, realistic camp: 2 age groups, 4 cabins, 6 counselors.
 func testSimpleCamp(t *testing.T) {
-	ts := mustSetupServer(t)
+	ts, pool := mustSetupServer(t)
 
-	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{
-		"name":     "Camp Pinebrook",
-		"location": "Vermont",
-	})
-	campID := str(campResp, "id")
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name, camp_location) VALUES ($1, $2) RETURNING id`,
+		"Camp Pinebrook", "Vermont").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
 
 	juniors := mustPost(t, apiURL(ts, "/camps/"+campID+"/age-groups"), map[string]any{
 		"name": "Juniors",
-	})
+	}, token)
 	juniorsID := str(juniors, "id")
 
 	seniors := mustPost(t, apiURL(ts, "/camps/"+campID+"/age-groups"), map[string]any{
 		"name": "Seniors",
-	})
+	}, token)
 	seniorsID := str(seniors, "id")
 
 	pine := mustPost(t, apiURL(ts, "/camps/"+campID+"/cabins"), map[string]any{
 		"name":         "Pine",
 		"age_group_id": juniorsID,
-	})
+	}, token)
 	pineID := str(pine, "id")
 
 	oak := mustPost(t, apiURL(ts, "/camps/"+campID+"/cabins"), map[string]any{
 		"name":         "Oak",
 		"age_group_id": juniorsID,
-	})
+	}, token)
 	oakID := str(oak, "id")
 
 	maple := mustPost(t, apiURL(ts, "/camps/"+campID+"/cabins"), map[string]any{
 		"name":         "Maple",
 		"age_group_id": seniorsID,
-	})
+	}, token)
 	mapleID := str(maple, "id")
 
 	cedar := mustPost(t, apiURL(ts, "/camps/"+campID+"/cabins"), map[string]any{
 		"name":         "Cedar",
 		"age_group_id": seniorsID,
-	})
+	}, token)
 	cedarID := str(cedar, "id")
 
 	seasonResp := mustPost(t, apiURL(ts, "/camps/"+campID+"/seasons"), map[string]any{
 		"name":       "Summer 2025",
 		"start_date": "2025-06-01",
 		"end_date":   "2025-08-31",
-	})
+	}, token)
 	seasonID := str(seasonResp, "id")
 
 	session1 := mustPost(t, apiURL(ts, "/camps/"+campID+"/sessions"), map[string]any{
 		"name":      "Session 1",
 		"season_id": seasonID,
-	})
+	}, token)
 	session1ID := str(session1, "id")
 
 	session2 := mustPost(t, apiURL(ts, "/camps/"+campID+"/sessions"), map[string]any{
 		"name":                "Session 2",
 		"season_id":           seasonID,
 		"previous_session_id": session1ID,
-	})
+	}, token)
 	session2ID := str(session2, "id")
 
 	type counselorInfo struct {
@@ -497,7 +729,7 @@ func testSimpleCamp(t *testing.T) {
 		resp := mustPost(t, apiURL(ts, "/camps/"+campID+"/counselors"), map[string]any{
 			"name":             c.name,
 			"junior_counselor": c.junior,
-		})
+		}, token)
 		counselors = append(counselors, counselorInfo{id: str(resp, "id"), name: c.name})
 	}
 
@@ -506,12 +738,12 @@ func testSimpleCamp(t *testing.T) {
 
 	sagJuniors := mustPost(t, apiURL(ts, "/camps/"+campID+"/sessions/"+session2ID+"/age-groups"), map[string]any{
 		"age_group_id": juniorsID,
-	})
+	}, token)
 	sagJuniorsID := str(sagJuniors, "id")
 
 	sagSeniors := mustPost(t, apiURL(ts, "/camps/"+campID+"/sessions/"+session2ID+"/age-groups"), map[string]any{
 		"age_group_id": seniorsID,
-	})
+	}, token)
 	sagSeniorsID := str(sagSeniors, "id")
 
 	reqCounselors := int32(1)
@@ -528,7 +760,7 @@ func testSimpleCamp(t *testing.T) {
 			"session_age_group_id": cfg.sagID,
 			"cabin_id":             cfg.cabinID,
 			"required_counselors":  reqCounselors,
-		})
+		}, token)
 	}
 
 	// Alice and Bob were both in Pine (Juniors) in session 1, making them
@@ -551,25 +783,25 @@ func testSimpleCamp(t *testing.T) {
 		if h.cabinID != nil {
 			body["cabin_id"] = *h.cabinID
 		}
-		mustPost(t, apiURL(ts, historyBase+h.counselorID+"/session-history"), body)
+		mustPost(t, apiURL(ts, historyBase+h.counselorID+"/session-history"), body, token)
 	}
 
 	prefBase := "/camps/" + campID + "/sessions/" + session2ID + "/counselors/"
 	mustPost(t, apiURL(ts, prefBase+alice.id+"/age-group-preferences"), map[string]any{
 		"age_group_id": juniorsID,
 		"rank":         1,
-	})
+	}, token)
 	mustPost(t, apiURL(ts, prefBase+bob.id+"/cocounselor-preferences"), map[string]any{
 		"preferred_counselor_id": alice.id,
 		"rank":                   1,
-	})
+	}, token)
 	mustPost(t, apiURL(ts, prefBase+carol.id+"/age-group-preferences"), map[string]any{
 		"age_group_id": seniorsID,
 		"rank":         1,
-	})
+	}, token)
 
 	runURL := apiURL(ts, "/camps/"+campID+"/sessions/"+session2ID+"/assignment-runs")
-	triggerResp := mustPost(t, runURL, nil)
+	triggerResp := mustPost(t, runURL, nil, token)
 
 	runID := str(triggerResp, "id")
 	if runID == "" {
@@ -602,7 +834,7 @@ func testSimpleCamp(t *testing.T) {
 		}
 	}
 
-	runs := mustGetList(t, runURL)
+	runs := mustGetList(t, runURL, token)
 	if len(runs) != 1 {
 		t.Fatalf("expected 1 run, got %d", len(runs))
 	}
@@ -610,13 +842,13 @@ func testSimpleCamp(t *testing.T) {
 		t.Fatal("listed run ID does not match created run")
 	}
 
-	runDetail := mustGet(t, runURL+"/"+runID)
+	runDetail := mustGet(t, runURL+"/"+runID, token)
 	detailSolutions := list(runDetail, "solutions")
 	if len(detailSolutions) != len(solutions) {
 		t.Fatalf("expected %d solutions in detail, got %d", len(solutions), len(detailSolutions))
 	}
 
-	solDetail := mustGet(t, runURL+"/"+runID+"/solutions/"+topSolutionID)
+	solDetail := mustGet(t, runURL+"/"+runID+"/solutions/"+topSolutionID, token)
 
 	assignments := list(solDetail, "assignments")
 	if len(assignments) == 0 {
@@ -660,20 +892,20 @@ func testSimpleCamp(t *testing.T) {
 	}
 
 	selectResp := doRequest(t, http.MethodPost,
-		runURL+"/"+runID+"/solutions/"+topSolutionID+"/select", nil, http.StatusOK)
+		runURL+"/"+runID+"/solutions/"+topSolutionID+"/select", nil, http.StatusOK, token)
 	selectedID := str(selectResp, "selected_solution_id")
 	if selectedID != topSolutionID {
 		t.Fatalf("expected selected_solution_id %q, got %q", topSolutionID, selectedID)
 	}
 
-	updatedRun := mustGet(t, runURL+"/"+runID)
+	updatedRun := mustGet(t, runURL+"/"+runID, token)
 	if str(updatedRun, "selected_solution_id") != topSolutionID {
 		t.Fatal("run detail does not reflect selected solution")
 	}
 
-	mustDelete(t, runURL+"/"+runID)
+	mustDelete(t, runURL+"/"+runID, token)
 
-	runsAfterDelete := mustGetList(t, runURL)
+	runsAfterDelete := mustGetList(t, runURL, token)
 	if len(runsAfterDelete) != 0 {
 		t.Fatalf("expected 0 runs after delete, got %d", len(runsAfterDelete))
 	}
@@ -685,21 +917,24 @@ func testSimpleCamp(t *testing.T) {
 // co-counselor in Teen) ensure the solver produces unmet_preference
 // explanations and that solutions are meaningfully ranked.
 func testComplexCamp(t *testing.T) {
-	ts := mustSetupServer(t)
+	ts, pool := mustSetupServer(t)
 
-	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{
-		"name":     "Camp Ridgewood",
-		"location": "New Hampshire",
-	})
-	campID := str(campResp, "id")
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name, camp_location) VALUES ($1, $2) RETURNING id`,
+		"Camp Ridgewood", "New Hampshire").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
 
-	young := mustPost(t, apiURL(ts, "/camps/"+campID+"/age-groups"), map[string]any{"name": "Young"})
+	young := mustPost(t, apiURL(ts, "/camps/"+campID+"/age-groups"), map[string]any{"name": "Young"}, token)
 	youngID := str(young, "id")
 
-	middle := mustPost(t, apiURL(ts, "/camps/"+campID+"/age-groups"), map[string]any{"name": "Middle"})
+	middle := mustPost(t, apiURL(ts, "/camps/"+campID+"/age-groups"), map[string]any{"name": "Middle"}, token)
 	middleID := str(middle, "id")
 
-	teen := mustPost(t, apiURL(ts, "/camps/"+campID+"/age-groups"), map[string]any{"name": "Teen"})
+	teen := mustPost(t, apiURL(ts, "/camps/"+campID+"/age-groups"), map[string]any{"name": "Teen"}, token)
 	teenID := str(teen, "id")
 
 	type cabinInfo struct {
@@ -722,7 +957,7 @@ func testComplexCamp(t *testing.T) {
 		resp := mustPost(t, apiURL(ts, "/camps/"+campID+"/cabins"), map[string]any{
 			"name":         cd.name,
 			"age_group_id": cd.ageGroupID,
-		})
+		}, token)
 		cabins[i] = cabinInfo{id: str(resp, "id"), name: cd.name}
 	}
 
@@ -730,20 +965,20 @@ func testComplexCamp(t *testing.T) {
 		"name":       "Summer 2025",
 		"start_date": "2025-06-01",
 		"end_date":   "2025-08-31",
-	})
+	}, token)
 	seasonID := str(seasonResp, "id")
 
 	session1 := mustPost(t, apiURL(ts, "/camps/"+campID+"/sessions"), map[string]any{
 		"name":      "Session 1",
 		"season_id": seasonID,
-	})
+	}, token)
 	session1ID := str(session1, "id")
 
 	session2 := mustPost(t, apiURL(ts, "/camps/"+campID+"/sessions"), map[string]any{
 		"name":                "Session 2",
 		"season_id":           seasonID,
 		"previous_session_id": session1ID,
-	})
+	}, token)
 	session2ID := str(session2, "id")
 
 	type counselorInfo struct {
@@ -771,7 +1006,7 @@ func testComplexCamp(t *testing.T) {
 		resp := mustPost(t, apiURL(ts, "/camps/"+campID+"/counselors"), map[string]any{
 			"name":             c.name,
 			"junior_counselor": c.junior,
-		})
+		}, token)
 		allCounselors[i] = counselorInfo{
 			id:       str(resp, "id"),
 			name:     c.name,
@@ -785,17 +1020,17 @@ func testComplexCamp(t *testing.T) {
 
 	sagYoung := mustPost(t, apiURL(ts, "/camps/"+campID+"/sessions/"+session2ID+"/age-groups"), map[string]any{
 		"age_group_id": youngID,
-	})
+	}, token)
 	sagYoungID := str(sagYoung, "id")
 
 	sagMiddle := mustPost(t, apiURL(ts, "/camps/"+campID+"/sessions/"+session2ID+"/age-groups"), map[string]any{
 		"age_group_id": middleID,
-	})
+	}, token)
 	sagMiddleID := str(sagMiddle, "id")
 
 	sagTeen := mustPost(t, apiURL(ts, "/camps/"+campID+"/sessions/"+session2ID+"/age-groups"), map[string]any{
 		"age_group_id": teenID,
-	})
+	}, token)
 	sagTeenID := str(sagTeen, "id")
 
 	sagIDs := []string{sagYoungID, sagYoungID, sagMiddleID, sagMiddleID, sagTeenID, sagTeenID}
@@ -805,7 +1040,7 @@ func testComplexCamp(t *testing.T) {
 			"session_age_group_id": sagIDs[i],
 			"cabin_id":             cab.id,
 			"required_counselors":  reqCounselors,
-		})
+		}, token)
 	}
 
 	// Gina and Hank were both in Birch (Young) in session 1, making them
@@ -825,47 +1060,47 @@ func testComplexCamp(t *testing.T) {
 			"session_id":   session1ID,
 			"age_group_id": h.ageGroupID,
 			"cabin_id":     h.cabinID,
-		})
+		}, token)
 	}
 
 	prefBase := "/camps/" + campID + "/sessions/" + session2ID + "/counselors/"
 
 	mustPost(t, apiURL(ts, prefBase+gina.id+"/age-group-preferences"), map[string]any{
 		"age_group_id": youngID, "rank": 1,
-	})
+	}, token)
 	mustPost(t, apiURL(ts, prefBase+hank.id+"/age-group-preferences"), map[string]any{
 		"age_group_id": youngID, "rank": 1,
-	})
+	}, token)
 	mustPost(t, apiURL(ts, prefBase+hank.id+"/cocounselor-preferences"), map[string]any{
 		"preferred_counselor_id": gina.id, "rank": 1,
-	})
+	}, token)
 	mustPost(t, apiURL(ts, prefBase+iris.id+"/age-group-preferences"), map[string]any{
 		"age_group_id": middleID, "rank": 1,
-	})
+	}, token)
 	mustPost(t, apiURL(ts, prefBase+jake.id+"/age-group-preferences"), map[string]any{
 		"age_group_id": teenID, "rank": 1,
-	})
+	}, token)
 	mustPost(t, apiURL(ts, prefBase+jake.id+"/cocounselor-preferences"), map[string]any{
 		"preferred_counselor_id": kim.id, "rank": 1,
-	})
+	}, token)
 	// Kim prefers Young, but Jake wants Kim as a Teen co-counselor -- can't both be satisfied.
 	mustPost(t, apiURL(ts, prefBase+kim.id+"/age-group-preferences"), map[string]any{
 		"age_group_id": youngID, "rank": 1,
-	})
+	}, token)
 	mustPost(t, apiURL(ts, prefBase+allCounselors[5].id+"/age-group-preferences"), map[string]any{
 		"age_group_id": middleID, "rank": 1,
-	})
+	}, token)
 	mustPost(t, apiURL(ts, prefBase+mia.id+"/age-group-preferences"), map[string]any{
 		"age_group_id": teenID, "rank": 1,
-	})
+	}, token)
 	mustPost(t, apiURL(ts, prefBase+allCounselors[7].id+"/cocounselor-preferences"), map[string]any{
 		"preferred_counselor_id": mia.id, "rank": 1,
-	})
+	}, token)
 
 	runURL := apiURL(ts, "/camps/"+campID+"/sessions/"+session2ID+"/assignment-runs")
 	triggerResp := mustPost(t, runURL, map[string]any{
 		"max_solutions": 5,
-	})
+	}, token)
 
 	runID := str(triggerResp, "id")
 	if runID == "" {
@@ -892,7 +1127,7 @@ func testComplexCamp(t *testing.T) {
 	}
 
 	topSolutionID := str(asMap(solutions[0]), "id")
-	solDetail := mustGet(t, runURL+"/"+runID+"/solutions/"+topSolutionID)
+	solDetail := mustGet(t, runURL+"/"+runID+"/solutions/"+topSolutionID, token)
 
 	assignments := list(solDetail, "assignments")
 	if len(assignments) == 0 {
@@ -963,13 +1198,13 @@ func testComplexCamp(t *testing.T) {
 	}
 
 	selectResp := doRequest(t, http.MethodPost,
-		runURL+"/"+runID+"/solutions/"+topSolutionID+"/select", nil, http.StatusOK)
+		runURL+"/"+runID+"/solutions/"+topSolutionID+"/select", nil, http.StatusOK, token)
 	if str(selectResp, "selected_solution_id") != topSolutionID {
 		t.Fatal("selected_solution_id mismatch after selection")
 	}
 
-	mustDelete(t, runURL+"/"+runID)
-	runsAfterDelete := mustGetList(t, runURL)
+	mustDelete(t, runURL+"/"+runID, token)
+	runsAfterDelete := mustGetList(t, runURL, token)
 	if len(runsAfterDelete) != 0 {
 		t.Fatalf("expected 0 runs after delete, got %d", len(runsAfterDelete))
 	}
@@ -979,62 +1214,64 @@ func testComplexCamp(t *testing.T) {
 // create camp entities, enroll campers, trigger a camper_cabin run,
 // and verify assignments respect cabin capacity and age group constraints.
 func testBasicCamperAssignment(t *testing.T) {
-	ts := mustSetupServer(t)
+	ts, pool := mustSetupServer(t)
 
-	// Create camp.
-	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{
-		"name": "Camp Lakeside",
-	})
-	campID := str(campResp, "id")
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Lakeside").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
 	base := "/camps/" + campID
 
 	// Create age groups.
-	juniors := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Young"})
+	juniors := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Young"}, token)
 	juniorsID := str(juniors, "id")
 
 	// Create cabins.
 	cabinA := mustPost(t, apiURL(ts, base+"/cabins"), map[string]any{
 		"name": "Birch", "age_group_id": juniorsID,
-	})
+	}, token)
 	cabinAID := str(cabinA, "id")
 
 	cabinB := mustPost(t, apiURL(ts, base+"/cabins"), map[string]any{
 		"name": "Elm", "age_group_id": juniorsID,
-	})
+	}, token)
 	cabinBID := str(cabinB, "id")
 
 	// Create season and session.
 	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{
 		"name": "Summer 2026", "start_date": "2026-06-01", "end_date": "2026-08-31",
-	})
+	}, token)
 	seasonID := str(season, "id")
 
 	session := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{
 		"name": "Week 1", "season_id": seasonID,
-	})
+	}, token)
 	sessionID := str(session, "id")
 	sessionBase := base + "/sessions/" + sessionID
 
 	// Configure session age group and cabins with capacity.
 	sag := mustPost(t, apiURL(ts, sessionBase+"/age-groups"), map[string]any{
 		"age_group_id": juniorsID, "group_size": 20,
-	})
+	}, token)
 	sagID := str(sag, "id")
 
 	mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabinAID,
 		"group_size": 4, "required_counselors": 1,
-	})
+	}, token)
 	mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabinBID,
 		"group_size": 4, "required_counselors": 1,
-	})
+	}, token)
 
 	// Create campers.
 	camperNames := []string{"Alice", "Bob", "Charlie", "Diana", "Eve", "Frank"}
 	camperIDs := make([]string, len(camperNames))
 	for i, name := range camperNames {
-		resp := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": name})
+		resp := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": name}, token)
 		camperIDs[i] = str(resp, "id")
 	}
 
@@ -1042,14 +1279,14 @@ func testBasicCamperAssignment(t *testing.T) {
 	for _, camperID := range camperIDs {
 		mustPost(t, apiURL(ts, sessionBase+"/enrollments"), map[string]any{
 			"camper_id": camperID, "session_age_group_id": sagID,
-		})
+		}, token)
 	}
 
 	// Trigger camper_cabin run.
 	runURL := apiURL(ts, sessionBase+"/assignment-runs")
 	runResp := mustPost(t, runURL, map[string]any{
 		"run_type": "camper_cabin",
-	})
+	}, token)
 
 	if str(runResp, "run_type") != "camper_cabin" {
 		t.Fatalf("expected run_type camper_cabin, got %s", str(runResp, "run_type"))
@@ -1068,7 +1305,7 @@ func testBasicCamperAssignment(t *testing.T) {
 	topSolutionID := str(topSolution, "id")
 	runID := str(runResp, "id")
 
-	solDetail := mustGet(t, runURL+"/"+runID+"/solutions/"+topSolutionID)
+	solDetail := mustGet(t, runURL+"/"+runID+"/solutions/"+topSolutionID, token)
 	assignments := list(solDetail, "assignments")
 	if len(assignments) != 6 {
 		t.Fatalf("expected 6 camper assignments, got %d", len(assignments))
@@ -1087,98 +1324,100 @@ func testBasicCamperAssignment(t *testing.T) {
 	}
 
 	// Clean up.
-	mustDelete(t, runURL+"/"+runID)
+	mustDelete(t, runURL+"/"+runID, token)
 }
 
 // testCamperFriendPreferences verifies that the solver optimizes for friend
 // preferences and generates appropriate explanations.
 func testCamperFriendPreferences(t *testing.T) {
-	ts := mustSetupServer(t)
+	ts, pool := mustSetupServer(t)
 
-	// Create camp.
-	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{
-		"name": "Camp Friendship",
-	})
-	campID := str(campResp, "id")
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Friendship").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
 	base := "/camps/" + campID
 
 	// Create age group and cabins.
-	teens := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Teens"})
+	teens := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Teens"}, token)
 	teensID := str(teens, "id")
 
 	cabin1 := mustPost(t, apiURL(ts, base+"/cabins"), map[string]any{
 		"name": "Hawk", "age_group_id": teensID,
-	})
+	}, token)
 	cabin1ID := str(cabin1, "id")
 
 	cabin2 := mustPost(t, apiURL(ts, base+"/cabins"), map[string]any{
 		"name": "Eagle", "age_group_id": teensID,
-	})
+	}, token)
 	cabin2ID := str(cabin2, "id")
 
 	// Create season and session.
 	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{
 		"name": "Summer 2026", "start_date": "2026-06-01", "end_date": "2026-08-31",
-	})
+	}, token)
 	seasonID := str(season, "id")
 
 	session := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{
 		"name": "Week 1", "season_id": seasonID,
-	})
+	}, token)
 	sessionID := str(session, "id")
 	sessionBase := base + "/sessions/" + sessionID
 
 	// Configure cabins with capacity 3 each.
 	sag := mustPost(t, apiURL(ts, sessionBase+"/age-groups"), map[string]any{
 		"age_group_id": teensID, "group_size": 6,
-	})
+	}, token)
 	sagID := str(sag, "id")
 
 	mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabin1ID,
 		"group_size": 3, "required_counselors": 1,
-	})
+	}, token)
 	mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabin2ID,
 		"group_size": 3, "required_counselors": 1,
-	})
+	}, token)
 
 	// Create 4 campers: Amy, Beth, Carol, Dana.
-	amy := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": "Amy"})
+	amy := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": "Amy"}, token)
 	amyID := str(amy, "id")
-	beth := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": "Beth"})
+	beth := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": "Beth"}, token)
 	bethID := str(beth, "id")
-	carol := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": "Carol"})
+	carol := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": "Carol"}, token)
 	carolID := str(carol, "id")
-	dana := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": "Dana"})
+	dana := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": "Dana"}, token)
 	danaID := str(dana, "id")
 
 	// Enroll all.
 	for _, id := range []string{amyID, bethID, carolID, danaID} {
 		mustPost(t, apiURL(ts, sessionBase+"/enrollments"), map[string]any{
 			"camper_id": id, "session_age_group_id": sagID,
-		})
+		}, token)
 	}
 
 	// Amy wants Beth, Beth wants Amy (mutual friends).
 	mustPost(t, apiURL(ts, sessionBase+"/campers/"+amyID+"/friend-preferences"), map[string]any{
 		"preferred_camper_id": bethID, "rank": 1,
-	})
+	}, token)
 	mustPost(t, apiURL(ts, sessionBase+"/campers/"+bethID+"/friend-preferences"), map[string]any{
 		"preferred_camper_id": amyID, "rank": 1,
-	})
+	}, token)
 
 	// Carol wants Dana.
 	mustPost(t, apiURL(ts, sessionBase+"/campers/"+carolID+"/friend-preferences"), map[string]any{
 		"preferred_camper_id": danaID, "rank": 1,
-	})
+	}, token)
 
 	// Trigger camper run.
 	runURL := apiURL(ts, sessionBase+"/assignment-runs")
 	runResp := mustPost(t, runURL, map[string]any{
 		"run_type":      "camper_cabin",
 		"max_solutions": 3,
-	})
+	}, token)
 
 	solutions := list(runResp, "solutions")
 	if len(solutions) == 0 {
@@ -1195,7 +1434,7 @@ func testCamperFriendPreferences(t *testing.T) {
 	// Check the solution detail.
 	runID := str(runResp, "id")
 	topSolutionID := str(topSolution, "id")
-	solDetail := mustGet(t, runURL+"/"+runID+"/solutions/"+topSolutionID)
+	solDetail := mustGet(t, runURL+"/"+runID+"/solutions/"+topSolutionID, token)
 
 	// Verify score breakdown exists.
 	breakdown := list(solDetail, "score_breakdown")
@@ -1235,189 +1474,209 @@ func testCamperFriendPreferences(t *testing.T) {
 	}
 
 	// Clean up.
-	mustDelete(t, runURL+"/"+runID)
+	mustDelete(t, runURL+"/"+runID, token)
 }
 
 // testEnrollmentSessionScoping verifies that GET and DELETE enrollment
 // endpoints enforce session scoping: accessing an enrollment via the wrong
 // session returns 404 even if the enrollment ID and camp ID are valid.
 func testEnrollmentSessionScoping(t *testing.T) {
-	ts := mustSetupServer(t)
+	ts, pool := mustSetupServer(t)
 
-	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{"name": "Camp Scope"})
-	campID := str(campResp, "id")
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Scope").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
 	base := "/camps/" + campID
 
-	ag := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Kids"})
+	ag := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Kids"}, token)
 	agID := str(ag, "id")
 
-	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31"})
+	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31"}, token)
 	seasonID := str(season, "id")
 
-	s1 := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{"name": "S1", "season_id": seasonID})
+	s1 := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{"name": "S1", "season_id": seasonID}, token)
 	s1ID := str(s1, "id")
 
 	s2 := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{
 		"name": "S2", "season_id": seasonID, "previous_session_id": s1ID,
-	})
+	}, token)
 	s2ID := str(s2, "id")
 
 	sag := mustPost(t, apiURL(ts, base+"/sessions/"+s1ID+"/age-groups"), map[string]any{
 		"age_group_id": agID,
-	})
+	}, token)
 	sagID := str(sag, "id")
 
-	camper := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": "Test Camper"})
+	camper := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": "Test Camper"}, token)
 	camperID := str(camper, "id")
 
 	enrollment := mustPost(t, apiURL(ts, base+"/sessions/"+s1ID+"/enrollments"), map[string]any{
 		"camper_id": camperID, "session_age_group_id": sagID,
-	})
+	}, token)
 	enrollmentID := str(enrollment, "id")
 
 	// GET via correct session should succeed.
-	mustGet(t, apiURL(ts, base+"/sessions/"+s1ID+"/enrollments/"+enrollmentID))
+	mustGet(t, apiURL(ts, base+"/sessions/"+s1ID+"/enrollments/"+enrollmentID), token)
 
 	// GET via wrong session should return 404.
 	doRawRequest(t, http.MethodGet,
 		apiURL(ts, base+"/sessions/"+s2ID+"/enrollments/"+enrollmentID),
-		nil, http.StatusNotFound)
+		nil, http.StatusNotFound, token)
 
 	// DELETE via wrong session should return 404.
 	doRawRequest(t, http.MethodDelete,
 		apiURL(ts, base+"/sessions/"+s2ID+"/enrollments/"+enrollmentID),
-		nil, http.StatusNotFound)
+		nil, http.StatusNotFound, token)
 
 	// DELETE via correct session should succeed.
-	mustDelete(t, apiURL(ts, base+"/sessions/"+s1ID+"/enrollments/"+enrollmentID))
+	mustDelete(t, apiURL(ts, base+"/sessions/"+s1ID+"/enrollments/"+enrollmentID), token)
 }
 
 // testEnrollmentSessionUniqueness verifies that a camper cannot be enrolled
 // twice in the same session, even across different age groups.
 func testEnrollmentSessionUniqueness(t *testing.T) {
-	ts := mustSetupServer(t)
+	ts, pool := mustSetupServer(t)
 
-	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{"name": "Camp Unique"})
-	campID := str(campResp, "id")
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Unique").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
 	base := "/camps/" + campID
 
-	ag1 := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Young"})
+	ag1 := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Young"}, token)
 	ag1ID := str(ag1, "id")
-	ag2 := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Old"})
+	ag2 := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Old"}, token)
 	ag2ID := str(ag2, "id")
 
-	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31"})
+	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31"}, token)
 	seasonID := str(season, "id")
 
 	session := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{
 		"name": "Week 1", "season_id": seasonID,
-	})
+	}, token)
 	sessionID := str(session, "id")
 
 	sag1 := mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/age-groups"), map[string]any{
 		"age_group_id": ag1ID,
-	})
+	}, token)
 	sag1ID := str(sag1, "id")
 	sag2 := mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/age-groups"), map[string]any{
 		"age_group_id": ag2ID,
-	})
+	}, token)
 	sag2ID := str(sag2, "id")
 
-	camper := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": "Duplicate Dan"})
+	camper := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": "Duplicate Dan"}, token)
 	camperID := str(camper, "id")
 
 	// First enrollment succeeds.
 	mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/enrollments"), map[string]any{
 		"camper_id": camperID, "session_age_group_id": sag1ID,
-	})
+	}, token)
 
 	// Second enrollment in the same session (different age group) should fail
 	// due to UNIQUE(camper_id, session_id).
 	doRawRequest(t, http.MethodPost,
 		apiURL(ts, base+"/sessions/"+sessionID+"/enrollments"),
 		map[string]any{"camper_id": camperID, "session_age_group_id": sag2ID},
-		http.StatusConflict)
+		http.StatusConflict, token)
 }
 
 // testGetSolutionRunOwnership verifies that requesting a solution through a
 // run that doesn't own it returns 404, preventing cross-run data leakage.
 func testGetSolutionRunOwnership(t *testing.T) {
-	ts := mustSetupServer(t)
+	ts, pool := mustSetupServer(t)
 
-	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{"name": "Camp Ownership"})
-	campID := str(campResp, "id")
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Ownership").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
 	base := "/camps/" + campID
 
-	ag := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Juniors"})
+	ag := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Juniors"}, token)
 	agID := str(ag, "id")
 
 	cabin := mustPost(t, apiURL(ts, base+"/cabins"), map[string]any{
 		"name": "Pine", "age_group_id": agID,
-	})
+	}, token)
 	cabinID := str(cabin, "id")
 
-	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31"})
+	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31"}, token)
 	seasonID := str(season, "id")
 
 	session := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{
 		"name": "Week 1", "season_id": seasonID,
-	})
+	}, token)
 	sessionID := str(session, "id")
 
 	sag := mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/age-groups"), map[string]any{
 		"age_group_id": agID, "group_size": 10,
-	})
+	}, token)
 	sagID := str(sag, "id")
 
 	mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabinID,
 		"group_size": 4, "required_counselors": 1,
-	})
+	}, token)
 
 	// Create 2 campers and enroll them.
 	for _, name := range []string{"Alice", "Bob"} {
-		c := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": name})
+		c := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": name}, token)
 		mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/enrollments"), map[string]any{
 			"camper_id": str(c, "id"), "session_age_group_id": sagID,
-		})
+		}, token)
 	}
 
 	// Trigger two camper runs to get solutions from different runs.
 	runURL := apiURL(ts, base+"/sessions/"+sessionID+"/assignment-runs")
-	run1 := mustPost(t, runURL, map[string]any{"run_type": "camper_cabin"})
+	run1 := mustPost(t, runURL, map[string]any{"run_type": "camper_cabin"}, token)
 	run1ID := str(run1, "id")
 	sol1ID := str(asMap(list(run1, "solutions")[0]), "id")
 
-	run2 := mustPost(t, runURL, map[string]any{"run_type": "camper_cabin"})
+	run2 := mustPost(t, runURL, map[string]any{"run_type": "camper_cabin"}, token)
 	run2ID := str(run2, "id")
 
 	// Getting run1's solution through run1 should succeed.
-	mustGet(t, runURL+"/"+run1ID+"/solutions/"+sol1ID)
+	mustGet(t, runURL+"/"+run1ID+"/solutions/"+sol1ID, token)
 
 	// Getting run1's solution through run2 should return 404.
 	doRawRequest(t, http.MethodGet,
 		runURL+"/"+run2ID+"/solutions/"+sol1ID,
-		nil, http.StatusNotFound)
+		nil, http.StatusNotFound, token)
 
 	// Clean up.
-	mustDelete(t, runURL+"/"+run1ID)
-	mustDelete(t, runURL+"/"+run2ID)
+	mustDelete(t, runURL+"/"+run1ID, token)
+	mustDelete(t, runURL+"/"+run2ID, token)
 }
 
 // testGetSolutionRunNotFound verifies that GetSolution returns 404 (not 500)
 // when the run doesn't exist.
 func testGetSolutionRunNotFound(t *testing.T) {
-	ts := mustSetupServer(t)
+	ts, pool := mustSetupServer(t)
 
-	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{"name": "Camp 404"})
-	campID := str(campResp, "id")
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp 404").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
 
-	season := mustPost(t, apiURL(ts, "/camps/"+campID+"/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31"})
+	season := mustPost(t, apiURL(ts, "/camps/"+campID+"/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31"}, token)
 	seasonID := str(season, "id")
 
 	session := mustPost(t, apiURL(ts, "/camps/"+campID+"/sessions"), map[string]any{
 		"name": "Week 1", "season_id": seasonID,
-	})
+	}, token)
 	sessionID := str(session, "id")
 
 	fakeRunID := "00000000-0000-0000-0000-000000000001"
@@ -1426,67 +1685,72 @@ func testGetSolutionRunNotFound(t *testing.T) {
 	runURL := apiURL(ts, "/camps/"+campID+"/sessions/"+sessionID+"/assignment-runs")
 
 	// GetRun with nonexistent run ID should return 404.
-	doRawRequest(t, http.MethodGet, runURL+"/"+fakeRunID, nil, http.StatusNotFound)
+	doRawRequest(t, http.MethodGet, runURL+"/"+fakeRunID, nil, http.StatusNotFound, token)
 
 	// GetSolution with nonexistent run ID should return 404, not 500.
 	doRawRequest(t, http.MethodGet,
 		runURL+"/"+fakeRunID+"/solutions/"+fakeSolID,
-		nil, http.StatusNotFound)
+		nil, http.StatusNotFound, token)
 }
 
 // testSelectSolutionCamperRun verifies that SelectSolution works for
 // camper_cabin runs (not just counselor_cabin runs).
 func testSelectSolutionCamperRun(t *testing.T) {
-	ts := mustSetupServer(t)
+	ts, pool := mustSetupServer(t)
 
-	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{"name": "Camp Select"})
-	campID := str(campResp, "id")
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Select").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
 	base := "/camps/" + campID
 
-	ag := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Teens"})
+	ag := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Teens"}, token)
 	agID := str(ag, "id")
 
 	cabin := mustPost(t, apiURL(ts, base+"/cabins"), map[string]any{
 		"name": "Hawk", "age_group_id": agID,
-	})
+	}, token)
 	cabinID := str(cabin, "id")
 
-	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31"})
+	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31"}, token)
 	seasonID := str(season, "id")
 
 	session := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{
 		"name": "Week 1", "season_id": seasonID,
-	})
+	}, token)
 	sessionID := str(session, "id")
 	sessionBase := base + "/sessions/" + sessionID
 
 	sag := mustPost(t, apiURL(ts, sessionBase+"/age-groups"), map[string]any{
 		"age_group_id": agID, "group_size": 10,
-	})
+	}, token)
 	sagID := str(sag, "id")
 
 	mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabinID,
 		"group_size": 4, "required_counselors": 1,
-	})
+	}, token)
 
 	// Create and enroll 2 campers.
 	for _, name := range []string{"Alice", "Bob"} {
-		c := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": name})
+		c := mustPost(t, apiURL(ts, base+"/campers"), map[string]any{"name": name}, token)
 		mustPost(t, apiURL(ts, sessionBase+"/enrollments"), map[string]any{
 			"camper_id": str(c, "id"), "session_age_group_id": sagID,
-		})
+		}, token)
 	}
 
 	// Trigger camper run.
 	runURL := apiURL(ts, sessionBase+"/assignment-runs")
-	runResp := mustPost(t, runURL, map[string]any{"run_type": "camper_cabin"})
+	runResp := mustPost(t, runURL, map[string]any{"run_type": "camper_cabin"}, token)
 	runID := str(runResp, "id")
 	topSolutionID := str(asMap(list(runResp, "solutions")[0]), "id")
 
 	// Select solution should succeed for a camper run.
 	selectResp := doRequest(t, http.MethodPost,
-		runURL+"/"+runID+"/solutions/"+topSolutionID+"/select", nil, http.StatusOK)
+		runURL+"/"+runID+"/solutions/"+topSolutionID+"/select", nil, http.StatusOK, token)
 
 	selectedID := str(selectResp, "selected_solution_id")
 	if selectedID != topSolutionID {
@@ -1497,25 +1761,30 @@ func testSelectSolutionCamperRun(t *testing.T) {
 	}
 
 	// Verify via GetRun.
-	updatedRun := mustGet(t, runURL+"/"+runID)
+	updatedRun := mustGet(t, runURL+"/"+runID, token)
 	if str(updatedRun, "selected_solution_id") != topSolutionID {
 		t.Fatal("run detail does not reflect selected camper solution")
 	}
 
 	// Clean up.
-	mustDelete(t, runURL+"/"+runID)
+	mustDelete(t, runURL+"/"+runID, token)
 }
 
 func testCamperRunInvalidSession(t *testing.T) {
-	ts := mustSetupServer(t)
+	ts, pool := mustSetupServer(t)
 
-	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{"name": "Camp Ghost"})
-	campID := str(campResp, "id")
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Ghost").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
 
 	fakeSessionID := "00000000-0000-0000-0000-000000000099"
 	runURL := apiURL(ts, "/camps/"+campID+"/sessions/"+fakeSessionID+"/assignment-runs")
 
-	doRawRequest(t, http.MethodPost, runURL, map[string]any{"run_type": "camper_cabin"}, http.StatusNotFound)
+	doRawRequest(t, http.MethodPost, runURL, map[string]any{"run_type": "camper_cabin"}, http.StatusNotFound, token)
 }
 
 // testRepeatedUnmetPreferenceBoost exercises the full flow of:
@@ -1528,48 +1797,51 @@ func testCamperRunInvalidSession(t *testing.T) {
 // Young, but only one Young cabin exists, so one must go to Old. In session 2,
 // the counselor whose Young preference was unmet gets a score boost.
 func testRepeatedUnmetPreferenceBoost(t *testing.T) {
-	ts := mustSetupServer(t)
+	ts, pool := mustSetupServer(t)
 
-	campResp := mustPost(t, apiURL(ts, "/camps"), map[string]any{
-		"name": "Camp Boost",
-	})
-	campID := str(campResp, "id")
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Boost").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
 	base := "/camps/" + campID
 
 	// Create age groups.
-	young := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Young"})
+	young := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Young"}, token)
 	youngID := str(young, "id")
 
-	old := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Old"})
+	old := mustPost(t, apiURL(ts, base+"/age-groups"), map[string]any{"name": "Old"}, token)
 	oldID := str(old, "id")
 
 	// Create cabins.
 	pine := mustPost(t, apiURL(ts, base+"/cabins"), map[string]any{
 		"name": "Pine", "age_group_id": youngID,
-	})
+	}, token)
 	pineID := str(pine, "id")
 
 	oak := mustPost(t, apiURL(ts, base+"/cabins"), map[string]any{
 		"name": "Oak", "age_group_id": oldID,
-	})
+	}, token)
 	oakID := str(oak, "id")
 
 	// Create season and sessions.
 	season := mustPost(t, apiURL(ts, base+"/seasons"), map[string]any{
 		"name": "Summer 2025", "start_date": "2025-06-01", "end_date": "2025-08-31",
-	})
+	}, token)
 	seasonID := str(season, "id")
 
 	session1 := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{
 		"name": "Session 1", "season_id": seasonID,
-	})
+	}, token)
 	session1ID := str(session1, "id")
 
 	session2 := mustPost(t, apiURL(ts, base+"/sessions"), map[string]any{
 		"name":                "Session 2",
 		"season_id":           seasonID,
 		"previous_session_id": session1ID,
-	})
+	}, token)
 	session2ID := str(session2, "id")
 
 	// Create 2 senior counselors. Both prefer Young, but only one Young cabin
@@ -1583,7 +1855,7 @@ func testRepeatedUnmetPreferenceBoost(t *testing.T) {
 		resp := mustPost(t, apiURL(ts, base+"/counselors"), map[string]any{
 			"name":             name,
 			"junior_counselor": false,
-		})
+		}, token)
 		counselors = append(counselors, counselorInfo{id: str(resp, "id"), name: name})
 	}
 	alice, bob := counselors[0], counselors[1]
@@ -1592,20 +1864,20 @@ func testRepeatedUnmetPreferenceBoost(t *testing.T) {
 	configureCabins := func(sessionID string) {
 		sagYoung := mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/age-groups"), map[string]any{
 			"age_group_id": youngID,
-		})
+		}, token)
 		sagOld := mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/age-groups"), map[string]any{
 			"age_group_id": oldID,
-		})
+		}, token)
 		mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/cabins"), map[string]any{
 			"session_age_group_id": str(sagYoung, "id"),
 			"cabin_id":             pineID,
 			"required_counselors":  1,
-		})
+		}, token)
 		mustPost(t, apiURL(ts, base+"/sessions/"+sessionID+"/cabins"), map[string]any{
 			"session_age_group_id": str(sagOld, "id"),
 			"cabin_id":             oakID,
 			"required_counselors":  1,
-		})
+		}, token)
 	}
 
 	configureCabins(session1ID)
@@ -1616,17 +1888,17 @@ func testRepeatedUnmetPreferenceBoost(t *testing.T) {
 		prefBase := base + "/sessions/" + sessionID + "/counselors/"
 		mustPost(t, apiURL(ts, prefBase+alice.id+"/age-group-preferences"), map[string]any{
 			"age_group_id": youngID, "rank": 1,
-		})
+		}, token)
 		mustPost(t, apiURL(ts, prefBase+bob.id+"/age-group-preferences"), map[string]any{
 			"age_group_id": youngID, "rank": 1,
-		})
+		}, token)
 	}
 
 	setPreferences(session1ID)
 
 	// Trigger session 1 run.
 	run1URL := apiURL(ts, base+"/sessions/"+session1ID+"/assignment-runs")
-	run1Resp := mustPost(t, run1URL, nil)
+	run1Resp := mustPost(t, run1URL, nil, token)
 	run1ID := str(run1Resp, "id")
 
 	solutions1 := list(run1Resp, "solutions")
@@ -1637,14 +1909,14 @@ func testRepeatedUnmetPreferenceBoost(t *testing.T) {
 
 	// Select the top solution for session 1.
 	doRequest(t, http.MethodPost,
-		run1URL+"/"+run1ID+"/solutions/"+sol1ID+"/select", nil, http.StatusOK)
+		run1URL+"/"+run1ID+"/solutions/"+sol1ID+"/select", nil, http.StatusOK, token)
 
 	// Set the same preferences for session 2.
 	setPreferences(session2ID)
 
 	// Trigger session 2 run.
 	run2URL := apiURL(ts, base+"/sessions/"+session2ID+"/assignment-runs")
-	run2Resp := mustPost(t, run2URL, nil)
+	run2Resp := mustPost(t, run2URL, nil, token)
 	run2ID := str(run2Resp, "id")
 
 	solutions2 := list(run2Resp, "solutions")
@@ -1654,7 +1926,7 @@ func testRepeatedUnmetPreferenceBoost(t *testing.T) {
 	sol2ID := str(asMap(solutions2[0]), "id")
 
 	// Fetch the session 2 solution detail and verify the boost.
-	sol2Detail := mustGet(t, run2URL+"/"+run2ID+"/solutions/"+sol2ID)
+	sol2Detail := mustGet(t, run2URL+"/"+run2ID+"/solutions/"+sol2ID, token)
 
 	breakdown := list(sol2Detail, "score_breakdown")
 	if len(breakdown) == 0 {
@@ -1675,6 +1947,6 @@ func testRepeatedUnmetPreferenceBoost(t *testing.T) {
 	}
 
 	// Clean up.
-	mustDelete(t, run1URL+"/"+run1ID)
-	mustDelete(t, run2URL+"/"+run2ID)
+	mustDelete(t, run1URL+"/"+run1ID, token)
+	mustDelete(t, run2URL+"/"+run2ID, token)
 }

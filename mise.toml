@@ -15,6 +15,7 @@ DATABASE_PASSWORD = "p@ss123"
 DATABASE_SSL_MODE = "disable"
 DATABASE_NAME = "camp_scheduler"
 DATABASE_TIMEOUT = "10s"
+JWT_SECRET = "local-dev-secret-do-not-use-in-production"
 
 # Constructed URLs for golang-migrate
 DATABASE_URL = "postgres://{{env.DATABASE_USER}}:{{env.DATABASE_PASSWORD}}@{{env.DATABASE_HOST}}:{{env.DATABASE_PORT}}/{{env.DATABASE_NAME}}?sslmode={{env.DATABASE_SSL_MODE}}"

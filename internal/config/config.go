@@ -12,12 +12,19 @@ import (
 type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
+	JWT      JWTConfig
 }
 
 type ServerConfig struct {
 	Port     int    `envconfig:"PORT" default:"9100"`
 	Mode     string `envconfig:"MODE" default:"prod"`
 	LogLevel string `envconfig:"LOG_LEVEL" default:"info"`
+}
+
+type JWTConfig struct {
+	Secret          string        `envconfig:"JWT_SECRET" required:"true"`
+	AccessTokenTTL  time.Duration `envconfig:"JWT_ACCESS_TTL" default:"15m"`
+	RefreshTokenTTL time.Duration `envconfig:"JWT_REFRESH_TTL" default:"168h"`
 }
 
 type DatabaseConfig struct {

@@ -1,6 +1,10 @@
 services:
   postgres:
-    image: postgres:18
+    build: ./database/postgres
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_cron
+      -c cron.database_name=camp_scheduler
     ports:
       - "5432:5432"
     environment:

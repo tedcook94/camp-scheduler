@@ -61,7 +61,8 @@ Override any value locally with `mise.local.toml` (gitignored).
 
 `docker-compose.yml` defines two services:
 
-- **postgres** — PostgreSQL 18 with a named volume for data persistence. On
+- **postgres** — PostgreSQL 18 with pg_cron (built from
+  `database/postgres/Dockerfile`). Uses a named volume for data persistence. On
   first start, runs `database/local-setup/local-setup.sql` to create the app
   user and databases.
 - **server** — Dev container that runs migrations and starts air. Bind-mounts
@@ -91,6 +92,7 @@ variables:
 | `DATABASE_NAME`       | `camp_scheduler`  | Database name              |
 | `DATABASE_SSL_MODE`   | `disable`         | Postgres SSL mode          |
 | `DATABASE_TIMEOUT`    | `10s`             | Connection timeout         |
+| `JWT_SECRET`          | (dev value)       | Signing key for JWT tokens |
 
 `DATABASE_URL` and `DATABASE_URL_TEST` are automatically constructed from the
 above variables via mise templates.

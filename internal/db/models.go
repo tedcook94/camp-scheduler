@@ -218,6 +218,15 @@ type CounselorSessionHistory struct {
 	CabinID     pgtype.UUID
 }
 
+type RefreshToken struct {
+	ID        pgtype.UUID
+	UserID    pgtype.UUID
+	TokenHash string
+	ExpiresAt pgtype.Timestamptz
+	RevokedAt pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+}
+
 type Season struct {
 	ID         pgtype.UUID
 	CampID     pgtype.UUID
@@ -272,4 +281,17 @@ type TimeSlot struct {
 	ID           pgtype.UUID
 	CampID       pgtype.UUID
 	TimeSlotName string
+}
+
+type User struct {
+	ID           pgtype.UUID
+	CampID       pgtype.UUID
+	Username     string
+	Email        string
+	PasswordHash string
+	FirstName    string
+	LastName     string
+	Role         string
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
 }

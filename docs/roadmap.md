@@ -120,8 +120,11 @@ viable configurations and understand trade-offs.
 
 - [x] Reward repeated preferences that were previously unmet
 - [x] Docker Compose for local dev
-- [ ] JWT authentication
+- [x] JWT authentication
   - Remove camp_id from REST endpoint paths; derive camp context from JWT
+- [ ] Migrate to Yaak for API testing
+- [ ] Super-admin endpoint for revoking a user's refresh tokens
+- [ ] "Super-admin" panel for managing users with ghost mode
 - [ ] Web frontend
 - [ ] Overrides (locking assignments before solver runs)
 - [ ] Data import (CSV/spreadsheet)

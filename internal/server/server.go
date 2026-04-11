@@ -95,7 +95,7 @@ func (s *Server) routes() {
 
 	v1 := s.router.Group("/api/v1")
 
-	authenticator := auth.NewJWTAuthenticator(queries, auth.JWTConfig{
+	authenticator := auth.NewJWTAuthenticator(s.pool, queries, auth.JWTConfig{
 		SigningKey:      []byte(s.cfg.JWT.Secret),
 		AccessTokenTTL:  s.cfg.JWT.AccessTokenTTL,
 		RefreshTokenTTL: s.cfg.JWT.RefreshTokenTTL,

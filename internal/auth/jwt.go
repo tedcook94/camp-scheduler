@@ -15,6 +15,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -26,6 +27,7 @@ var (
 // JWTAuthenticator implements Authenticator using locally-signed JWTs for
 // access tokens and opaque, DB-backed tokens for refresh token rotation.
 type JWTAuthenticator struct {
+	pool            *pgxpool.Pool
 	queries         *db.Queries
 	signingKey      []byte
 	accessTokenTTL  time.Duration
@@ -38,8 +40,9 @@ type JWTConfig struct {
 	RefreshTokenTTL time.Duration
 }
 
-func NewJWTAuthenticator(queries *db.Queries, cfg JWTConfig) *JWTAuthenticator {
+func NewJWTAuthenticator(pool *pgxpool.Pool, queries *db.Queries, cfg JWTConfig) *JWTAuthenticator {
 	return &JWTAuthenticator{
+		pool:            pool,
 		queries:         queries,
 		signingKey:      cfg.SigningKey,
 		accessTokenTTL:  cfg.AccessTokenTTL,
@@ -79,7 +82,15 @@ func (a *JWTAuthenticator) Login(ctx context.Context, username, password string)
 func (a *JWTAuthenticator) Refresh(ctx context.Context, refreshToken string) (string, string, error) {
 	hash := hashToken(refreshToken)
 
-	stored, err := a.queries.GetRefreshTokenByHash(ctx, hash)
+	tx, err := a.pool.Begin(ctx)
+	if err != nil {
+		return "", "", fmt.Errorf("error starting transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	txQueries := a.queries.WithTx(tx)
+
+	stored, err := txQueries.GetRefreshTokenByHash(ctx, hash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", "", ErrInvalidToken
@@ -91,11 +102,15 @@ func (a *JWTAuthenticator) Refresh(ctx context.Context, refreshToken string) (st
 		return "", "", ErrInvalidToken
 	}
 
-	if err := a.queries.RevokeRefreshToken(ctx, stored.ID); err != nil {
+	_, err = txQueries.RevokeRefreshToken(ctx, stored.ID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", "", ErrInvalidToken
+		}
 		return "", "", fmt.Errorf("error revoking refresh token: %w", err)
 	}
 
-	user, err := a.queries.GetUserByID(ctx, stored.UserID)
+	user, err := txQueries.GetUserByID(ctx, stored.UserID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", "", ErrInvalidToken
@@ -111,9 +126,13 @@ func (a *JWTAuthenticator) Refresh(ctx context.Context, refreshToken string) (st
 		return "", "", fmt.Errorf("error generating access token: %w", err)
 	}
 
-	newRefresh, err := a.createRefreshToken(ctx, user.ID)
+	newRefresh, err := a.createRefreshTokenTx(ctx, txQueries, user.ID)
 	if err != nil {
 		return "", "", fmt.Errorf("error creating refresh token: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return "", "", fmt.Errorf("error committing refresh transaction: %w", err)
 	}
 
 	return newAccess, newRefresh, nil
@@ -164,6 +183,10 @@ func (a *JWTAuthenticator) generateAccessToken(userID, campID, username string, 
 }
 
 func (a *JWTAuthenticator) createRefreshToken(ctx context.Context, userID pgtype.UUID) (string, error) {
+	return a.createRefreshTokenTx(ctx, a.queries, userID)
+}
+
+func (a *JWTAuthenticator) createRefreshTokenTx(ctx context.Context, q *db.Queries, userID pgtype.UUID) (string, error) {
 	raw, err := generateOpaqueToken()
 	if err != nil {
 		return "", fmt.Errorf("error generating opaque token: %w", err)
@@ -171,7 +194,7 @@ func (a *JWTAuthenticator) createRefreshToken(ctx context.Context, userID pgtype
 
 	hash := hashToken(raw)
 
-	_, err = a.queries.CreateRefreshToken(ctx, db.CreateRefreshTokenParams{
+	_, err = q.CreateRefreshToken(ctx, db.CreateRefreshTokenParams{
 		UserID:    userID,
 		TokenHash: hash,
 		ExpiresAt: pgtype.Timestamptz{

@@ -26,12 +26,17 @@ CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens (user_id);
 CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens (expires_at)
     WHERE revoked_at IS NULL;
 
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-
-SELECT cron.schedule(
-    'cleanup-expired-refresh-tokens',
-    '0 8 * * *',
-    $$DELETE FROM refresh_tokens WHERE expires_at < now()$$
-);
+DO $$
+BEGIN
+    IF current_database() = 'camp_scheduler' THEN
+        CREATE EXTENSION IF NOT EXISTS pg_cron;
+        PERFORM cron.schedule(
+            'cleanup-expired-refresh-tokens',
+            '0 8 * * *',
+            'DELETE FROM refresh_tokens WHERE expires_at < now()'
+        );
+    END IF;
+END
+$$;
 
 COMMIT;

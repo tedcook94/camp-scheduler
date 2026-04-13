@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"camp-scheduler/internal/api"
+	"camp-scheduler/internal/auth"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -19,8 +20,8 @@ func NewController(svc *Service) *Controller {
 	return &Controller{svc: svc}
 }
 
-func (ctrl *Controller) RegisterRoutes(camps *gin.RouterGroup) {
-	activities := camps.Group("/:campId/activities")
+func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
+	activities := rg.Group("/activities")
 	activities.GET("", ctrl.List)
 	activities.GET("/:activityId", ctrl.Get)
 	activities.POST("", ctrl.Create)
@@ -60,7 +61,7 @@ type ActivityCertificationResponse struct {
 }
 
 func (ctrl *Controller) List(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 
 	activities, err := ctrl.svc.List(c.Request.Context(), campID)
 	if err != nil {
@@ -80,7 +81,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 }
 
 func (ctrl *Controller) Get(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	id := c.Param("activityId")
 
 	activity, err := ctrl.svc.GetByID(c.Request.Context(), campID, id)
@@ -106,7 +107,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 }
 
 func (ctrl *Controller) Create(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 
 	var req CreateActivityRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -132,7 +133,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 }
 
 func (ctrl *Controller) Update(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	id := c.Param("activityId")
 
 	var req UpdateActivityRequest
@@ -164,7 +165,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 }
 
 func (ctrl *Controller) Delete(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	id := c.Param("activityId")
 
 	err := ctrl.svc.Delete(c.Request.Context(), campID, id)
@@ -194,7 +195,7 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 }
 
 func (ctrl *Controller) ListCertifications(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	activityID := c.Param("activityId")
 
 	certs, err := ctrl.svc.ListCertifications(c.Request.Context(), campID, activityID)
@@ -216,7 +217,7 @@ func (ctrl *Controller) ListCertifications(c *gin.Context) {
 }
 
 func (ctrl *Controller) AddCertification(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	activityID := c.Param("activityId")
 
 	var req AddCertificationRequest
@@ -252,7 +253,7 @@ func (ctrl *Controller) AddCertification(c *gin.Context) {
 }
 
 func (ctrl *Controller) RemoveCertification(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	activityID := c.Param("activityId")
 	id := c.Param("certId")
 

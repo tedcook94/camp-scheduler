@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"camp-scheduler/internal/api"
+	"camp-scheduler/internal/auth"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -19,8 +20,8 @@ func NewController(svc *Service) *Controller {
 	return &Controller{svc: svc}
 }
 
-func (ctrl *Controller) RegisterRoutes(camps *gin.RouterGroup) {
-	enrollments := camps.Group("/:campId/sessions/:sessionId/enrollments")
+func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
+	enrollments := rg.Group("/sessions/:sessionId/enrollments")
 	enrollments.GET("", ctrl.List)
 	enrollments.GET("/:enrollmentId", ctrl.Get)
 	enrollments.POST("", ctrl.Create)
@@ -43,7 +44,7 @@ type EnrollmentResponse struct {
 }
 
 func (ctrl *Controller) List(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 
 	enrollments, err := ctrl.svc.ListBySession(c.Request.Context(), campID, sessionID)
@@ -65,7 +66,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 }
 
 func (ctrl *Controller) Get(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("enrollmentId")
 
@@ -93,7 +94,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 }
 
 func (ctrl *Controller) Create(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 
 	var req CreateEnrollmentRequest
@@ -133,7 +134,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 }
 
 func (ctrl *Controller) Delete(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("enrollmentId")
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"camp-scheduler/internal/api"
+	"camp-scheduler/internal/auth"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -19,15 +20,15 @@ func NewController(svc *Service) *Controller {
 	return &Controller{svc: svc}
 }
 
-func (ctrl *Controller) RegisterRoutes(camps *gin.RouterGroup) {
-	history := camps.Group("/:campId/counselors/:counselorId/session-history")
+func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
+	history := rg.Group("/counselors/:counselorId/session-history")
 	history.GET("", ctrl.List)
 	history.GET("/:id", ctrl.Get)
 	history.POST("", ctrl.Create)
 	history.PUT("/:id", ctrl.Update)
 	history.DELETE("/:id", ctrl.Delete)
 
-	counselor := camps.Group("/:campId/counselors/:counselorId")
+	counselor := rg.Group("/counselors/:counselorId")
 	counselor.GET("/history", ctrl.GetHistorySummary)
 }
 
@@ -62,7 +63,7 @@ type HistorySummaryEntry struct {
 }
 
 func (ctrl *Controller) List(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	counselorID := c.Param("counselorId")
 
 	entries, err := ctrl.svc.List(c.Request.Context(), campID, counselorID)
@@ -84,7 +85,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 }
 
 func (ctrl *Controller) Get(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	counselorID := c.Param("counselorId")
 	id := c.Param("id")
 
@@ -112,7 +113,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 }
 
 func (ctrl *Controller) Create(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	counselorID := c.Param("counselorId")
 
 	var req CreateSessionHistoryRequest
@@ -144,7 +145,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 }
 
 func (ctrl *Controller) Update(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	counselorID := c.Param("counselorId")
 	id := c.Param("id")
 
@@ -182,7 +183,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 }
 
 func (ctrl *Controller) Delete(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	counselorID := c.Param("counselorId")
 	id := c.Param("id")
 
@@ -210,7 +211,7 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 }
 
 func (ctrl *Controller) GetHistorySummary(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	counselorID := c.Param("counselorId")
 
 	var seasonID *string

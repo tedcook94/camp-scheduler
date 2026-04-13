@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"camp-scheduler/internal/api"
+	"camp-scheduler/internal/auth"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -19,8 +20,8 @@ func NewActivityPreferenceController(svc *ActivityPreferenceService) *ActivityPr
 	return &ActivityPreferenceController{svc: svc}
 }
 
-func (ctrl *ActivityPreferenceController) RegisterRoutes(camps *gin.RouterGroup) {
-	prefs := camps.Group("/:campId/sessions/:sessionId/counselors/:counselorId/activity-preferences")
+func (ctrl *ActivityPreferenceController) RegisterRoutes(rg *gin.RouterGroup) {
+	prefs := rg.Group("/sessions/:sessionId/counselors/:counselorId/activity-preferences")
 	prefs.GET("", ctrl.List)
 	prefs.GET("/:id", ctrl.Get)
 	prefs.POST("", ctrl.Create)
@@ -48,7 +49,7 @@ type ActivityPreferenceResponse struct {
 }
 
 func (ctrl *ActivityPreferenceController) List(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	counselorID := c.Param("counselorId")
 
@@ -72,7 +73,7 @@ func (ctrl *ActivityPreferenceController) List(c *gin.Context) {
 }
 
 func (ctrl *ActivityPreferenceController) Get(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	counselorID := c.Param("counselorId")
 	id := c.Param("id")
@@ -102,7 +103,7 @@ func (ctrl *ActivityPreferenceController) Get(c *gin.Context) {
 }
 
 func (ctrl *ActivityPreferenceController) Create(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	counselorID := c.Param("counselorId")
 
@@ -140,7 +141,7 @@ func (ctrl *ActivityPreferenceController) Create(c *gin.Context) {
 }
 
 func (ctrl *ActivityPreferenceController) Update(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	counselorID := c.Param("counselorId")
 	id := c.Param("id")
@@ -184,7 +185,7 @@ func (ctrl *ActivityPreferenceController) Update(c *gin.Context) {
 }
 
 func (ctrl *ActivityPreferenceController) Delete(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	counselorID := c.Param("counselorId")
 	id := c.Param("id")

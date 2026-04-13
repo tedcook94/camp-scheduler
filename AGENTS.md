@@ -56,6 +56,28 @@ a constraint satisfaction solver. See `README.md` for a high-level overview and
 - Integration tests that exercise real flows (API → DB → solver → results) are
   preferred over isolated unit tests with heavy mocking.
 
+## Git Workflow
+
+- New features and refactors go on topic branches off `main`. Do not commit
+  directly to `main`.
+- Branch names: lowercase kebab-case describing the change
+  (e.g., `jwt-camp-context`, `add-solver-weights`).
+- Commit messages: lowercase imperative, concise, focused on *what changed* at a
+  high level. No function/type/file names — describe the intent, not the
+  mechanics. Abbreviations like `jwt`, `id`, `db` stay lowercase.
+  ```
+  # good
+  add helper to extract camp id from jwt claims
+  derive camp id from jwt claims in resource routes
+  update integration tests for jwt-based camp context
+
+  # bad
+  Add GetCampID() helper to middleware.go
+  Update agegroup/controller.go, cabin/controller.go, ...
+  ```
+- One logical change per commit. Group related file edits into a single commit;
+  split unrelated changes into separate commits.
+
 ## Dev Workflow
 
 - Tool versions are pinned in `mise.toml`. Run `mise install` to set up.

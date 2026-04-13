@@ -13,11 +13,7 @@ resources:
     description: ""
     method: GET
     body: {}
-    parameters:
-      - id: pair_4c7ad06b77464ba2a160dbf59a9be025
-        name: ""
-        value: ""
-        description: ""
+    parameters: []
     headers: []
     authentication: {}
     metaSortKey: -1690666857649.8594
@@ -33,10 +29,10 @@ resources:
     parentId: fld_0165b0f3641045a88246e473a724a706
     modified: 1690667893935
     created: 1690666707017
-    name: camps
+    name: camp
     description: ""
     environment:
-      cs-endpoint: camps
+      cs-endpoint: camp
     environmentPropertyOrder:
       "&":
         - cs-endpoint
@@ -148,71 +144,12 @@ resources:
     description: ""
     scope: collection
     _type: workspace
-  - _id: req_9bb8866f3607434fbf40a1113ef0c15d
-    parentId: fld_99ab89ec48f24d83b1c68c5e4ad6260b
-    modified: 1690667914430
-    created: 1690667393563
-    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
-      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
-    name: Get By ID
-    description: ""
-    method: GET
-    body: {}
-    parameters:
-      - id: pair_4c7ad06b77464ba2a160dbf59a9be025
-        name: id
-        value: "{{ _['cs-test-camp'] }}"
-        description: ""
-    headers: []
-    authentication: {}
-    metaSortKey: -1690666857644
-    isPrivate: false
-    settingStoreCookies: true
-    settingSendCookies: true
-    settingDisableRenderRequestBody: false
-    settingEncodeUrl: true
-    settingRebuildPath: true
-    settingFollowRedirects: global
-    _type: request
-  - _id: req_996527107dab4a2ea9cee4291770f0a9
-    parentId: fld_99ab89ec48f24d83b1c68c5e4ad6260b
-    modified: 1690667926299
-    created: 1690667497661
-    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
-      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
-    name: Create
-    description: ""
-    method: POST
-    body:
-      mimeType: application/json
-      text: |-
-        {
-        	"name": "Camp Cosby"
-        }
-    parameters:
-      - id: pair_4c7ad06b77464ba2a160dbf59a9be025
-        name: ""
-        value: ""
-        description: ""
-    headers:
-      - name: Content-Type
-        value: application/json
-    authentication: {}
-    metaSortKey: -1690666857655.7188
-    isPrivate: false
-    settingStoreCookies: true
-    settingSendCookies: true
-    settingDisableRenderRequestBody: false
-    settingEncodeUrl: true
-    settingRebuildPath: true
-    settingFollowRedirects: global
-    _type: request
   - _id: req_ee54291a3e1c4cadb3fb7ad7c704662c
     parentId: fld_99ab89ec48f24d83b1c68c5e4ad6260b
     modified: 1690668261117
     created: 1690667605309
     url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
-      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
+      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}"
     name: Update
     description: ""
     method: PUT
@@ -224,42 +161,12 @@ resources:
         	"location": "Alpine, AL",
         	"enabled": true
         }
-    parameters:
-      - id: pair_4c7ad06b77464ba2a160dbf59a9be025
-        name: id
-        value: "{{ _['cs-test-camp'] }}"
-        description: ""
+    parameters: []
     headers:
       - name: Content-Type
         value: application/json
     authentication: {}
     metaSortKey: -1690666857594
-    isPrivate: false
-    settingStoreCookies: true
-    settingSendCookies: true
-    settingDisableRenderRequestBody: false
-    settingEncodeUrl: true
-    settingRebuildPath: true
-    settingFollowRedirects: global
-    _type: request
-  - _id: req_d07eb0480ac940e5be3a513c107eff27
-    parentId: fld_99ab89ec48f24d83b1c68c5e4ad6260b
-    modified: 1690667939960
-    created: 1690667669596
-    url: "{{ _['cs-protocol'] }}://{{ _['cs-host'] }}:{{ _['cs-port'] }}/api/{{
-      _['cs-api-version'] }}/{{ _['cs-endpoint'] }}/:id"
-    name: Delete
-    description: ""
-    method: DELETE
-    body: {}
-    parameters:
-      - id: pair_4c7ad06b77464ba2a160dbf59a9be025
-        name: id
-        value: "{{ _['cs-test-camp'] }}"
-        description: ""
-    headers: []
-    authentication: {}
-    metaSortKey: -1690666857544
     isPrivate: false
     settingStoreCookies: true
     settingSendCookies: true
@@ -275,7 +182,7 @@ resources:
     name: age-groups
     description: ""
     environment:
-      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/age-groups"
+      cs-endpoint: "age-groups"
     environmentPropertyOrder:
       "&":
         - cs-endpoint
@@ -424,7 +331,7 @@ resources:
     name: cabins
     description: ""
     environment:
-      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/cabins"
+      cs-endpoint: "cabins"
     environmentPropertyOrder:
       "&":
         - cs-endpoint
@@ -575,7 +482,7 @@ resources:
     name: seasons
     description: ""
     environment:
-      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/seasons"
+      cs-endpoint: "seasons"
     environmentPropertyOrder:
       "&":
         - cs-endpoint
@@ -724,7 +631,7 @@ resources:
     name: sessions
     description: ""
     environment:
-      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/sessions"
+      cs-endpoint: "sessions"
     environmentPropertyOrder:
       "&":
         - cs-endpoint
@@ -875,7 +782,7 @@ resources:
     name: counselors
     description: ""
     environment:
-      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/counselors"
+      cs-endpoint: "counselors"
     environmentPropertyOrder:
       "&":
         - cs-endpoint
@@ -1027,7 +934,7 @@ resources:
     name: age-group-preferences
     description: ""
     environment:
-      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/sessions/{{ _['cs-test-session-for-prefs'] }}/counselors/{{ _['cs-test-counselor-for-prefs'] }}/age-group-preferences"
+      cs-endpoint: "sessions/{{ _['cs-test-session-for-prefs'] }}/counselors/{{ _['cs-test-counselor-for-prefs'] }}/age-group-preferences"
     environmentPropertyOrder:
       "&":
         - cs-endpoint
@@ -1178,7 +1085,7 @@ resources:
     name: cocounselor-preferences
     description: ""
     environment:
-      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/sessions/{{ _['cs-test-session-for-prefs'] }}/counselors/{{ _['cs-test-counselor-for-prefs'] }}/cocounselor-preferences"
+      cs-endpoint: "sessions/{{ _['cs-test-session-for-prefs'] }}/counselors/{{ _['cs-test-counselor-for-prefs'] }}/cocounselor-preferences"
     environmentPropertyOrder:
       "&":
         - cs-endpoint
@@ -1329,7 +1236,7 @@ resources:
     name: session-history
     description: ""
     environment:
-      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/counselors/{{ _['cs-test-counselor-for-history'] }}/session-history"
+      cs-endpoint: "counselors/{{ _['cs-test-counselor-for-history'] }}/session-history"
     environmentPropertyOrder:
       "&":
         - cs-endpoint
@@ -1482,7 +1389,7 @@ resources:
     name: counselor-history
     description: ""
     environment:
-      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/counselors/{{ _['cs-test-counselor-for-history'] }}/history"
+      cs-endpoint: "counselors/{{ _['cs-test-counselor-for-history'] }}/history"
     environmentPropertyOrder:
       "&":
         - cs-endpoint
@@ -1569,7 +1476,7 @@ resources:
     name: session-age-groups
     description: ""
     environment:
-      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/sessions/{{ _['cs-test-session'] }}/age-groups"
+      cs-endpoint: "sessions/{{ _['cs-test-session'] }}/age-groups"
     environmentPropertyOrder:
       "&":
         - cs-endpoint
@@ -1720,7 +1627,7 @@ resources:
     name: session-cabins
     description: ""
     environment:
-      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/sessions/{{ _['cs-test-session'] }}/cabins"
+      cs-endpoint: "sessions/{{ _['cs-test-session'] }}/cabins"
     environmentPropertyOrder:
       "&":
         - cs-endpoint
@@ -1874,7 +1781,7 @@ resources:
     name: campers
     description: ""
     environment:
-      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/campers"
+      cs-endpoint: "campers"
     environmentPropertyOrder:
       "&":
         - cs-endpoint
@@ -2023,7 +1930,7 @@ resources:
     name: camper-friend-preferences
     description: ""
     environment:
-      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/sessions/{{ _['cs-test-session'] }}/campers/{{ _['cs-test-camper'] }}/friend-preferences"
+      cs-endpoint: "sessions/{{ _['cs-test-session'] }}/campers/{{ _['cs-test-camper'] }}/friend-preferences"
     environmentPropertyOrder:
       "&":
         - cs-endpoint
@@ -2174,7 +2081,7 @@ resources:
     name: enrollments
     description: ""
     environment:
-      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/sessions/{{ _['cs-test-session'] }}/enrollments"
+      cs-endpoint: "sessions/{{ _['cs-test-session'] }}/enrollments"
     environmentPropertyOrder:
       "&":
         - cs-endpoint
@@ -2291,7 +2198,7 @@ resources:
     name: assignment-runs
     description: ""
     environment:
-      cs-endpoint: "camps/{{ _['cs-test-camp'] }}/sessions/{{ _['cs-test-session'] }}/assignment-runs"
+      cs-endpoint: "sessions/{{ _['cs-test-session'] }}/assignment-runs"
     environmentPropertyOrder:
       "&":
         - cs-endpoint
@@ -2521,7 +2428,7 @@ resources:
       cs-protocol: http
       cs-host: 10.0.4.14
       cs-port: "9100"
-      cs-test-camp: c25973b5-9723-440f-b1fb-eabb3b4a5ba9
+      cs-access-token: ""
       cs-test-age-group: ""
       cs-test-cabin: ""
       cs-test-season: ""
@@ -2540,14 +2447,12 @@ resources:
       cs-test-camper: ""
       cs-test-enrollment: ""
       cs-test-camper-friend-pref: ""
-      cs-access-token: ""
     dataPropertyOrder:
       "&":
         - cs-protocol
         - cs-host
         - cs-port
         - cs-access-token
-        - cs-test-camp
         - cs-test-age-group
         - cs-test-cabin
         - cs-test-season

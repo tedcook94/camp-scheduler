@@ -52,8 +52,23 @@ description = "Run unit tests"
 run = "go test ./..."
 
 [tasks."test:integration"]
-description = "Run integration tests (requires local database)"
-run = "go test -tags integration ./..."
+description = "Run integration tests (starts Postgres if needed, applies migrations)"
+run = """
+#!/usr/bin/env bash
+set -e
+already_running=$(docker compose ps --status running --format json postgres 2>/dev/null | grep -c '"postgres"' || true)
+cleanup() {
+  if [ "$already_running" -eq 0 ]; then
+    echo ""
+    echo "Stopping Postgres..."
+    docker compose down
+  fi
+}
+trap cleanup EXIT
+docker compose up -d --wait postgres
+mise run migrate:all
+go test -tags integration ./...
+"""
 
 [tasks.sqlc]
 description = "Generate Go code from SQL queries"

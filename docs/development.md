@@ -48,7 +48,7 @@ Override any value locally with `mise.local.toml` (gitignored).
 | `mise run server`   | Run server standalone (assumes Postgres is running)  |
 | `mise run build`    | Build the server binary to `bin/server`              |
 | `mise run test`     | Run unit tests                                       |
-| `mise run test:integration` | Run integration tests (requires local database) |
+| `mise run test:integration` | Run integration tests (auto-starts Postgres) |
 | `mise run sqlc`     | Regenerate Go code from SQL queries                  |
 | `mise run migrate`  | Run pending migrations on the dev database           |
 | `mise run migrate -- --version N` | Migrate dev database to version N     |
@@ -103,19 +103,14 @@ including migrations and reset instructions.
 
 ```sh
 mise run test              # Unit tests
-mise run test:integration  # Integration tests (needs running Postgres with migrations applied)
+mise run test:integration  # Integration tests
 ```
 
-Integration tests connect to a `camp_scheduler_test` database. When using
-`mise run dev`, migrations are applied to both databases automatically.
-
-For standalone testing, start Postgres and run migrations first:
-
-```sh
-docker compose up -d postgres          # Start just Postgres
-mise run migrate:all                   # Apply migrations to both databases
-mise run test:integration              # Run integration tests
-```
+Integration tests connect to a `camp_scheduler_test` database.
+`mise run test:integration` automatically starts Postgres (if not already
+running), applies migrations, runs the tests, and stops Postgres afterwards if
+it was started by the task. If Postgres was already running (e.g., from
+`mise run dev`), it is left as-is.
 
 ## API Testing
 

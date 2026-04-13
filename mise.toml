@@ -25,7 +25,19 @@ DATABASE_URL_TEST = "postgres://{{env.DATABASE_USER}}:{{env.DATABASE_PASSWORD}}@
 
 [tasks.dev]
 description = "Start Postgres and the Go server with hot-reload"
-run = "docker compose up"
+run = """
+#!/usr/bin/env bash
+set -e
+cleanup() {
+  echo ""
+  echo "Shutting down..."
+  docker compose down
+}
+trap cleanup EXIT
+docker compose up -d --wait postgres
+mise run migrate:all
+air
+"""
 
 [tasks.server]
 description = "Run the Go server with hot-reload (standalone, assumes Postgres is already running)"

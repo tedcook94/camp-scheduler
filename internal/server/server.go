@@ -104,87 +104,87 @@ func (s *Server) routes() {
 	authController := auth.NewController(authenticator)
 	authController.RegisterRoutes(v1)
 
-	camps := v1.Group("/camps")
-	camps.Use(auth.Middleware(authenticator))
+	protected := v1.Group("")
+	protected.Use(auth.Middleware(authenticator))
 	campService := camp.NewService(queries)
 	campController := camp.NewController(campService)
-	campController.RegisterRoutes(camps)
+	campController.RegisterRoutes(protected)
 
 	ageGroupService := agegroup.NewService(queries)
 	ageGroupController := agegroup.NewController(ageGroupService)
-	ageGroupController.RegisterRoutes(camps)
+	ageGroupController.RegisterRoutes(protected)
 
 	cabinService := cabin.NewService(queries)
 	cabinController := cabin.NewController(cabinService)
-	cabinController.RegisterRoutes(camps)
+	cabinController.RegisterRoutes(protected)
 
 	seasonService := season.NewService(queries)
 	seasonController := season.NewController(seasonService)
-	seasonController.RegisterRoutes(camps)
+	seasonController.RegisterRoutes(protected)
 
 	sessionService := session.NewService(queries)
 	sessionController := session.NewController(sessionService)
-	sessionController.RegisterRoutes(camps)
+	sessionController.RegisterRoutes(protected)
 
 	counselorService := counselor.NewService(queries)
 	counselorController := counselor.NewController(counselorService)
-	counselorController.RegisterRoutes(camps)
+	counselorController.RegisterRoutes(protected)
 
 	ageGroupPrefService := preferences.NewAgeGroupService(queries)
 	ageGroupPrefController := preferences.NewAgeGroupController(ageGroupPrefService)
-	ageGroupPrefController.RegisterRoutes(camps)
+	ageGroupPrefController.RegisterRoutes(protected)
 
 	cocounselorPrefService := preferences.NewCocounselorService(queries)
 	cocounselorPrefController := preferences.NewCocounselorController(cocounselorPrefService)
-	cocounselorPrefController.RegisterRoutes(camps)
+	cocounselorPrefController.RegisterRoutes(protected)
 
 	counselorCertService := preferences.NewCounselorCertificationService(queries)
 	counselorCertController := preferences.NewCounselorCertificationController(counselorCertService)
-	counselorCertController.RegisterRoutes(camps)
+	counselorCertController.RegisterRoutes(protected)
 
 	activityPrefService := preferences.NewActivityPreferenceService(queries)
 	activityPrefController := preferences.NewActivityPreferenceController(activityPrefService)
-	activityPrefController.RegisterRoutes(camps)
+	activityPrefController.RegisterRoutes(protected)
 
 	camperFriendPrefService := preferences.NewCamperFriendService(queries)
 	camperFriendPrefController := preferences.NewCamperFriendController(camperFriendPrefService)
-	camperFriendPrefController.RegisterRoutes(camps)
+	camperFriendPrefController.RegisterRoutes(protected)
 
 	historyService := history.NewService(queries)
 	historyController := history.NewController(historyService)
-	historyController.RegisterRoutes(camps)
+	historyController.RegisterRoutes(protected)
 
 	sessionConfigService := sessionconfig.NewService(queries)
 	sessionConfigController := sessionconfig.NewController(sessionConfigService)
-	sessionConfigController.RegisterRoutes(camps)
+	sessionConfigController.RegisterRoutes(protected)
 
 	activityConfigService := sessionconfig.NewActivityService(queries)
 	activityConfigController := sessionconfig.NewActivityController(activityConfigService)
-	activityConfigController.RegisterRoutes(camps)
+	activityConfigController.RegisterRoutes(protected)
 
 	camperService := camper.NewService(queries)
 	camperController := camper.NewController(camperService)
-	camperController.RegisterRoutes(camps)
+	camperController.RegisterRoutes(protected)
 
 	enrollmentService := enrollment.NewService(queries)
 	enrollmentController := enrollment.NewController(enrollmentService)
-	enrollmentController.RegisterRoutes(camps)
+	enrollmentController.RegisterRoutes(protected)
 
 	certificationService := certification.NewService(queries)
 	certificationController := certification.NewController(certificationService)
-	certificationController.RegisterRoutes(camps)
+	certificationController.RegisterRoutes(protected)
 
 	activityService := activity.NewService(queries)
 	activityController := activity.NewController(activityService)
-	activityController.RegisterRoutes(camps)
+	activityController.RegisterRoutes(protected)
 
 	timeSlotService := timeslot.NewService(queries)
 	timeSlotController := timeslot.NewController(timeSlotService)
-	timeSlotController.RegisterRoutes(camps)
+	timeSlotController.RegisterRoutes(protected)
 
 	assignmentService := assignment.NewService(queries, s.pool)
 	assignmentController := assignment.NewController(assignmentService)
-	assignmentController.RegisterRoutes(camps)
+	assignmentController.RegisterRoutes(protected)
 }
 
 func initDB(cfg config.Config) (*pgxpool.Pool, error) {

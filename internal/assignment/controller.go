@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"camp-scheduler/internal/api"
+	"camp-scheduler/internal/auth"
 	"camp-scheduler/internal/solver"
 
 	"github.com/gin-gonic/gin"
@@ -23,8 +24,8 @@ func NewController(svc *Service) *Controller {
 	return &Controller{svc: svc}
 }
 
-func (ctrl *Controller) RegisterRoutes(camps *gin.RouterGroup) {
-	runs := camps.Group("/:campId/sessions/:sessionId/assignment-runs")
+func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
+	runs := rg.Group("/sessions/:sessionId/assignment-runs")
 	runs.POST("", ctrl.TriggerRun)
 	runs.GET("", ctrl.ListRuns)
 	runs.GET("/:runId", ctrl.GetRun)
@@ -105,7 +106,7 @@ type ExplanationResponse struct {
 }
 
 func (ctrl *Controller) TriggerRun(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 
 	var req TriggerRunRequest
@@ -192,7 +193,7 @@ func (ctrl *Controller) handleTriggerError(c *gin.Context, campID, sessionID str
 }
 
 func (ctrl *Controller) ListRuns(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 
 	runs, err := ctrl.svc.ListRuns(c.Request.Context(), campID, sessionID)
@@ -214,7 +215,7 @@ func (ctrl *Controller) ListRuns(c *gin.Context) {
 }
 
 func (ctrl *Controller) GetRun(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	runID := c.Param("runId")
 
 	run, err := ctrl.svc.GetRun(c.Request.Context(), campID, runID)
@@ -240,7 +241,7 @@ func (ctrl *Controller) GetRun(c *gin.Context) {
 }
 
 func (ctrl *Controller) DeleteRun(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	runID := c.Param("runId")
 
 	err := ctrl.svc.DeleteRun(c.Request.Context(), campID, runID)
@@ -266,7 +267,7 @@ func (ctrl *Controller) DeleteRun(c *gin.Context) {
 }
 
 func (ctrl *Controller) GetSolution(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	runID := c.Param("runId")
 	solutionID := c.Param("solutionId")
 
@@ -297,7 +298,7 @@ func (ctrl *Controller) GetSolution(c *gin.Context) {
 }
 
 func (ctrl *Controller) SelectSolution(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	runID := c.Param("runId")
 	solutionID := c.Param("solutionId")
 

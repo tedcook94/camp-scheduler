@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"camp-scheduler/internal/api"
+	"camp-scheduler/internal/auth"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,8 +19,8 @@ func NewCounselorCertificationController(svc *CounselorCertificationService) *Co
 	return &CounselorCertificationController{svc: svc}
 }
 
-func (ctrl *CounselorCertificationController) RegisterRoutes(camps *gin.RouterGroup) {
-	certs := camps.Group("/:campId/counselors/:counselorId/certifications")
+func (ctrl *CounselorCertificationController) RegisterRoutes(rg *gin.RouterGroup) {
+	certs := rg.Group("/counselors/:counselorId/certifications")
 	certs.GET("", ctrl.List)
 	certs.POST("", ctrl.Add)
 	certs.DELETE("/:id", ctrl.Remove)
@@ -38,7 +39,7 @@ type CounselorCertificationResponse struct {
 }
 
 func (ctrl *CounselorCertificationController) List(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	counselorID := c.Param("counselorId")
 
 	certs, err := ctrl.svc.List(c.Request.Context(), campID, counselorID)
@@ -60,7 +61,7 @@ func (ctrl *CounselorCertificationController) List(c *gin.Context) {
 }
 
 func (ctrl *CounselorCertificationController) Add(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	counselorID := c.Param("counselorId")
 
 	var req AddCounselorCertificationRequest
@@ -96,7 +97,7 @@ func (ctrl *CounselorCertificationController) Add(c *gin.Context) {
 }
 
 func (ctrl *CounselorCertificationController) Remove(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	counselorID := c.Param("counselorId")
 	id := c.Param("id")
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"camp-scheduler/internal/api"
+	"camp-scheduler/internal/auth"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -19,8 +20,8 @@ func NewActivityController(svc *ActivityService) *ActivityController {
 	return &ActivityController{svc: svc}
 }
 
-func (ctrl *ActivityController) RegisterRoutes(camps *gin.RouterGroup) {
-	timeSlots := camps.Group("/:campId/sessions/:sessionId/time-slots")
+func (ctrl *ActivityController) RegisterRoutes(rg *gin.RouterGroup) {
+	timeSlots := rg.Group("/sessions/:sessionId/time-slots")
 	timeSlots.GET("", ctrl.ListTimeSlots)
 	timeSlots.GET("/:timeSlotId", ctrl.GetTimeSlot)
 	timeSlots.POST("", ctrl.CreateTimeSlot)
@@ -75,7 +76,7 @@ type SessionActivityResponse struct {
 }
 
 func (ctrl *ActivityController) ListTimeSlots(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 
 	slots, err := ctrl.svc.ListTimeSlots(c.Request.Context(), campID, sessionID)
@@ -97,7 +98,7 @@ func (ctrl *ActivityController) ListTimeSlots(c *gin.Context) {
 }
 
 func (ctrl *ActivityController) GetTimeSlot(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("timeSlotId")
 
@@ -125,7 +126,7 @@ func (ctrl *ActivityController) GetTimeSlot(c *gin.Context) {
 }
 
 func (ctrl *ActivityController) CreateTimeSlot(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 
 	var req CreateSessionTimeSlotRequest
@@ -161,7 +162,7 @@ func (ctrl *ActivityController) CreateTimeSlot(c *gin.Context) {
 }
 
 func (ctrl *ActivityController) UpdateTimeSlot(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("timeSlotId")
 
@@ -203,7 +204,7 @@ func (ctrl *ActivityController) UpdateTimeSlot(c *gin.Context) {
 }
 
 func (ctrl *ActivityController) DeleteTimeSlot(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("timeSlotId")
 
@@ -235,7 +236,7 @@ func (ctrl *ActivityController) DeleteTimeSlot(c *gin.Context) {
 }
 
 func (ctrl *ActivityController) ListActivities(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	timeSlotID := c.Param("timeSlotId")
 
@@ -263,7 +264,7 @@ func (ctrl *ActivityController) ListActivities(c *gin.Context) {
 }
 
 func (ctrl *ActivityController) GetActivity(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("activityId")
 
@@ -291,7 +292,7 @@ func (ctrl *ActivityController) GetActivity(c *gin.Context) {
 }
 
 func (ctrl *ActivityController) CreateActivity(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	timeSlotID := c.Param("timeSlotId")
 
@@ -337,7 +338,7 @@ func (ctrl *ActivityController) CreateActivity(c *gin.Context) {
 }
 
 func (ctrl *ActivityController) UpdateActivity(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("activityId")
 
@@ -383,7 +384,7 @@ func (ctrl *ActivityController) UpdateActivity(c *gin.Context) {
 }
 
 func (ctrl *ActivityController) DeleteActivity(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("activityId")
 

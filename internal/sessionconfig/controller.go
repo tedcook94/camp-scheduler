@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"camp-scheduler/internal/api"
+	"camp-scheduler/internal/auth"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -19,15 +20,15 @@ func NewController(svc *Service) *Controller {
 	return &Controller{svc: svc}
 }
 
-func (ctrl *Controller) RegisterRoutes(camps *gin.RouterGroup) {
-	ageGroups := camps.Group("/:campId/sessions/:sessionId/age-groups")
+func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
+	ageGroups := rg.Group("/sessions/:sessionId/age-groups")
 	ageGroups.GET("", ctrl.ListAgeGroups)
 	ageGroups.GET("/:id", ctrl.GetAgeGroup)
 	ageGroups.POST("", ctrl.CreateAgeGroup)
 	ageGroups.PUT("/:id", ctrl.UpdateAgeGroup)
 	ageGroups.DELETE("/:id", ctrl.DeleteAgeGroup)
 
-	cabins := camps.Group("/:campId/sessions/:sessionId/cabins")
+	cabins := rg.Group("/sessions/:sessionId/cabins")
 	cabins.GET("", ctrl.ListCabins)
 	cabins.GET("/:id", ctrl.GetCabin)
 	cabins.POST("", ctrl.CreateCabin)
@@ -83,7 +84,7 @@ type SessionCabinResponse struct {
 // Session age group handlers
 
 func (ctrl *Controller) ListAgeGroups(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 
 	groups, err := ctrl.svc.ListAgeGroups(c.Request.Context(), campID, sessionID)
@@ -105,7 +106,7 @@ func (ctrl *Controller) ListAgeGroups(c *gin.Context) {
 }
 
 func (ctrl *Controller) GetAgeGroup(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("id")
 
@@ -133,7 +134,7 @@ func (ctrl *Controller) GetAgeGroup(c *gin.Context) {
 }
 
 func (ctrl *Controller) CreateAgeGroup(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 
 	var req CreateSessionAgeGroupRequest
@@ -165,7 +166,7 @@ func (ctrl *Controller) CreateAgeGroup(c *gin.Context) {
 }
 
 func (ctrl *Controller) UpdateAgeGroup(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("id")
 
@@ -203,7 +204,7 @@ func (ctrl *Controller) UpdateAgeGroup(c *gin.Context) {
 }
 
 func (ctrl *Controller) DeleteAgeGroup(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("id")
 
@@ -237,7 +238,7 @@ func (ctrl *Controller) DeleteAgeGroup(c *gin.Context) {
 // Session cabin handlers
 
 func (ctrl *Controller) ListCabins(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 
 	cabins, err := ctrl.svc.ListCabins(c.Request.Context(), campID, sessionID)
@@ -259,7 +260,7 @@ func (ctrl *Controller) ListCabins(c *gin.Context) {
 }
 
 func (ctrl *Controller) GetCabin(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("id")
 
@@ -287,7 +288,7 @@ func (ctrl *Controller) GetCabin(c *gin.Context) {
 }
 
 func (ctrl *Controller) CreateCabin(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 
 	var req CreateSessionCabinRequest
@@ -323,7 +324,7 @@ func (ctrl *Controller) CreateCabin(c *gin.Context) {
 }
 
 func (ctrl *Controller) UpdateCabin(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("id")
 
@@ -361,7 +362,7 @@ func (ctrl *Controller) UpdateCabin(c *gin.Context) {
 }
 
 func (ctrl *Controller) DeleteCabin(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("id")
 

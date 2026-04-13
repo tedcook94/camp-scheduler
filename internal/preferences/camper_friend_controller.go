@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"camp-scheduler/internal/api"
+	"camp-scheduler/internal/auth"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -19,8 +20,8 @@ func NewCamperFriendController(svc *CamperFriendService) *CamperFriendController
 	return &CamperFriendController{svc: svc}
 }
 
-func (ctrl *CamperFriendController) RegisterRoutes(camps *gin.RouterGroup) {
-	prefs := camps.Group("/:campId/sessions/:sessionId/campers/:camperId/friend-preferences")
+func (ctrl *CamperFriendController) RegisterRoutes(rg *gin.RouterGroup) {
+	prefs := rg.Group("/sessions/:sessionId/campers/:camperId/friend-preferences")
 	prefs.GET("", ctrl.List)
 	prefs.GET("/:id", ctrl.Get)
 	prefs.POST("", ctrl.Create)
@@ -48,7 +49,7 @@ type CamperFriendPreferenceResponse struct {
 }
 
 func (ctrl *CamperFriendController) List(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	camperID := c.Param("camperId")
 
@@ -72,7 +73,7 @@ func (ctrl *CamperFriendController) List(c *gin.Context) {
 }
 
 func (ctrl *CamperFriendController) Get(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	camperID := c.Param("camperId")
 	id := c.Param("id")
@@ -102,7 +103,7 @@ func (ctrl *CamperFriendController) Get(c *gin.Context) {
 }
 
 func (ctrl *CamperFriendController) Create(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	camperID := c.Param("camperId")
 
@@ -144,7 +145,7 @@ func (ctrl *CamperFriendController) Create(c *gin.Context) {
 }
 
 func (ctrl *CamperFriendController) Update(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	camperID := c.Param("camperId")
 	id := c.Param("id")
@@ -192,7 +193,7 @@ func (ctrl *CamperFriendController) Update(c *gin.Context) {
 }
 
 func (ctrl *CamperFriendController) Delete(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	camperID := c.Param("camperId")
 	id := c.Param("id")

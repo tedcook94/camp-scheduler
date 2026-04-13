@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"camp-scheduler/internal/api"
+	"camp-scheduler/internal/auth"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -19,8 +20,8 @@ func NewController(svc *Service) *Controller {
 	return &Controller{svc: svc}
 }
 
-func (ctrl *Controller) RegisterRoutes(camps *gin.RouterGroup) {
-	certs := camps.Group("/:campId/certifications")
+func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
+	certs := rg.Group("/certifications")
 	certs.GET("", ctrl.List)
 	certs.GET("/:id", ctrl.Get)
 	certs.POST("", ctrl.Create)
@@ -43,7 +44,7 @@ type CertificationResponse struct {
 }
 
 func (ctrl *Controller) List(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 
 	certs, err := ctrl.svc.List(c.Request.Context(), campID)
 	if err != nil {
@@ -63,7 +64,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 }
 
 func (ctrl *Controller) Get(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	id := c.Param("id")
 
 	cert, err := ctrl.svc.GetByID(c.Request.Context(), campID, id)
@@ -89,7 +90,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 }
 
 func (ctrl *Controller) Create(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 
 	var req CreateCertificationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -115,7 +116,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 }
 
 func (ctrl *Controller) Update(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	id := c.Param("id")
 
 	var req UpdateCertificationRequest
@@ -147,7 +148,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 }
 
 func (ctrl *Controller) Delete(c *gin.Context) {
-	campID := c.Param("campId")
+	campID := auth.GetCampID(c)
 	id := c.Param("id")
 
 	err := ctrl.svc.Delete(c.Request.Context(), campID, id)

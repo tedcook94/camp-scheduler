@@ -42,3 +42,15 @@ func GetClaims(c *gin.Context) *Claims {
 	claims, _ := v.(*Claims)
 	return claims
 }
+
+// GetCampID returns the camp ID from the authenticated user's JWT claims.
+// If claims are missing (middleware misconfiguration), it aborts with 401
+// so the failure is visible rather than silently passing an empty camp ID.
+func GetCampID(c *gin.Context) string {
+	claims := GetClaims(c)
+	if claims == nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing authentication claims"})
+		return ""
+	}
+	return claims.CampID
+}

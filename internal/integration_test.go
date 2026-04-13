@@ -231,6 +231,7 @@ func TestAuth(t *testing.T) {
 	t.Run("refresh_revokes_old_token", testRefreshRevokesOldToken)
 	t.Run("protected_route_no_token", testProtectedRouteNoToken)
 	t.Run("protected_route_invalid_token", testProtectedRouteInvalidToken)
+	t.Run("cross_camp_isolation", testCrossCampIsolation)
 }
 
 func testLoginSuccess(t *testing.T) {
@@ -1941,4 +1942,81 @@ func testRepeatedUnmetPreferenceBoost(t *testing.T) {
 	// Clean up.
 	mustDelete(t, run1URL+"/"+run1ID, token)
 	mustDelete(t, run2URL+"/"+run2ID, token)
+}
+
+func testCrossCampIsolation(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campAID, campBID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Alpha").Scan(&campAID)
+	if err != nil {
+		t.Fatalf("inserting camp A: %v", err)
+	}
+	err = pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Bravo").Scan(&campBID)
+	if err != nil {
+		t.Fatalf("inserting camp B: %v", err)
+	}
+
+	tokenA := mustLogin(t, ts, pool, campAID)
+	tokenB := mustLogin(t, ts, pool, campBID)
+
+	// GET /camp returns each user's own camp.
+	campA := mustGet(t, apiURL(ts, "/camp"), tokenA)
+	campB := mustGet(t, apiURL(ts, "/camp"), tokenB)
+	if str(campA, "id") != campAID {
+		t.Fatalf("expected camp A id %s, got %s", campAID, str(campA, "id"))
+	}
+	if str(campB, "id") != campBID {
+		t.Fatalf("expected camp B id %s, got %s", campBID, str(campB, "id"))
+	}
+
+	// Create resources in camp A.
+	ageGroup := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Juniors"}, tokenA)
+	ageGroupID := str(ageGroup, "id")
+
+	cabin := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name": "Pine", "age_group_id": ageGroupID,
+	}, tokenA)
+	cabinID := str(cabin, "id")
+
+	counselor := mustPost(t, apiURL(ts, "/counselors"), map[string]any{
+		"name": "Alice", "junior_counselor": false,
+	}, tokenA)
+	counselorID := str(counselor, "id")
+
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Summer 2026", "start_date": "2026-06-01", "end_date": "2026-08-31",
+	}, tokenA)
+	seasonID := str(season, "id")
+
+	// Token B must not see camp A's resources in list endpoints.
+	for _, tc := range []struct {
+		name string
+		path string
+	}{
+		{"age-groups", "/age-groups"},
+		{"cabins", "/cabins"},
+		{"counselors", "/counselors"},
+		{"seasons", "/seasons"},
+	} {
+		items := mustGetList(t, apiURL(ts, tc.path), tokenB)
+		if len(items) != 0 {
+			t.Errorf("token B listed %d %s, expected 0", len(items), tc.name)
+		}
+	}
+
+	// Token B must get 404 when fetching camp A resources by ID.
+	for _, tc := range []struct {
+		name string
+		path string
+	}{
+		{"age-group", "/age-groups/" + ageGroupID},
+		{"cabin", "/cabins/" + cabinID},
+		{"counselor", "/counselors/" + counselorID},
+		{"season", "/seasons/" + seasonID},
+	} {
+		doRawRequest(t, http.MethodGet, apiURL(ts, tc.path), nil, http.StatusNotFound, tokenB)
+	}
 }

@@ -19,28 +19,5 @@ services:
       timeout: 5s
       retries: 5
 
-  server:
-    build: .
-    ports:
-      - "9100:9100"
-    volumes:
-      - .:/app
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      PORT: 9100
-      MODE: local
-      LOG_LEVEL: info
-      DATABASE_HOST: postgres
-      DATABASE_PORT: 5432
-      DATABASE_USER: camp_scheduler
-      DATABASE_PASSWORD: "p@ss123"
-      DATABASE_SSL_MODE: disable
-      DATABASE_NAME: camp_scheduler
-      DATABASE_TIMEOUT: 10s
-      DATABASE_URL: "postgres://camp_scheduler:p@ss123@postgres:5432/camp_scheduler?sslmode=disable"
-      DATABASE_URL_TEST: "postgres://camp_scheduler:p@ss123@postgres:5432/camp_scheduler_test?sslmode=disable"
-
 volumes:
   pgdata:

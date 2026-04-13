@@ -3,8 +3,7 @@
 ## Prerequisites
 
 - [mise](https://mise.jdx.dev/) — manages tool versions and tasks
-- [Docker](https://docs.docker.com/get-docker/) — runs PostgreSQL (and the dev
-  server) in containers
+- [Docker](https://docs.docker.com/get-docker/) — runs PostgreSQL in a container
 
 ## Getting Started
 
@@ -13,17 +12,18 @@ mise install       # Install pinned tool versions (Go, sqlc, migrate, air)
 mise run dev       # Start everything
 ```
 
-`mise run dev` runs `docker compose up`, which:
+`mise run dev` starts the full local development environment:
 
-1. Starts PostgreSQL 18 (auto-creates the `camp_scheduler` user + dev/test
-   databases on first run via `local-setup.sql`)
-2. Builds a dev container with Go, air (hot-reload), and golang-migrate
-3. Runs all pending migrations on both dev and test databases
-4. Starts the Go server via air — watches for file changes and rebuilds
+1. Starts PostgreSQL 18 with pg_cron in Docker (auto-creates the
+   `camp_scheduler` user + dev/test databases on first run via
+   `local-setup.sql`)
+2. Runs all pending migrations on both dev and test databases
+3. Starts the Go server via air — watches for file changes and rebuilds
    automatically
 
-The server is available at `http://localhost:9100`. Press Ctrl+C to stop
-everything.
+All environment variables are provided by mise (defined in `mise.toml`), so the
+server runs directly on the host. Press Ctrl+C to stop everything — Postgres is
+automatically shut down via `docker compose down`.
 
 ## Tooling
 
@@ -59,21 +59,18 @@ Override any value locally with `mise.local.toml` (gitignored).
 
 ### Docker Compose
 
-`docker-compose.yml` defines two services:
+`docker-compose.yml` defines the Postgres service:
 
 - **postgres** — PostgreSQL 18 with pg_cron (built from
   `database/postgres/Dockerfile`). Uses a named volume for data persistence. On
   first start, runs `database/local-setup/local-setup.sql` to create the app
   user and databases.
-- **server** — Dev container that runs migrations and starts air. Bind-mounts
-  the project directory so file changes trigger hot-reload.
 
 ### air (hot-reload)
 
 [air](https://github.com/air-verse/air) watches `.go` files and rebuilds/restarts
-the server on changes. Configuration lives in `.air.toml`. Air runs inside the
-server Docker container when using `mise run dev`, or standalone on the host via
-`mise run server`.
+the server on changes. Configuration lives in `.air.toml`. Air runs on the host
+when using `mise run dev` or standalone via `mise run server`.
 
 ## Environment Variables
 
@@ -96,11 +93,6 @@ variables:
 
 `DATABASE_URL` and `DATABASE_URL_TEST` are automatically constructed from the
 above variables via mise templates.
-
-Note: the Docker Compose server service defines its own environment with
-`DATABASE_HOST=postgres` (the Docker network hostname) so the containerized
-server connects to the containerized Postgres. The mise env vars with
-`DATABASE_HOST=localhost` are used by host-based tools like `mise run migrate`.
 
 ## Database
 

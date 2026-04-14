@@ -194,6 +194,10 @@ func (s *Server) routes() {
 	adminService := admin.NewService(queries)
 	adminController := admin.NewController(adminService)
 	adminController.RegisterRoutes(superAdmin)
+
+	userService := admin.NewUserService(queries)
+	userController := admin.NewUserController(userService)
+	userController.RegisterRoutes(superAdmin)
 }
 
 func initDB(cfg config.Config) (*pgxpool.Pool, error) {

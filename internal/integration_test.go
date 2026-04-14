@@ -2154,3 +2154,273 @@ func testSuperAdminRejectedFromCampRoutes(t *testing.T) {
 	doRawRequest(t, http.MethodGet, apiURL(ts, "/age-groups"), nil, http.StatusForbidden, superToken)
 	doRawRequest(t, http.MethodGet, apiURL(ts, "/cabins"), nil, http.StatusForbidden, superToken)
 }
+
+func TestSuperAdminUserCRUD(t *testing.T) {
+	t.Run("full_lifecycle", testSuperAdminUserLifecycle)
+	t.Run("admin_rejected_from_user_routes", testAdminRejectedFromUserRoutes)
+	t.Run("constraint_violations", testUserConstraintViolations)
+}
+
+func testSuperAdminUserLifecycle(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+	token := mustLoginSuperAdmin(t, ts, pool)
+
+	// Create a camp to associate with admin users.
+	camp := mustPost(t, apiURL(ts, "/admin/camps"),
+		map[string]any{"name": "User Test Camp", "location": "Somewhere"}, token)
+	campID := str(camp, "id")
+
+	// Create an admin user.
+	created := mustPost(t, apiURL(ts, "/admin/users"), map[string]any{
+		"camp_id":    campID,
+		"username":   "testadmin",
+		"email":      "testadmin@example.com",
+		"password":   "securepass123",
+		"first_name": "Test",
+		"last_name":  "Admin",
+		"role":       "admin",
+	}, token)
+
+	userID := str(created, "id")
+	if userID == "" {
+		t.Fatal("expected id in create response")
+	}
+	if str(created, "username") != "testadmin" {
+		t.Fatalf("expected username 'testadmin', got %q", str(created, "username"))
+	}
+	if str(created, "role") != "admin" {
+		t.Fatalf("expected role 'admin', got %q", str(created, "role"))
+	}
+	if str(created, "camp_id") != campID {
+		t.Fatalf("expected camp_id %q, got %q", campID, str(created, "camp_id"))
+	}
+
+	// Create a super_admin user.
+	superUser := mustPost(t, apiURL(ts, "/admin/users"), map[string]any{
+		"username":   "newsuper",
+		"email":      "newsuper@example.com",
+		"password":   "securepass123",
+		"first_name": "New",
+		"last_name":  "Super",
+		"role":       "super_admin",
+	}, token)
+	superUserID := str(superUser, "id")
+	if str(superUser, "camp_id") != "" {
+		t.Fatalf("expected empty camp_id for super_admin, got %q", str(superUser, "camp_id"))
+	}
+
+	// List all users — both created users (and the seeded super-admin) must appear.
+	users := mustGetList(t, apiURL(ts, "/admin/users"), token)
+	if len(users) < 3 {
+		t.Fatalf("expected at least 3 users in list, got %d", len(users))
+	}
+
+	// List users filtered by camp_id.
+	campUsers := mustGetList(t, apiURL(ts, "/admin/users?camp_id="+campID), token)
+	if len(campUsers) != 1 {
+		t.Fatalf("expected 1 user for camp, got %d", len(campUsers))
+	}
+	if str(asMap(campUsers[0]), "id") != userID {
+		t.Fatalf("expected user %s in camp list, got %s", userID, str(asMap(campUsers[0]), "id"))
+	}
+
+	// Get user by ID.
+	got := mustGet(t, apiURL(ts, "/admin/users/"+userID), token)
+	if str(got, "username") != "testadmin" {
+		t.Fatalf("expected username 'testadmin', got %q", str(got, "username"))
+	}
+
+	// Update user.
+	updated := doRequest(t, http.MethodPut, apiURL(ts, "/admin/users/"+userID),
+		map[string]any{
+			"camp_id":    campID,
+			"username":   "updatedadmin",
+			"email":      "updated@example.com",
+			"first_name": "Updated",
+			"last_name":  "Admin",
+			"role":       "admin",
+		}, http.StatusOK, token)
+	if str(updated, "username") != "updatedadmin" {
+		t.Fatalf("expected username 'updatedadmin', got %q", str(updated, "username"))
+	}
+	if str(updated, "email") != "updated@example.com" {
+		t.Fatalf("expected email 'updated@example.com', got %q", str(updated, "email"))
+	}
+
+	// Verify update persisted.
+	gotAfterUpdate := mustGet(t, apiURL(ts, "/admin/users/"+userID), token)
+	if str(gotAfterUpdate, "first_name") != "Updated" {
+		t.Fatalf("expected persisted first_name 'Updated', got %q", str(gotAfterUpdate, "first_name"))
+	}
+
+	// Update password.
+	doRawRequest(t, http.MethodPut, apiURL(ts, "/admin/users/"+userID+"/password"),
+		map[string]any{"password": "newpassword123"}, http.StatusOK, token)
+
+	// Verify new password works by logging in.
+	doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
+		map[string]any{"username": "updatedadmin", "password": "newpassword123"},
+		http.StatusOK, "")
+
+	// Update password for nonexistent user returns 404.
+	doRawRequest(t, http.MethodPut,
+		apiURL(ts, "/admin/users/00000000-0000-0000-0000-000000000000/password"),
+		map[string]any{"password": "newpassword123"}, http.StatusNotFound, token)
+
+	// Get nonexistent user returns 404.
+	doRawRequest(t, http.MethodGet,
+		apiURL(ts, "/admin/users/00000000-0000-0000-0000-000000000000"),
+		nil, http.StatusNotFound, token)
+
+	// Update nonexistent user returns 404.
+	doRawRequest(t, http.MethodPut,
+		apiURL(ts, "/admin/users/00000000-0000-0000-0000-000000000000"),
+		map[string]any{
+			"camp_id":    campID,
+			"username":   "ghost",
+			"email":      "ghost@example.com",
+			"first_name": "Ghost",
+			"last_name":  "User",
+			"role":       "admin",
+		}, http.StatusNotFound, token)
+
+	// Delete nonexistent user returns 404.
+	doRawRequest(t, http.MethodDelete,
+		apiURL(ts, "/admin/users/00000000-0000-0000-0000-000000000000"),
+		nil, http.StatusNotFound, token)
+
+	// Delete user.
+	mustDelete(t, apiURL(ts, "/admin/users/"+userID), token)
+
+	// Verify deletion.
+	doRawRequest(t, http.MethodGet, apiURL(ts, "/admin/users/"+userID),
+		nil, http.StatusNotFound, token)
+
+	// Clean up the other created user.
+	mustDelete(t, apiURL(ts, "/admin/users/"+superUserID), token)
+}
+
+func testAdminRejectedFromUserRoutes(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp User Reject").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+
+	adminToken := mustLogin(t, ts, pool, campID)
+
+	doRawRequest(t, http.MethodGet, apiURL(ts, "/admin/users"), nil, http.StatusForbidden, adminToken)
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/admin/users"),
+		map[string]any{
+			"camp_id":    campID,
+			"username":   "sneaky",
+			"email":      "sneaky@example.com",
+			"password":   "securepass123",
+			"first_name": "Sneaky",
+			"last_name":  "User",
+			"role":       "admin",
+		}, http.StatusForbidden, adminToken)
+}
+
+func testUserConstraintViolations(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+	token := mustLoginSuperAdmin(t, ts, pool)
+
+	camp := mustPost(t, apiURL(ts, "/admin/camps"),
+		map[string]any{"name": "Constraint Camp", "location": "Here"}, token)
+	campID := str(camp, "id")
+
+	// Create a user to test conflicts against.
+	mustPost(t, apiURL(ts, "/admin/users"), map[string]any{
+		"camp_id":    campID,
+		"username":   "existing",
+		"email":      "existing@example.com",
+		"password":   "securepass123",
+		"first_name": "Existing",
+		"last_name":  "User",
+		"role":       "admin",
+	}, token)
+
+	// Duplicate username → 409.
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/admin/users"),
+		map[string]any{
+			"camp_id":    campID,
+			"username":   "existing",
+			"email":      "different@example.com",
+			"password":   "securepass123",
+			"first_name": "Dup",
+			"last_name":  "User",
+			"role":       "admin",
+		}, http.StatusConflict, token)
+
+	// Duplicate email → 409.
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/admin/users"),
+		map[string]any{
+			"camp_id":    campID,
+			"username":   "different",
+			"email":      "existing@example.com",
+			"password":   "securepass123",
+			"first_name": "Dup",
+			"last_name":  "User",
+			"role":       "admin",
+		}, http.StatusConflict, token)
+
+	// admin role with no camp_id → 400 (check violation).
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/admin/users"),
+		map[string]any{
+			"username":   "nocampuser",
+			"email":      "nocampuser@example.com",
+			"password":   "securepass123",
+			"first_name": "No",
+			"last_name":  "Camp",
+			"role":       "admin",
+		}, http.StatusBadRequest, token)
+
+	// super_admin role with camp_id → 400 (check violation).
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/admin/users"),
+		map[string]any{
+			"camp_id":    campID,
+			"username":   "badsuperadmin",
+			"email":      "badsuperadmin@example.com",
+			"password":   "securepass123",
+			"first_name": "Bad",
+			"last_name":  "Super",
+			"role":       "super_admin",
+		}, http.StatusBadRequest, token)
+
+	// Invalid camp_id (FK violation) → 400.
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/admin/users"),
+		map[string]any{
+			"camp_id":    "00000000-0000-0000-0000-000000000000",
+			"username":   "badcamp",
+			"email":      "badcamp@example.com",
+			"password":   "securepass123",
+			"first_name": "Bad",
+			"last_name":  "Camp",
+			"role":       "admin",
+		}, http.StatusBadRequest, token)
+
+	// Missing required fields → 400.
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/admin/users"),
+		map[string]any{"username": "incomplete"}, http.StatusBadRequest, token)
+
+	// Short password → 400.
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/admin/users"),
+		map[string]any{
+			"camp_id":    campID,
+			"username":   "shortpw",
+			"email":      "shortpw@example.com",
+			"password":   "short",
+			"first_name": "Short",
+			"last_name":  "Pw",
+			"role":       "admin",
+		}, http.StatusBadRequest, token)
+
+	// Short password on update → 400.
+	doRawRequest(t, http.MethodPut,
+		apiURL(ts, "/admin/users/00000000-0000-0000-0000-000000000000/password"),
+		map[string]any{"password": "short"}, http.StatusBadRequest, token)
+}

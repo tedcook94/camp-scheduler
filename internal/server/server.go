@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"camp-scheduler/internal/activity"
+	"camp-scheduler/internal/admin"
 	"camp-scheduler/internal/agegroup"
 	"camp-scheduler/internal/assignment"
 	"camp-scheduler/internal/auth"
@@ -185,6 +186,14 @@ func (s *Server) routes() {
 	assignmentService := assignment.NewService(queries, s.pool)
 	assignmentController := assignment.NewController(assignmentService)
 	assignmentController.RegisterRoutes(protected)
+
+	superAdmin := v1.Group("/admin")
+	superAdmin.Use(auth.Middleware(authenticator))
+	superAdmin.Use(auth.RequireSuperAdmin())
+
+	adminService := admin.NewService(queries)
+	adminController := admin.NewController(adminService)
+	adminController.RegisterRoutes(superAdmin)
 }
 
 func initDB(cfg config.Config) (*pgxpool.Pool, error) {

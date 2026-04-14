@@ -107,6 +107,10 @@ description = "Create a new migration file"
 usage = 'arg "<name>" help="Name of the migration"'
 run = "migrate create -ext sql -dir database/migrations -seq \"${usage_name:?}\""
 
+[tasks."seed:super-admin"]
+description = "Create a super-admin user (interactive)"
+run = "go run ./cmd/seed-super-admin"
+
 [tasks."db:reset"]
 description = "Destroy and recreate the local databases (next 'mise run dev' reinitializes)"
 run = "docker compose down -v"

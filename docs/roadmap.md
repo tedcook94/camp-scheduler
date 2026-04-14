@@ -125,9 +125,10 @@ viable configurations and understand trade-offs.
 - [x] Migrate to Yaak for API testing
 - [ ] Super-admin management
   - [x] Camp management (create, update, delete camps)
-  - [ ] User management (create, update, delete users)
+  - [x] User management (create, update, delete users)
   - [ ] Frontend panel for managing camps/users
   - [ ] Ability to revoke a user's refresh tokens/log out all devices
+    - Should also revoke tokens on password reset (currently not done)
   - [ ] Ghost mode (ability to log in as any user)
 - [ ] Web frontend
 - [ ] Overrides (locking assignments before solver runs)

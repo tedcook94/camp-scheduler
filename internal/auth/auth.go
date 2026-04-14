@@ -4,7 +4,10 @@ import "context"
 
 type Role string
 
-const RoleAdmin Role = "admin"
+const (
+	RoleAdmin      Role = "admin"
+	RoleSuperAdmin Role = "super_admin"
+)
 
 type Claims struct {
 	UserID   string

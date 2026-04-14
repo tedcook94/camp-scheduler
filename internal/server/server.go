@@ -105,7 +105,7 @@ func (s *Server) routes() {
 	authController.RegisterRoutes(v1)
 
 	protected := v1.Group("")
-	protected.Use(auth.Middleware(authenticator))
+	protected.Use(auth.Middleware(authenticator), auth.RequireCampScope())
 	campService := camp.NewService(queries)
 	campController := camp.NewController(campService)
 	campController.RegisterRoutes(protected)

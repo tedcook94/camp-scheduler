@@ -1,0 +1,22 @@
+type: http_request
+model: http_request
+id: rq_admin-users-delete
+createdAt: "2026-04-14T00:00:00.000000"
+updatedAt: "2026-04-14T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_admin-users
+name: Delete
+description: ""
+url: "${[ base_url ]}/admin/users/:test-admin-user-id"
+urlParameters:
+  - enabled: true
+    name: ":test-admin-user-id"
+    value: "${[ test-admin-user-id ]}"
+    id: null
+method: DELETE
+headers: []
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+sortPriority: 5.0

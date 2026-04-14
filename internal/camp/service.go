@@ -27,7 +27,7 @@ func (svc *Service) GetByID(ctx context.Context, id string) (CampResponse, error
 		return CampResponse{}, fmt.Errorf("error getting camp %s: %w", id, err)
 	}
 
-	return toCampResponse(camp), nil
+	return ToCampResponse(camp), nil
 }
 
 func (svc *Service) Update(ctx context.Context, id string, req UpdateCampRequest) (CampResponse, error) {
@@ -46,10 +46,10 @@ func (svc *Service) Update(ctx context.Context, id string, req UpdateCampRequest
 		return CampResponse{}, fmt.Errorf("error updating camp %s: %w", id, err)
 	}
 
-	return toCampResponse(camp), nil
+	return ToCampResponse(camp), nil
 }
 
-func toCampResponse(c db.Camp) CampResponse {
+func ToCampResponse(c db.Camp) CampResponse {
 	resp := CampResponse{
 		ID:      api.UUIDToString(c.ID),
 		Name:    c.CampName,

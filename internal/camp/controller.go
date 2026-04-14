@@ -31,6 +31,8 @@ type UpdateCampRequest struct {
 	Enabled  bool    `json:"enabled"`
 }
 
+// CampResponse is the shared response type for camp data, used by both
+// the camp-scoped and admin endpoints.
 type CampResponse struct {
 	ID       string  `json:"id"`
 	Name     string  `json:"name"`

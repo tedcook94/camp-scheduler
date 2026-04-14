@@ -94,5 +94,9 @@ variables:
   name: test-admin-camp-id
   value: ''
   id: aKm7XqPwN3
+- enabled: true
+  name: test-admin-user-id
+  value: ''
+  id: xR4mWkP9vB
 color: null
 sortPriority: 0.0

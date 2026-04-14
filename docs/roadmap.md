@@ -123,11 +123,15 @@ viable configurations and understand trade-offs.
 - [x] JWT authentication
   - [x] Remove camp_id from REST endpoint paths; derive camp context from JWT
 - [x] Migrate to Yaak for API testing
-- [x] Super-admin camp management (create, update, delete camps)
-- [ ] Super-admin endpoint for revoking a user's refresh tokens
-- [ ] "Super-admin" panel for managing users with ghost mode
+- [ ] Super-admin management
+  - [x] Camp management (create, update, delete camps)
+  - [ ] User management (create, update, delete users)
+  - [ ] Frontend panel for managing camps/users
+  - [ ] Ability to revoke a user's refresh tokens/log out all devices
+  - [ ] Ghost mode (ability to log in as any user)
 - [ ] Web frontend
 - [ ] Overrides (locking assignments before solver runs)
 - [ ] Data import (CSV/spreadsheet)
+- [ ] Auditing
 - [ ] External system integration (Campminder, etc.)
 - [ ] LLM conversational layer (MCP) for "why was X assigned to Y?" queries

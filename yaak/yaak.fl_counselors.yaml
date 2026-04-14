@@ -1,0 +1,13 @@
+type: folder
+model: folder
+id: fl_counselors
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: null
+name: counselors
+description: ""
+authentication: {}
+authenticationType: null
+headers: []
+sortPriority: 6.0

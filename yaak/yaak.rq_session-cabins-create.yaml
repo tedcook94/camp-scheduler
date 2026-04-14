@@ -1,0 +1,19 @@
+type: http_request
+model: http_request
+id: rq_session-cabins-create
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_session-cabins
+name: Create
+description: ""
+url: "${[ base_url ]}/sessions/${[ test-session-id ]}/cabins"
+urlParameters: []
+method: POST
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"session_age_group_id": "${[ test-session-age-group-id ]}", "cabin_id": "${[ test-cabin-id ]}", "group_size": 8, "required_counselors": 2}'
+bodyType: application/json
+sortPriority: 2.0

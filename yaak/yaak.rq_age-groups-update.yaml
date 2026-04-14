@@ -1,0 +1,23 @@
+type: http_request
+model: http_request
+id: rq_age-groups-update
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_age-groups
+name: Update
+description: ""
+url: "${[ base_url ]}/age-groups/:test-age-group-id"
+urlParameters:
+  - enabled: true
+    name: ":test-age-group-id"
+    value: "${[ test-age-group-id ]}"
+    id: null
+method: PUT
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"name": "Updated Age Group Name"}'
+bodyType: application/json
+sortPriority: 3.0

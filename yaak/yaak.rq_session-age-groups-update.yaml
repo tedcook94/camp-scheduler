@@ -1,0 +1,23 @@
+type: http_request
+model: http_request
+id: rq_session-age-groups-update
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_session-age-groups
+name: Update
+description: ""
+url: "${[ base_url ]}/sessions/${[ test-session-id ]}/age-groups/:test-session-age-group-id"
+urlParameters:
+  - enabled: true
+    name: ":test-session-age-group-id"
+    value: "${[ test-session-age-group-id ]}"
+    id: null
+method: PUT
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"age_group_id": "${[ test-age-group-id ]}", "group_size": 12}'
+bodyType: application/json
+sortPriority: 3.0

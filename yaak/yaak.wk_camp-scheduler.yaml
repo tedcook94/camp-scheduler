@@ -1,0 +1,17 @@
+type: workspace
+model: workspace
+id: wk_camp-scheduler
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+name: camp-scheduler
+description: ""
+authenticationType: bearer
+authentication:
+  token: "${[ access-token ]}"
+  prefix: Bearer
+headers: []
+encryptionKeyChallenge: null
+settingValidateCertificates: true
+settingFollowRedirects: true
+settingRequestTimeout: 0
+settingDnsOverrides: []

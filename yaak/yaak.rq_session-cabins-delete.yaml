@@ -1,0 +1,22 @@
+type: http_request
+model: http_request
+id: rq_session-cabins-delete
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_session-cabins
+name: Delete
+description: ""
+url: "${[ base_url ]}/sessions/${[ test-session-id ]}/cabins/:test-session-cabin-id"
+urlParameters:
+  - enabled: true
+    name: ":test-session-cabin-id"
+    value: "${[ test-session-cabin-id ]}"
+    id: null
+method: DELETE
+headers: []
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+sortPriority: 4.0

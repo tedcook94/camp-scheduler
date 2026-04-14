@@ -1,0 +1,23 @@
+type: http_request
+model: http_request
+id: rq_session-history-update
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_session-history
+name: Update
+description: ""
+url: "${[ base_url ]}/counselors/${[ test-counselor-for-history-id ]}/session-history/:test-session-history-id"
+urlParameters:
+  - enabled: true
+    name: ":test-session-history-id"
+    value: "${[ test-session-history-id ]}"
+    id: null
+method: PUT
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"session_id": "${[ test-session-id ]}", "age_group_id": "${[ test-age-group-id ]}", "cabin_id": "${[ test-cabin-id ]}"}'
+bodyType: application/json
+sortPriority: 3.0

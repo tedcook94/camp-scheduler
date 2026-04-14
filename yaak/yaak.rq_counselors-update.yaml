@@ -1,0 +1,23 @@
+type: http_request
+model: http_request
+id: rq_counselors-update
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_counselors
+name: Update
+description: ""
+url: "${[ base_url ]}/counselors/:test-counselor-id"
+urlParameters:
+  - enabled: true
+    name: ":test-counselor-id"
+    value: "${[ test-counselor-id ]}"
+    id: null
+method: PUT
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"name": "Updated Counselor Name", "junior_counselor": false, "enabled": true}'
+bodyType: application/json
+sortPriority: 3.0

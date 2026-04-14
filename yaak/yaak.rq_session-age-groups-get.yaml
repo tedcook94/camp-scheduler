@@ -1,0 +1,22 @@
+type: http_request
+model: http_request
+id: rq_session-age-groups-get
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_session-age-groups
+name: Get By ID
+description: ""
+url: "${[ base_url ]}/sessions/${[ test-session-id ]}/age-groups/:test-session-age-group-id"
+urlParameters:
+  - enabled: true
+    name: ":test-session-age-group-id"
+    value: "${[ test-session-age-group-id ]}"
+    id: null
+method: GET
+headers: []
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+sortPriority: 1.0

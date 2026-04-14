@@ -1,0 +1,22 @@
+type: http_request
+model: http_request
+id: rq_assignment-runs-delete
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_assignment-runs
+name: Delete Run
+description: ""
+url: "${[ base_url ]}/sessions/${[ test-session-id ]}/assignment-runs/:test-assignment-run-id"
+urlParameters:
+  - enabled: true
+    name: ":test-assignment-run-id"
+    value: "${[ test-assignment-run-id ]}"
+    id: null
+method: DELETE
+headers: []
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+sortPriority: 4.0

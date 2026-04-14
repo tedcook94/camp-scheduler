@@ -122,7 +122,7 @@ viable configurations and understand trade-offs.
 - [x] Docker Compose for local dev
 - [x] JWT authentication
   - [x] Remove camp_id from REST endpoint paths; derive camp context from JWT
-- [ ] Migrate to Yaak for API testing
+- [x] Migrate to Yaak for API testing
 - [ ] Super-admin endpoint for revoking a user's refresh tokens
 - [ ] "Super-admin" panel for managing users with ghost mode
 - [ ] Web frontend

@@ -1,0 +1,23 @@
+type: http_request
+model: http_request
+id: rq_sessions-update
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_sessions
+name: Update
+description: ""
+url: "${[ base_url ]}/sessions/:test-session-id"
+urlParameters:
+  - enabled: true
+    name: ":test-session-id"
+    value: "${[ test-session-id ]}"
+    id: null
+method: PUT
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"name": "Updated Session Name", "season_id": "${[ test-season-id ]}"}'
+bodyType: application/json
+sortPriority: 3.0

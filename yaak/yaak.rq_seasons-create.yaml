@@ -1,0 +1,19 @@
+type: http_request
+model: http_request
+id: rq_seasons-create
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_seasons
+name: Create
+description: ""
+url: "${[ base_url ]}/seasons"
+urlParameters: []
+method: POST
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"name": "Season Name"}'
+bodyType: application/json
+sortPriority: 2.0

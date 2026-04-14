@@ -1,0 +1,94 @@
+type: environment
+model: environment
+id: ev_base
+workspaceId: wk_camp-scheduler
+createdAt: 2026-04-13T00:00:00
+updatedAt: 2026-04-14T00:09:26.582995820
+name: Base Environment
+public: true
+base: true
+parentModel: workspace
+parentId: null
+variables:
+- enabled: true
+  name: base_url
+  value: http://localhost:9100/api/v1
+  id: 6CXWUXwWJ4
+- enabled: true
+  name: access-token
+  value: ${[ response.body.path(request='rq_auth-login', path='$.access_token') ]}
+  id: 5eEMJAKVca
+- enabled: true
+  name: test-age-group-id
+  value: ''
+  id: SXNr38v8fR
+- enabled: true
+  name: test-cabin-id
+  value: ''
+  id: K5SvZAnQ8k
+- enabled: true
+  name: test-season-id
+  value: ''
+  id: IC2SrTxVVj
+- enabled: true
+  name: test-session-id
+  value: ''
+  id: qMqwRMqgap
+- enabled: true
+  name: test-counselor-id
+  value: ''
+  id: Z3Si9Xj9DB
+- enabled: true
+  name: test-session-for-prefs-id
+  value: ''
+  id: nJjuEym6Qa
+- enabled: true
+  name: test-counselor-for-prefs-id
+  value: ''
+  id: SFK0UzFKBV
+- enabled: true
+  name: test-age-group-pref-id
+  value: ''
+  id: NNjdycaSvU
+- enabled: true
+  name: test-cocounselor-pref-id
+  value: ''
+  id: drzMAZjyNE
+- enabled: true
+  name: test-counselor-for-history-id
+  value: ''
+  id: 2i03R4MtZn
+- enabled: true
+  name: test-session-history-id
+  value: ''
+  id: ijgZGhVQd8
+- enabled: true
+  name: test-assignment-run-id
+  value: ''
+  id: V8kxZhJBNG
+- enabled: true
+  name: test-solution-id
+  value: ''
+  id: 47rEmHVt2a
+- enabled: true
+  name: test-session-age-group-id
+  value: ''
+  id: yie6U9JgsK
+- enabled: true
+  name: test-session-cabin-id
+  value: ''
+  id: B3PaXiNJKq
+- enabled: true
+  name: test-camper-id
+  value: ''
+  id: S8WQ7k0bcx
+- enabled: true
+  name: test-enrollment-id
+  value: ''
+  id: iW3hXdQAHN
+- enabled: true
+  name: test-camper-friend-pref-id
+  value: ''
+  id: bYiwYYQqUi
+color: null
+sortPriority: 0.0

@@ -1,0 +1,23 @@
+type: http_request
+model: http_request
+id: rq_cocounselor-prefs-update
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_cocounselor-prefs
+name: Update
+description: ""
+url: "${[ base_url ]}/sessions/${[ test-session-for-prefs-id ]}/counselors/${[ test-counselor-for-prefs-id ]}/cocounselor-preferences/:test-cocounselor-pref-id"
+urlParameters:
+  - enabled: true
+    name: ":test-cocounselor-pref-id"
+    value: "${[ test-cocounselor-pref-id ]}"
+    id: null
+method: PUT
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"preferred_counselor_id": "${[ test-counselor-id ]}", "rank": 2}'
+bodyType: application/json
+sortPriority: 3.0

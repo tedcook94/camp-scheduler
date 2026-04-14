@@ -1,0 +1,19 @@
+type: http_request
+model: http_request
+id: rq_age-groups-create
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_age-groups
+name: Create
+description: ""
+url: "${[ base_url ]}/age-groups"
+urlParameters: []
+method: POST
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"name": "Age Group Name"}'
+bodyType: application/json
+sortPriority: 2.0

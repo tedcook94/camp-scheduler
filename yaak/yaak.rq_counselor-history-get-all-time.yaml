@@ -1,0 +1,22 @@
+type: http_request
+model: http_request
+id: rq_counselor-history-get-all-time
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_counselor-history
+name: Get Summary All Time
+description: ""
+url: "${[ base_url ]}/counselors/${[ test-counselor-for-history-id ]}/history"
+urlParameters:
+  - enabled: true
+    name: "season_id"
+    value: "all"
+    id: null
+method: GET
+headers: []
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+sortPriority: 2.0

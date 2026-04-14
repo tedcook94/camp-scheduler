@@ -1,0 +1,19 @@
+type: http_request
+model: http_request
+id: rq_auth-login
+createdAt: 2026-04-13T00:00:00
+updatedAt: 2026-04-14T00:48:35.626780932
+workspaceId: wk_camp-scheduler
+folderId: fl_auth
+authentication: {}
+authenticationType: none
+body:
+  text: '{"username": "admin", "password": "password"}'
+bodyType: application/json
+description: ''
+headers: []
+method: POST
+name: Login
+sortPriority: 0.0
+url: ${[ base_url ]}/auth/login
+urlParameters: []

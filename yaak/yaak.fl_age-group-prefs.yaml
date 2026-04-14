@@ -1,0 +1,13 @@
+type: folder
+model: folder
+id: fl_age-group-prefs
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: null
+name: age-group-preferences
+description: ""
+authentication: {}
+authenticationType: null
+headers: []
+sortPriority: 7.0

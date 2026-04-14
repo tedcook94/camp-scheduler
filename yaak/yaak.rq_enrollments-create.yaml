@@ -1,0 +1,19 @@
+type: http_request
+model: http_request
+id: rq_enrollments-create
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_enrollments
+name: Create
+description: ""
+url: "${[ base_url ]}/sessions/${[ test-session-id ]}/enrollments"
+urlParameters: []
+method: POST
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"camper_id": "${[ test-camper-id ]}", "session_age_group_id": "${[ test-session-age-group-id ]}"}'
+bodyType: application/json
+sortPriority: 2.0

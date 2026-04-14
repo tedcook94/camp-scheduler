@@ -1,0 +1,19 @@
+type: http_request
+model: http_request
+id: rq_session-age-groups-create
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_session-age-groups
+name: Create
+description: ""
+url: "${[ base_url ]}/sessions/${[ test-session-id ]}/age-groups"
+urlParameters: []
+method: POST
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"age_group_id": "${[ test-age-group-id ]}", "group_size": 10}'
+bodyType: application/json
+sortPriority: 2.0

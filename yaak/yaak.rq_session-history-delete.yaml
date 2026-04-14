@@ -1,0 +1,22 @@
+type: http_request
+model: http_request
+id: rq_session-history-delete
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_session-history
+name: Delete
+description: ""
+url: "${[ base_url ]}/counselors/${[ test-counselor-for-history-id ]}/session-history/:test-session-history-id"
+urlParameters:
+  - enabled: true
+    name: ":test-session-history-id"
+    value: "${[ test-session-history-id ]}"
+    id: null
+method: DELETE
+headers: []
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+sortPriority: 4.0

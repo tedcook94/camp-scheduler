@@ -1,0 +1,22 @@
+type: http_request
+model: http_request
+id: rq_counselors-get
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_counselors
+name: Get By ID
+description: ""
+url: "${[ base_url ]}/counselors/:test-counselor-id"
+urlParameters:
+  - enabled: true
+    name: ":test-counselor-id"
+    value: "${[ test-counselor-id ]}"
+    id: null
+method: GET
+headers: []
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+sortPriority: 1.0

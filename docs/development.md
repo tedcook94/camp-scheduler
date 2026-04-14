@@ -9,6 +9,7 @@
 
 ```sh
 mise install       # Install pinned tool versions (Go, sqlc, migrate, air)
+mise run dev       # Start Postgres + Go server with hot-reload
 mise run dev       # Start everything
 ```
 
@@ -114,9 +115,13 @@ it was started by the task. If Postgres was already running (e.g., from
 
 ## API Testing
 
-API definitions are maintained in `insomnia/` as an Insomnia workspace export.
-See [insomnia/README.md](../insomnia/README.md) for usage instructions. Keep
-these definitions in sync when adding or changing endpoints.
+API definitions are maintained in `yaak/` as a Yaak workspace sync directory.
+See [yaak/README.md](../yaak/README.md) for usage instructions. Keep these
+definitions in sync when adding or changing endpoints.
+
+Yaak auto-saves every UI change to the sync directory, including request body
+edits made during testing. Review staged `yaak/` files before committing to
+verify the changes are intentional and not leftover test data.
 
 ## Code Generation
 

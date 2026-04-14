@@ -86,8 +86,8 @@ a constraint satisfaction solver. See `README.md` for a high-level overview and
 
 ## API Testing
 
-- API definitions live in `insomnia/` (Insomnia workspace export)
-- Keep the Insomnia definitions up to date as endpoints are added or changed
+- API definitions live in `yaak/` (Yaak workspace sync directory)
+- Keep the Yaak definitions up to date as endpoints are added or changed
 
 ## Things to Avoid
 
@@ -101,5 +101,5 @@ a constraint satisfaction solver. See `README.md` for a high-level overview and
 - Keep `README.md`, `docs/`, `database/README.md`, and other docs up to date
   when making changes that affect project structure, setup steps, or developer
   workflows.
-- Keep `insomnia/` API definitions in sync with endpoint changes.
+- Keep `yaak/` API definitions in sync with endpoint changes.
 - Keep `docs/roadmap.md` up to date when completing or adding development phases.

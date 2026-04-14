@@ -87,7 +87,7 @@ database/
   migrations/        → SQL migration files (golang-migrate)
   queries/           → SQL query files (sqlc)
   local-setup/       → Local Postgres initialization scripts
-insomnia/            → API workspace export (Insomnia)
+yaak/                → API workspace sync directory (Yaak)
 docs/                → Development and roadmap documentation
 ```
 
@@ -98,7 +98,7 @@ docs/                → Development and roadmap documentation
 | [docs/development.md](docs/development.md) | Local setup, dev workflow, tooling  |
 | [docs/roadmap.md](docs/roadmap.md)    | Product roadmap and development phases |
 | [database/README.md](database/README.md) | Database setup, migrations, reset  |
-| [insomnia/README.md](insomnia/README.md) | API testing with Insomnia          |
+| [yaak/README.md](yaak/README.md)         | API testing with Yaak              |
 | [AGENTS.md](AGENTS.md)               | Coding conventions for AI agents     |
 
 ## Quick Start

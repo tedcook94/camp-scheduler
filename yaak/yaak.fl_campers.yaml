@@ -1,0 +1,13 @@
+type: folder
+model: folder
+id: fl_campers
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: null
+name: campers
+description: ""
+authentication: {}
+authenticationType: null
+headers: []
+sortPriority: 13.0

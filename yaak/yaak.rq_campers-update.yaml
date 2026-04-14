@@ -1,0 +1,23 @@
+type: http_request
+model: http_request
+id: rq_campers-update
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_campers
+name: Update
+description: ""
+url: "${[ base_url ]}/campers/:test-camper-id"
+urlParameters:
+  - enabled: true
+    name: ":test-camper-id"
+    value: "${[ test-camper-id ]}"
+    id: null
+method: PUT
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"name": "Updated Camper Name"}'
+bodyType: application/json
+sortPriority: 3.0

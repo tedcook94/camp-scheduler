@@ -1,0 +1,23 @@
+type: http_request
+model: http_request
+id: rq_seasons-update
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_seasons
+name: Update
+description: ""
+url: "${[ base_url ]}/seasons/:test-season-id"
+urlParameters:
+  - enabled: true
+    name: ":test-season-id"
+    value: "${[ test-season-id ]}"
+    id: null
+method: PUT
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"name": "Updated Season Name"}'
+bodyType: application/json
+sortPriority: 3.0

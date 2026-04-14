@@ -1,0 +1,22 @@
+type: http_request
+model: http_request
+id: rq_age-group-prefs-get
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_age-group-prefs
+name: Get By ID
+description: ""
+url: "${[ base_url ]}/sessions/${[ test-session-for-prefs-id ]}/counselors/${[ test-counselor-for-prefs-id ]}/age-group-preferences/:test-age-group-pref-id"
+urlParameters:
+  - enabled: true
+    name: ":test-age-group-pref-id"
+    value: "${[ test-age-group-pref-id ]}"
+    id: null
+method: GET
+headers: []
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+sortPriority: 1.0

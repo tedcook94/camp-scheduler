@@ -1,0 +1,19 @@
+type: http_request
+model: http_request
+id: rq_age-group-prefs-create
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_age-group-prefs
+name: Create
+description: ""
+url: "${[ base_url ]}/sessions/${[ test-session-for-prefs-id ]}/counselors/${[ test-counselor-for-prefs-id ]}/age-group-preferences"
+urlParameters: []
+method: POST
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"age_group_id": "${[ test-age-group-id ]}", "rank": 1}'
+bodyType: application/json
+sortPriority: 2.0

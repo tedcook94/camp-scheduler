@@ -1,0 +1,23 @@
+type: http_request
+model: http_request
+id: rq_session-cabins-update
+createdAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-13T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_session-cabins
+name: Update
+description: ""
+url: "${[ base_url ]}/sessions/${[ test-session-id ]}/cabins/:test-session-cabin-id"
+urlParameters:
+  - enabled: true
+    name: ":test-session-cabin-id"
+    value: "${[ test-session-cabin-id ]}"
+    id: null
+method: PUT
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"session_age_group_id": "${[ test-session-age-group-id ]}", "cabin_id": "${[ test-cabin-id ]}", "group_size": 10, "required_counselors": 2}'
+bodyType: application/json
+sortPriority: 3.0

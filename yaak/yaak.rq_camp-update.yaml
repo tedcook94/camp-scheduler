@@ -1,0 +1,19 @@
+type: http_request
+model: http_request
+id: rq_camp-update
+createdAt: 2026-04-13T00:00:00
+updatedAt: 2026-04-14T00:30:31.691508153
+workspaceId: wk_camp-scheduler
+folderId: fl_camp
+authentication: {}
+authenticationType: null
+body:
+  text: '{"name": "Camp Name", "location": "Camp Location", "enabled": true}'
+bodyType: application/json
+description: ''
+headers: []
+method: PUT
+name: Update
+sortPriority: 1.0
+url: ${[ base_url ]}/camp
+urlParameters: []

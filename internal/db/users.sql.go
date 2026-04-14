@@ -53,6 +53,19 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
+const deleteUser = `-- name: DeleteUser :execrows
+DELETE FROM users
+WHERE id = $1
+`
+
+func (q *Queries) DeleteUser(ctx context.Context, id pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteUser, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getUserByID = `-- name: GetUserByID :one
 SELECT id, camp_id, username, email, password_hash, first_name, last_name, role, created_at, updated_at
 FROM users
@@ -99,4 +112,181 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listUsers = `-- name: ListUsers :many
+SELECT id, camp_id, username, email, first_name, last_name, role, created_at, updated_at
+FROM users
+ORDER BY created_at
+`
+
+type ListUsersRow struct {
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	Username  string
+	Email     string
+	FirstName string
+	LastName  string
+	Role      string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
+	rows, err := q.db.Query(ctx, listUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUsersRow
+	for rows.Next() {
+		var i ListUsersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.Username,
+			&i.Email,
+			&i.FirstName,
+			&i.LastName,
+			&i.Role,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUsersByCamp = `-- name: ListUsersByCamp :many
+SELECT id, camp_id, username, email, first_name, last_name, role, created_at, updated_at
+FROM users
+WHERE camp_id = $1
+ORDER BY created_at
+`
+
+type ListUsersByCampRow struct {
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	Username  string
+	Email     string
+	FirstName string
+	LastName  string
+	Role      string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) ListUsersByCamp(ctx context.Context, campID pgtype.UUID) ([]ListUsersByCampRow, error) {
+	rows, err := q.db.Query(ctx, listUsersByCamp, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUsersByCampRow
+	for rows.Next() {
+		var i ListUsersByCampRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.Username,
+			&i.Email,
+			&i.FirstName,
+			&i.LastName,
+			&i.Role,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateUser = `-- name: UpdateUser :one
+UPDATE users
+SET camp_id    = $2,
+    username   = $3,
+    email      = $4,
+    first_name = $5,
+    last_name  = $6,
+    role       = $7,
+    updated_at = now()
+WHERE id = $1
+RETURNING id, camp_id, username, email, first_name, last_name, role, created_at, updated_at
+`
+
+type UpdateUserParams struct {
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	Username  string
+	Email     string
+	FirstName string
+	LastName  string
+	Role      string
+}
+
+type UpdateUserRow struct {
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	Username  string
+	Email     string
+	FirstName string
+	LastName  string
+	Role      string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (UpdateUserRow, error) {
+	row := q.db.QueryRow(ctx, updateUser,
+		arg.ID,
+		arg.CampID,
+		arg.Username,
+		arg.Email,
+		arg.FirstName,
+		arg.LastName,
+		arg.Role,
+	)
+	var i UpdateUserRow
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.Username,
+		&i.Email,
+		&i.FirstName,
+		&i.LastName,
+		&i.Role,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateUserPassword = `-- name: UpdateUserPassword :execrows
+UPDATE users
+SET password_hash = $2,
+    updated_at    = now()
+WHERE id = $1
+`
+
+type UpdateUserPasswordParams struct {
+	ID           pgtype.UUID
+	PasswordHash string
+}
+
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateUserPassword, arg.ID, arg.PasswordHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

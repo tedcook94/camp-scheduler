@@ -8,6 +8,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/kelseyhightower/envconfig v1.4.0
 	golang.org/x/crypto v0.49.0
+	golang.org/x/term v0.42.0
 )
 
 require (
@@ -41,7 +42,6 @@ require (
 	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/term v0.42.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 )

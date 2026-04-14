@@ -1,0 +1,19 @@
+type: http_request
+model: http_request
+id: rq_admin-camps-create
+createdAt: "2026-04-14T00:00:00.000000"
+updatedAt: "2026-04-14T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_admin-camps
+name: Create
+description: ""
+url: "${[ base_url ]}/admin/camps"
+urlParameters: []
+method: POST
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"name": "New Camp", "location": "Somewhere, USA"}'
+bodyType: application/json
+sortPriority: 2.0

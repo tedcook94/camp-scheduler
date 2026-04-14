@@ -2020,3 +2020,137 @@ func testCrossCampIsolation(t *testing.T) {
 		doRawRequest(t, http.MethodGet, apiURL(ts, tc.path), nil, http.StatusNotFound, tokenB)
 	}
 }
+
+// mustLoginSuperAdmin creates a super-admin user (no camp association) and
+// returns an access token.
+func mustLoginSuperAdmin(t *testing.T, ts *httptest.Server, pool *pgxpool.Pool) string {
+	t.Helper()
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("hashing password: %v", err)
+	}
+
+	_, err = pool.Exec(context.Background(),
+		`INSERT INTO users (camp_id, username, email, password_hash, first_name, last_name, role)
+		 VALUES (NULL, $1, $2, $3, $4, $5, $6)
+		 ON CONFLICT (username) DO NOTHING`,
+		"superadmin", "superadmin@test.com",
+		string(hash), "Super", "Admin", "super_admin",
+	)
+	if err != nil {
+		t.Fatalf("inserting super-admin user: %v", err)
+	}
+
+	resp := doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
+		map[string]any{"username": "superadmin", "password": testPassword},
+		http.StatusOK, "")
+
+	token := str(resp, "access_token")
+	if token == "" {
+		t.Fatal("expected access_token in login response")
+	}
+	return token
+}
+
+func TestSuperAdminCampCRUD(t *testing.T) {
+	t.Run("full_lifecycle", testSuperAdminCampLifecycle)
+	t.Run("admin_rejected_from_admin_routes", testAdminRejectedFromAdminRoutes)
+	t.Run("super_admin_rejected_from_camp_routes", testSuperAdminRejectedFromCampRoutes)
+}
+
+func testSuperAdminCampLifecycle(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+	token := mustLoginSuperAdmin(t, ts, pool)
+
+	// Create a camp.
+	location := "Lake Tahoe"
+	created := mustPost(t, apiURL(ts, "/admin/camps"),
+		map[string]any{"name": "Camp Lifecycle", "location": location}, token)
+
+	campID := str(created, "id")
+	if campID == "" {
+		t.Fatal("expected id in create response")
+	}
+	if str(created, "name") != "Camp Lifecycle" {
+		t.Fatalf("expected name 'Camp Lifecycle', got %q", str(created, "name"))
+	}
+	if str(created, "location") != "Lake Tahoe" {
+		t.Fatalf("expected location 'Lake Tahoe', got %q", str(created, "location"))
+	}
+
+	// List camps — the created camp must appear.
+	camps := mustGetList(t, apiURL(ts, "/admin/camps"), token)
+	if len(camps) < 1 {
+		t.Fatal("expected at least 1 camp in list")
+	}
+	found := false
+	for _, c := range camps {
+		m := c.(map[string]any)
+		if str(m, "id") == campID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("created camp %s not found in list", campID)
+	}
+
+	// Get camp by ID.
+	got := mustGet(t, apiURL(ts, "/admin/camps/"+campID), token)
+	if str(got, "name") != "Camp Lifecycle" {
+		t.Fatalf("expected name 'Camp Lifecycle', got %q", str(got, "name"))
+	}
+
+	// Update camp.
+	newLocation := "Yosemite"
+	updated := doRequest(t, http.MethodPut, apiURL(ts, "/admin/camps/"+campID),
+		map[string]any{"name": "Camp Updated", "location": newLocation, "enabled": false},
+		http.StatusOK, token)
+	if str(updated, "name") != "Camp Updated" {
+		t.Fatalf("expected name 'Camp Updated', got %q", str(updated, "name"))
+	}
+	if str(updated, "location") != "Yosemite" {
+		t.Fatalf("expected location 'Yosemite', got %q", str(updated, "location"))
+	}
+
+	// Verify update persisted.
+	gotAfterUpdate := mustGet(t, apiURL(ts, "/admin/camps/"+campID), token)
+	if str(gotAfterUpdate, "name") != "Camp Updated" {
+		t.Fatalf("expected persisted name 'Camp Updated', got %q", str(gotAfterUpdate, "name"))
+	}
+
+	// Delete camp.
+	mustDelete(t, apiURL(ts, "/admin/camps/"+campID), token)
+
+	// Verify deletion — GET should return 404.
+	doRawRequest(t, http.MethodGet, apiURL(ts, "/admin/camps/"+campID), nil, http.StatusNotFound, token)
+}
+
+func testAdminRejectedFromAdminRoutes(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Admin Reject").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+
+	adminToken := mustLogin(t, ts, pool, campID)
+
+	// Regular admin should get 403 on all admin endpoints.
+	doRawRequest(t, http.MethodGet, apiURL(ts, "/admin/camps"), nil, http.StatusForbidden, adminToken)
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/admin/camps"),
+		map[string]any{"name": "Sneaky Camp"}, http.StatusForbidden, adminToken)
+}
+
+func testSuperAdminRejectedFromCampRoutes(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+	superToken := mustLoginSuperAdmin(t, ts, pool)
+
+	// Super-admin should get 403 on camp-scoped routes.
+	doRawRequest(t, http.MethodGet, apiURL(ts, "/camp"), nil, http.StatusForbidden, superToken)
+	doRawRequest(t, http.MethodGet, apiURL(ts, "/age-groups"), nil, http.StatusForbidden, superToken)
+	doRawRequest(t, http.MethodGet, apiURL(ts, "/cabins"), nil, http.StatusForbidden, superToken)
+}

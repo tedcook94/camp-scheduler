@@ -90,5 +90,9 @@ variables:
   name: test-camper-friend-pref-id
   value: ''
   id: bYiwYYQqUi
+- enabled: true
+  name: test-admin-camp-id
+  value: ''
+  id: aKm7XqPwN3
 color: null
 sortPriority: 0.0

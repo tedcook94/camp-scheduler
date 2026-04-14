@@ -27,7 +27,7 @@ integration) is in progress.
 ### Schema
 
 Tables are organized by domain. See `database/migrations/` for the complete
-schema (19 migrations). Key groups:
+schema (21 migrations). Key groups:
 
 - **Core:** camps, age_groups, cabins, seasons, sessions, counselors
 - **Preferences:** counselor_age_group_preferences, counselor_cocounselor_preferences, counselor_activity_preferences, camper_friend_preferences
@@ -123,6 +123,7 @@ viable configurations and understand trade-offs.
 - [x] JWT authentication
   - [x] Remove camp_id from REST endpoint paths; derive camp context from JWT
 - [x] Migrate to Yaak for API testing
+- [x] Super-admin camp management (create, update, delete camps)
 - [ ] Super-admin endpoint for revoking a user's refresh tokens
 - [ ] "Super-admin" panel for managing users with ghost mode
 - [ ] Web frontend

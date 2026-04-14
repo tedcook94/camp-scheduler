@@ -1,0 +1,18 @@
+type: http_request
+model: http_request
+id: rq_admin-camps-list
+createdAt: "2026-04-14T00:00:00.000000"
+updatedAt: "2026-04-14T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_admin-camps
+name: List
+description: ""
+url: "${[ base_url ]}/admin/camps"
+urlParameters: []
+method: GET
+headers: []
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+sortPriority: 0.0

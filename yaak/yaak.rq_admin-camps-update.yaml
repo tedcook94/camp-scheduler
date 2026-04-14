@@ -1,0 +1,23 @@
+type: http_request
+model: http_request
+id: rq_admin-camps-update
+createdAt: "2026-04-14T00:00:00.000000"
+updatedAt: "2026-04-14T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_admin-camps
+name: Update
+description: ""
+url: "${[ base_url ]}/admin/camps/:test-admin-camp-id"
+urlParameters:
+  - enabled: true
+    name: ":test-admin-camp-id"
+    value: "${[ test-admin-camp-id ]}"
+    id: null
+method: PUT
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"name": "Updated Camp", "location": "Elsewhere, USA", "enabled": true}'
+bodyType: application/json
+sortPriority: 3.0

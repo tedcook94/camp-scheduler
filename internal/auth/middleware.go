@@ -54,3 +54,28 @@ func GetCampID(c *gin.Context) string {
 	}
 	return claims.CampID
 }
+
+// RequireCampScope rejects requests from users without a camp association
+// (i.e. super-admins). Camp-scoped routes should use this middleware to
+// prevent super-admin tokens from reaching handlers that expect a camp ID.
+func RequireCampScope() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims := GetClaims(c)
+		if claims == nil || claims.CampID == "" {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "camp-scoped access required"})
+			return
+		}
+		c.Next()
+	}
+}
+
+func RequireSuperAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims := GetClaims(c)
+		if claims == nil || claims.Role != RoleSuperAdmin {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "super-admin access required"})
+			return
+		}
+		c.Next()
+	}
+}

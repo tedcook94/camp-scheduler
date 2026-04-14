@@ -154,7 +154,11 @@ func (a *JWTAuthenticator) ValidateToken(tokenString string) (*Claims, error) {
 	username, _ := claims["username"].(string)
 	role, _ := claims["role"].(string)
 
-	if userID == "" || campID == "" || username == "" || role == "" {
+	if userID == "" || username == "" || role == "" {
+		return nil, ErrInvalidToken
+	}
+
+	if campID == "" && Role(role) != RoleSuperAdmin {
 		return nil, ErrInvalidToken
 	}
 

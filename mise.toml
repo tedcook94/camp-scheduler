@@ -58,8 +58,8 @@ run = """
 #!/usr/bin/env bash
 set -e
 cd web && pnpm build && cd ..
-rm -rf cmd/server/static
-cp -r web/build cmd/server/static
+find cmd/server/static -mindepth 1 ! -name '.gitkeep' -exec rm -rf {} +
+cp -r web/build/. cmd/server/static/
 go build -o bin/server ./cmd/server
 """
 

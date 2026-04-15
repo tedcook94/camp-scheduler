@@ -35,7 +35,7 @@ func mustSetupServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
 			RefreshTokenTTL: 168 * time.Hour,
 		},
 	}
-	srv := server.NewWithPool(cfg, pool)
+	srv := server.NewWithPool(cfg, pool, nil)
 	ts := httptest.NewServer(srv)
 	t.Cleanup(ts.Close)
 	return ts, pool

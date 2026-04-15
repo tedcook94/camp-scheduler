@@ -14,6 +14,7 @@ solutions that respect hard constraints and optimize soft preferences.
 | Database    | PostgreSQL 18                            |
 | Query Layer | sqlc (type-safe SQL code generation)     |
 | Migrations  | golang-migrate                           |
+| Frontend    | SvelteKit, Svelte 5, Tailwind CSS v4     |
 | Solver      | Custom Go constraint satisfaction engine |
 | Dev Tooling | mise, air (hot-reload), Docker Compose   |
 
@@ -21,8 +22,8 @@ solutions that respect hard constraints and optimize soft preferences.
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Web UI    │────>│  REST API   │────>│ PostgreSQL  │
-│  (future)   │     │  (Go/Gin)   │     │             │
+│  Admin UI   │────>│  REST API   │────>│ PostgreSQL  │
+│ (SvelteKit) │     │  (Go/Gin)   │     │             │
 └─────────────┘     └──────┬──────┘     └──────┬──────┘
                            │                    │
                     ┌──────▼──────┐      ┌──────▼──────┐
@@ -83,6 +84,10 @@ internal/            → All application code
   api/               → Shared API helpers
   assignment/        → Assignment run orchestration
   <domain>/          → Domain packages (camp, cabin, counselor, camper, etc.)
+web/                 → Super-admin frontend (SvelteKit SPA)
+  src/lib/api/       → API client layer (typed fetch wrapper)
+  src/lib/components/→ UI components (shadcn-svelte)
+  src/routes/        → SvelteKit routes (login, camps, users)
 database/
   migrations/        → SQL migration files (golang-migrate)
   queries/           → SQL query files (sqlc)

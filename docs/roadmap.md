@@ -126,7 +126,7 @@ viable configurations and understand trade-offs.
 - [ ] Super-admin management
   - [x] Camp management (create, update, delete camps)
   - [x] User management (create, update, delete users)
-  - [ ] Frontend panel for managing camps/users
+  - [x] Frontend panel for managing camps/users
   - [ ] Ability to revoke a user's refresh tokens/log out all devices
     - Should also revoke tokens on password reset (currently not done)
   - [ ] Ghost mode (ability to log in as any user)

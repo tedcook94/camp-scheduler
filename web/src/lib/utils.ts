@@ -1,9 +1,12 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { Snippet } from "svelte";
 
 export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
+}
+
+export function capitalizeFirst(s: string): string {
+	return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 export type WithElementRef<T, El extends HTMLElement = HTMLElement> = T & {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -22,7 +23,19 @@ func main() {
 
 	initLogger(cfg)
 
-	srv, err := server.New(cfg)
+	var adminFS fs.FS
+	if sub, err := fs.Sub(staticFiles, "static"); err == nil {
+		if entry, err := fs.Stat(sub, "index.html"); err == nil && !entry.IsDir() {
+			adminFS = sub
+			slog.Info("serving embedded admin frontend")
+		} else {
+			slog.Info("no embedded admin frontend found, skipping")
+		}
+	} else {
+		slog.Info("no embedded admin frontend found, skipping")
+	}
+
+	srv, err := server.New(cfg, adminFS)
 	if err != nil {
 		slog.With("error", err).Error("error initializing server")
 		os.Exit(1)

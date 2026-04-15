@@ -3,8 +3,11 @@ package server
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
+	"path"
+	"strings"
 
 	"camp-scheduler/internal/activity"
 	"camp-scheduler/internal/admin"
@@ -31,22 +34,23 @@ import (
 )
 
 type Server struct {
-	cfg    config.Config
-	pool   *pgxpool.Pool
-	router *gin.Engine
+	cfg      config.Config
+	pool     *pgxpool.Pool
+	router   *gin.Engine
+	staticFS fs.FS
 }
 
-func New(cfg config.Config) (*Server, error) {
+func New(cfg config.Config, staticFS fs.FS) (*Server, error) {
 	pool, err := initDB(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
-	return NewWithPool(cfg, pool), nil
+	return NewWithPool(cfg, pool, staticFS), nil
 }
 
 // NewWithPool creates a server with an existing database connection pool,
 // allowing callers (such as integration tests) to supply their own pool.
-func NewWithPool(cfg config.Config, pool *pgxpool.Pool) *Server {
+func NewWithPool(cfg config.Config, pool *pgxpool.Pool, staticFS fs.FS) *Server {
 	if cfg.Server.Mode == "local" {
 		gin.SetMode(gin.DebugMode)
 	} else {
@@ -54,9 +58,10 @@ func NewWithPool(cfg config.Config, pool *pgxpool.Pool) *Server {
 	}
 
 	s := &Server{
-		cfg:    cfg,
-		pool:   pool,
-		router: gin.New(),
+		cfg:      cfg,
+		pool:     pool,
+		router:   gin.New(),
+		staticFS: staticFS,
 	}
 
 	s.router.Use(gin.Recovery())
@@ -198,6 +203,64 @@ func (s *Server) routes() {
 	userService := admin.NewUserService(queries)
 	userController := admin.NewUserController(userService)
 	userController.RegisterRoutes(superAdmin)
+
+	if s.staticFS != nil {
+		s.serveSPA()
+	}
+}
+
+// serveSPA configures the router to serve the embedded SPA under /admin.
+// Requests for static assets are served directly; all other /admin paths
+// fall back to index.html so that SvelteKit handles client-side routing.
+func (s *Server) serveSPA() {
+	indexHTML, err := fs.ReadFile(s.staticFS, "index.html")
+	if err != nil {
+		slog.With("error", err).Error("error reading index.html from static FS")
+		return
+	}
+
+	fileServer := http.FileServer(http.FS(s.staticFS))
+
+	s.router.NoRoute(func(c *gin.Context) {
+		reqPath := c.Request.URL.Path
+
+		if reqPath != "/admin" && !strings.HasPrefix(reqPath, "/admin/") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+
+		// Strip the /admin prefix to get the path within the static FS
+		fsPath := strings.TrimPrefix(reqPath, "/admin")
+		if fsPath == "" {
+			fsPath = "/"
+		}
+
+		// Try to stat the file to check if it exists and is not a directory.
+		// Directories must not be served directly to avoid exposing a listing
+		// of the embedded files.
+		filePath := strings.TrimPrefix(fsPath, "/")
+		if filePath == "" {
+			filePath = "."
+		}
+		if info, err := fs.Stat(s.staticFS, filePath); err == nil && !info.IsDir() {
+			c.Request.URL.Path = fsPath
+			fileServer.ServeHTTP(c.Writer, c.Request)
+			return
+		}
+
+		// If the path has a file extension it's a missing asset (JS, CSS, etc.)
+		// — return 404 instead of falling back to index.html, which would cause
+		// MIME-type errors in the browser.
+		if path.Ext(fsPath) != "" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+
+		// Route-like path — serve index.html directly for client-side routing.
+		// We serve the cached content instead of delegating to FileServer
+		// because FileServer redirects /index.html requests to /.
+		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
+	})
 }
 
 func initDB(cfg config.Config) (*pgxpool.Pool, error) {

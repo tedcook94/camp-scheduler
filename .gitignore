@@ -1,3 +1,12 @@
 bin/
 mise.local.toml
 tmp/
+
+# Frontend
+web/node_modules/
+web/.svelte-kit/
+web/build/
+
+# Embedded frontend build output (copied during build)
+cmd/server/static/*
+!cmd/server/static/.gitkeep

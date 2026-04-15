@@ -3,6 +3,7 @@ go = "1.26.0"
 "go:github.com/air-verse/air" = "latest"
 gomigrate = "latest"
 "go:github.com/sqlc-dev/sqlc/cmd/sqlc" = "latest"
+pnpm = "latest"
 
 [env]
 PORT = "9100"
@@ -24,19 +25,27 @@ DATABASE_URL_TEST = "postgres://{{env.DATABASE_USER}}:{{env.DATABASE_PASSWORD}}@
 # Override any of these values in mise.local.toml (gitignored) for personal preferences.
 
 [tasks.dev]
-description = "Start Postgres and the Go server with hot-reload"
+description = "Start Postgres, Go server, and frontend dev server"
 run = """
 #!/usr/bin/env bash
 set -e
 cleanup() {
   echo ""
   echo "Shutting down..."
+  kill $AIR_PID 2>/dev/null || true
+  kill $VITE_PID 2>/dev/null || true
+  wait $AIR_PID 2>/dev/null || true
+  wait $VITE_PID 2>/dev/null || true
   docker compose down
 }
 trap cleanup EXIT
 docker compose up -d --wait postgres
 mise run migrate:all
-air
+air &
+AIR_PID=$!
+cd web && pnpm dev &
+VITE_PID=$!
+wait
 """
 
 [tasks.server]
@@ -44,8 +53,15 @@ description = "Run the Go server with hot-reload (standalone, assumes Postgres i
 run = "air"
 
 [tasks.build]
-description = "Build the server binary"
-run = "go build -o bin/server ./cmd/server"
+description = "Build the frontend and server binary"
+run = """
+#!/usr/bin/env bash
+set -e
+cd web && pnpm build && cd ..
+rm -rf cmd/server/static
+cp -r web/build cmd/server/static
+go build -o bin/server ./cmd/server
+"""
 
 [tasks.test]
 description = "Run unit tests"
@@ -114,3 +130,18 @@ run = "go run ./cmd/seed-super-admin"
 [tasks."db:reset"]
 description = "Destroy and recreate the local databases (next 'mise run dev' reinitializes)"
 run = "docker compose down -v"
+
+[tasks.web]
+description = "Start the frontend dev server with HMR"
+dir = "web"
+run = "pnpm dev"
+
+[tasks."web:build"]
+description = "Build the frontend for production"
+dir = "web"
+run = "pnpm build"
+
+[tasks."web:check"]
+description = "Type-check the frontend"
+dir = "web"
+run = "pnpm check"

@@ -1,0 +1,3 @@
+# disallow all crawling — this is an admin panel
+User-agent: *
+Disallow: /

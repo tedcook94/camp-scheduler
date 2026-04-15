@@ -8,9 +8,8 @@
 ## Getting Started
 
 ```sh
-mise install       # Install pinned tool versions (Go, sqlc, migrate, air)
-mise run dev       # Start Postgres + Go server with hot-reload
-mise run dev       # Start everything
+mise install       # Install pinned tool versions (Go, sqlc, migrate, air, pnpm)
+mise run dev       # Start Postgres + Go server + Vite frontend with hot-reload
 ```
 
 `mise run dev` starts the full local development environment:
@@ -21,6 +20,19 @@ mise run dev       # Start everything
 2. Runs all pending migrations on both dev and test databases
 3. Starts the Go server via air — watches for file changes and rebuilds
    automatically
+4. Starts the Vite dev server for the admin panel — hot-module replacement on
+   port 5173
+
+The admin panel is accessible at `http://localhost:5173/admin` during development
+and at `http://localhost:9100/admin` in production builds. The Vite dev server
+proxies API requests to the Go server on port 9100.
+
+To run just one side independently:
+
+```sh
+mise run server    # Go server only (assumes Postgres is running)
+mise run web       # Vite frontend only (assumes Go server is running)
+```
 
 All environment variables are provided by mise (defined in `mise.toml`), so the
 server runs directly on the host. Press Ctrl+C to stop everything — Postgres is
@@ -45,9 +57,9 @@ Override any value locally with `mise.local.toml` (gitignored).
 
 | Task                | Description                                          |
 | ------------------- | ---------------------------------------------------- |
-| `mise run dev`      | Start Postgres + server with hot-reload              |
+| `mise run dev`      | Start Postgres, Go server, and Vite frontend         |
 | `mise run server`   | Run server standalone (assumes Postgres is running)  |
-| `mise run build`    | Build the server binary to `bin/server`              |
+| `mise run build`    | Build frontend + server binary to `bin/server`       |
 | `mise run test`     | Run unit tests                                       |
 | `mise run test:integration` | Run integration tests (auto-starts Postgres) |
 | `mise run sqlc`     | Regenerate Go code from SQL queries                  |
@@ -57,6 +69,9 @@ Override any value locally with `mise.local.toml` (gitignored).
 | `mise run migrate:all`  | Run migrations on both dev and test databases    |
 | `mise run migration <name>` | Create a new migration file                  |
 | `mise run db:reset` | Destroy local databases and volumes                  |
+| `mise run web`      | Start Vite dev server with HMR (port 5173)           |
+| `mise run web:build`| Build frontend static files                          |
+| `mise run web:check`| Run svelte-check type checking                       |
 
 ### Docker Compose
 

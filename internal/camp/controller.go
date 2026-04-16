@@ -70,6 +70,18 @@ func (ctrl *Controller) Update(c *gin.Context) {
 		return
 	}
 
+	// Regular admins cannot change the enabled flag — preserve the current value
+	current, err := ctrl.svc.GetByID(c.Request.Context(), campID)
+	if err != nil {
+		log.
+			With("id", campID).
+			With("error", err).
+			Error("error getting camp for update")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	req.Enabled = current.Enabled
+
 	camp, err := ctrl.svc.Update(c.Request.Context(), campID, req)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

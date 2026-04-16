@@ -135,7 +135,7 @@ viable configurations and understand trade-offs.
   - [x] Foundation: base path migration (`/admin` → `/`), route groups (`(admin)`, `(user)`), SPA handler update
   - [x] Login: unified login with role-based routing (super_admin → /admin, all other roles → /app)
   - [x] Dashboard: landing page with navigation cards to each section
-  - [ ] Camp settings: view and edit camp details
+  - [x] Camp settings: view and edit camp details
   - [ ] Certifications: list, create, edit, delete
   - [ ] Age groups: list, create, edit, delete
   - [ ] Cabins: list, create, edit, delete (with age group assignment)

@@ -350,6 +350,10 @@ func testRefreshSuccess(t *testing.T) {
 	if str(refreshResp, "refresh_token") == "" {
 		t.Fatal("expected refresh_token in refresh response")
 	}
+
+	// Verify the refreshed access token works on a protected endpoint.
+	doRawRequest(t, http.MethodGet, apiURL(ts, "/camp"),
+		nil, http.StatusOK, str(refreshResp, "access_token"))
 }
 
 func testRefreshRevokesOldToken(t *testing.T) {
@@ -2446,11 +2450,15 @@ func testPasswordChangeRevokesTokens(t *testing.T) {
 	}, superToken)
 	userID := str(created, "id")
 
-	// Login twice to simulate two devices with independent refresh tokens.
+	// Login twice to simulate two devices with independent tokens.
 	loginResp1 := doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
 		map[string]any{"username": "tokenuser", "password": "oldpassword123"},
 		http.StatusOK, "")
+	accessToken1 := str(loginResp1, "access_token")
 	refreshToken1 := str(loginResp1, "refresh_token")
+	if accessToken1 == "" {
+		t.Fatal("expected access_token in first login response")
+	}
 	if refreshToken1 == "" {
 		t.Fatal("expected refresh_token in first login response")
 	}
@@ -2458,17 +2466,32 @@ func testPasswordChangeRevokesTokens(t *testing.T) {
 	loginResp2 := doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
 		map[string]any{"username": "tokenuser", "password": "oldpassword123"},
 		http.StatusOK, "")
+	accessToken2 := str(loginResp2, "access_token")
 	refreshToken2 := str(loginResp2, "refresh_token")
+	if accessToken2 == "" {
+		t.Fatal("expected access_token in second login response")
+	}
 	if refreshToken2 == "" {
 		t.Fatal("expected refresh_token in second login response")
 	}
+
+	// Verify old access tokens work before password change.
+	doRawRequest(t, http.MethodGet, apiURL(ts, "/camp"),
+		nil, http.StatusOK, accessToken1)
 
 	// Change the admin user's password via the super-admin endpoint.
 	doRawRequest(t, http.MethodPut,
 		apiURL(ts, "/admin/users/"+userID+"/password"),
 		map[string]any{"password": "newpassword123"}, http.StatusOK, superToken)
 
-	// Both refresh tokens should now be revoked.
+	// Both access tokens should now be rejected (token version mismatch).
+	doRawRequest(t, http.MethodGet, apiURL(ts, "/camp"),
+		nil, http.StatusUnauthorized, accessToken1)
+
+	doRawRequest(t, http.MethodGet, apiURL(ts, "/camp"),
+		nil, http.StatusUnauthorized, accessToken2)
+
+	// Both refresh tokens should also be revoked.
 	doRawRequest(t, http.MethodPost, apiURL(ts, "/auth/refresh"),
 		map[string]any{"refresh_token": refreshToken1},
 		http.StatusUnauthorized, "")
@@ -2477,8 +2500,15 @@ func testPasswordChangeRevokesTokens(t *testing.T) {
 		map[string]any{"refresh_token": refreshToken2},
 		http.StatusUnauthorized, "")
 
-	// Login with the new password should succeed.
-	doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
+	// Login with the new password should succeed and produce a valid access token.
+	newLogin := doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
 		map[string]any{"username": "tokenuser", "password": "newpassword123"},
 		http.StatusOK, "")
+	newAccessToken := str(newLogin, "access_token")
+	if newAccessToken == "" {
+		t.Fatal("expected access_token in new login response")
+	}
+
+	doRawRequest(t, http.MethodGet, apiURL(ts, "/camp"),
+		nil, http.StatusOK, newAccessToken)
 }

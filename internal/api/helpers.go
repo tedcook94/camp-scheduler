@@ -79,6 +79,13 @@ func ToPgInt4(v *int32) pgtype.Int4 {
 	return pgtype.Int4{Int32: *v, Valid: true}
 }
 
+func ToPgBool(v *bool) pgtype.Bool {
+	if v == nil {
+		return pgtype.Bool{}
+	}
+	return pgtype.Bool{Bool: *v, Valid: true}
+}
+
 func FromPgInt4(v pgtype.Int4) *int32 {
 	if !v.Valid {
 		return nil

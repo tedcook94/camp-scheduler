@@ -6,7 +6,11 @@ import (
 	"net/http"
 	"strings"
 
+	"camp-scheduler/internal/api"
+	"camp-scheduler/internal/db"
+
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 )
 
 const claimsKey = "auth_claims"
@@ -110,6 +114,51 @@ func RequireSuperAdmin() gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "super-admin access required"})
 			return
 		}
+		c.Next()
+	}
+}
+
+// RequireCampEnabled rejects mutating requests (anything other than GET/HEAD)
+// when the authenticated user's camp is disabled. Read-only access is still
+// allowed so users can view their data.
+func RequireCampEnabled(queries *db.Queries) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
+			c.Next()
+			return
+		}
+
+		claims := GetClaims(c)
+		if claims == nil || claims.CampID == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "camp-scoped authentication required"})
+			return
+		}
+
+		campID, err := api.ParseUUID(claims.CampID)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid camp ID"})
+			return
+		}
+
+		camp, err := queries.GetCamp(c.Request.Context(), campID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "camp not found"})
+				return
+			}
+			Logger(c).
+				With("camp_id", claims.CampID).
+				With("error", err).
+				Error("error checking camp enabled status")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+			return
+		}
+
+		if !camp.CampEnabled {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "camp is disabled — changes are not allowed"})
+			return
+		}
+
 		c.Next()
 	}
 }

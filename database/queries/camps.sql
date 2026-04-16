@@ -15,10 +15,10 @@ RETURNING id, camp_name, camp_location, camp_enabled;
 
 -- name: UpdateCamp :one
 UPDATE camps
-SET camp_name = $2,
-    camp_location = $3,
-    camp_enabled = $4
-WHERE id = $1
+SET camp_name = @camp_name,
+    camp_location = @camp_location,
+    camp_enabled = COALESCE(sqlc.narg('camp_enabled'), camp_enabled)
+WHERE id = @id
 RETURNING id, camp_name, camp_location, camp_enabled;
 
 -- name: DeleteCamp :execrows

@@ -98,26 +98,26 @@ func (q *Queries) ListCamps(ctx context.Context) ([]Camp, error) {
 
 const updateCamp = `-- name: UpdateCamp :one
 UPDATE camps
-SET camp_name = $2,
-    camp_location = $3,
-    camp_enabled = $4
-WHERE id = $1
+SET camp_name = $1,
+    camp_location = $2,
+    camp_enabled = COALESCE($3, camp_enabled)
+WHERE id = $4
 RETURNING id, camp_name, camp_location, camp_enabled
 `
 
 type UpdateCampParams struct {
-	ID           pgtype.UUID
 	CampName     string
 	CampLocation pgtype.Text
-	CampEnabled  bool
+	CampEnabled  pgtype.Bool
+	ID           pgtype.UUID
 }
 
 func (q *Queries) UpdateCamp(ctx context.Context, arg UpdateCampParams) (Camp, error) {
 	row := q.db.QueryRow(ctx, updateCamp,
-		arg.ID,
 		arg.CampName,
 		arg.CampLocation,
 		arg.CampEnabled,
+		arg.ID,
 	)
 	var i Camp
 	err := row.Scan(

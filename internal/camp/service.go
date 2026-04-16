@@ -40,7 +40,7 @@ func (svc *Service) Update(ctx context.Context, id string, req UpdateCampRequest
 		ID:           uid,
 		CampName:     req.Name,
 		CampLocation: api.ToPgText(req.Location),
-		CampEnabled:  req.Enabled,
+		CampEnabled:  api.ToPgBool(req.Enabled),
 	})
 	if err != nil {
 		return CampResponse{}, fmt.Errorf("error updating camp %s: %w", id, err)

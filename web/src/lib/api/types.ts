@@ -30,7 +30,7 @@ export interface CreateCampRequest {
 export interface UpdateCampRequest {
 	name: string;
 	location?: string | null;
-	enabled: boolean;
+	enabled?: boolean;
 }
 
 export interface CreateUserRequest {

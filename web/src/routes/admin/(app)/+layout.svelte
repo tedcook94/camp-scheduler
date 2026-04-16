@@ -17,13 +17,11 @@
 	let { children } = $props();
 
 	if (browser && !auth.isAuthenticated) {
-		auth.clear();
-		goto("/login");
+		goto("/login", { replaceState: true });
 	}
 
 	if (browser && auth.isAuthenticated && auth.role !== "super_admin") {
-		auth.clear();
-		goto("/login");
+		goto("/app/dashboard", { replaceState: true });
 	}
 
 	function handleLogout() {

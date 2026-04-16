@@ -10,10 +10,11 @@ const (
 )
 
 type Claims struct {
-	UserID   string
-	CampID   string
-	Username string
-	Role     Role
+	UserID       string
+	CampID       string
+	Username     string
+	Role         Role
+	TokenVersion int32
 }
 
 // Authenticator abstracts authentication so the implementation (local JWT,
@@ -21,5 +22,5 @@ type Claims struct {
 type Authenticator interface {
 	Login(ctx context.Context, username, password string) (accessToken, refreshToken string, err error)
 	Refresh(ctx context.Context, refreshToken string) (accessToken, newRefreshToken string, err error)
-	ValidateToken(tokenString string) (*Claims, error)
+	ValidateToken(ctx context.Context, tokenString string) (*Claims, error)
 }

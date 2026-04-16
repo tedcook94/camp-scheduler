@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -23,9 +25,14 @@ func Middleware(auth Authenticator) gin.HandlerFunc {
 			return
 		}
 
-		claims, err := auth.ValidateToken(token)
+		claims, err := auth.ValidateToken(c.Request.Context(), token)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+			if errors.Is(err, ErrInvalidToken) {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+				return
+			}
+			slog.With("error", err).Error("error validating token")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}
 

@@ -67,12 +67,12 @@ func (a *JWTAuthenticator) Login(ctx context.Context, username, password string)
 	userID := api.UUIDToString(user.ID)
 	campID := api.UUIDToString(user.CampID)
 
-	accessToken, err := a.generateAccessToken(userID, campID, user.Username, Role(user.Role), user.TokenVersion)
+	accessToken, err := a.generateAccessToken(userID, campID, user.Username, Role(user.Role), user.TokenVersion, "")
 	if err != nil {
 		return "", "", fmt.Errorf("error generating access token: %w", err)
 	}
 
-	refreshToken, err := a.createRefreshToken(ctx, user.ID, user.TokenVersion)
+	refreshToken, err := a.createRefreshToken(ctx, user.ID, user.TokenVersion, pgtype.UUID{})
 	if err != nil {
 		return "", "", fmt.Errorf("error creating refresh token: %w", err)
 	}
@@ -126,12 +126,14 @@ func (a *JWTAuthenticator) Refresh(ctx context.Context, refreshToken string) (st
 	userID := api.UUIDToString(user.ID)
 	campID := api.UUIDToString(user.CampID)
 
-	newAccess, err := a.generateAccessToken(userID, campID, user.Username, Role(user.Role), user.TokenVersion)
+	impersonatedBy := api.UUIDToString(stored.ImpersonatedBy)
+
+	newAccess, err := a.generateAccessToken(userID, campID, user.Username, Role(user.Role), user.TokenVersion, impersonatedBy)
 	if err != nil {
 		return "", "", fmt.Errorf("error generating access token: %w", err)
 	}
 
-	newRefresh, err := a.createRefreshTokenTx(ctx, txQueries, user.ID, user.TokenVersion)
+	newRefresh, err := a.createRefreshTokenTx(ctx, txQueries, user.ID, user.TokenVersion, stored.ImpersonatedBy)
 	if err != nil {
 		return "", "", fmt.Errorf("error creating refresh token: %w", err)
 	}
@@ -141,6 +143,48 @@ func (a *JWTAuthenticator) Refresh(ctx context.Context, refreshToken string) (st
 	}
 
 	return newAccess, newRefresh, nil
+}
+
+var ErrCannotImpersonate = errors.New("cannot impersonate a super-admin user")
+var ErrUserNotFound = errors.New("user not found")
+
+func (a *JWTAuthenticator) ImpersonateUser(ctx context.Context, targetUserID string, impersonatorUserID string) (string, string, error) {
+	uid, err := api.ParseUUID(targetUserID)
+	if err != nil {
+		return "", "", fmt.Errorf("error parsing target user id: %w", err)
+	}
+
+	user, err := a.queries.GetUserByID(ctx, uid)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", "", ErrUserNotFound
+		}
+		return "", "", fmt.Errorf("error looking up target user: %w", err)
+	}
+
+	if Role(user.Role) == RoleSuperAdmin {
+		return "", "", ErrCannotImpersonate
+	}
+
+	userID := api.UUIDToString(user.ID)
+	campID := api.UUIDToString(user.CampID)
+
+	accessToken, err := a.generateAccessToken(userID, campID, user.Username, Role(user.Role), user.TokenVersion, impersonatorUserID)
+	if err != nil {
+		return "", "", fmt.Errorf("error generating access token: %w", err)
+	}
+
+	impersonatorUUID, err := api.ParseUUID(impersonatorUserID)
+	if err != nil {
+		return "", "", fmt.Errorf("error parsing impersonator user id: %w", err)
+	}
+
+	refreshToken, err := a.createRefreshToken(ctx, user.ID, user.TokenVersion, impersonatorUUID)
+	if err != nil {
+		return "", "", fmt.Errorf("error creating refresh token: %w", err)
+	}
+
+	return accessToken, refreshToken, nil
 }
 
 func (a *JWTAuthenticator) ValidateToken(ctx context.Context, tokenString string) (*Claims, error) {
@@ -190,16 +234,19 @@ func (a *JWTAuthenticator) ValidateToken(ctx context.Context, tokenString string
 		return nil, ErrInvalidToken
 	}
 
+	impersonatedBy, _ := claims["impersonated_by"].(string)
+
 	return &Claims{
-		UserID:       userID,
-		CampID:       campID,
-		Username:     username,
-		Role:         Role(role),
-		TokenVersion: currentVersion,
+		UserID:         userID,
+		CampID:         campID,
+		Username:       username,
+		Role:           Role(role),
+		TokenVersion:   currentVersion,
+		ImpersonatedBy: impersonatedBy,
 	}, nil
 }
 
-func (a *JWTAuthenticator) generateAccessToken(userID, campID, username string, role Role, tokenVersion int32) (string, error) {
+func (a *JWTAuthenticator) generateAccessToken(userID, campID, username string, role Role, tokenVersion int32, impersonatedBy string) (string, error) {
 	now := time.Now()
 	claims := jwt.MapClaims{
 		"sub":           userID,
@@ -212,15 +259,19 @@ func (a *JWTAuthenticator) generateAccessToken(userID, campID, username string, 
 		"exp":           now.Add(a.accessTokenTTL).Unix(),
 	}
 
+	if impersonatedBy != "" {
+		claims["impersonated_by"] = impersonatedBy
+	}
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(a.signingKey)
 }
 
-func (a *JWTAuthenticator) createRefreshToken(ctx context.Context, userID pgtype.UUID, tokenVersion int32) (string, error) {
-	return a.createRefreshTokenTx(ctx, a.queries, userID, tokenVersion)
+func (a *JWTAuthenticator) createRefreshToken(ctx context.Context, userID pgtype.UUID, tokenVersion int32, impersonatedBy pgtype.UUID) (string, error) {
+	return a.createRefreshTokenTx(ctx, a.queries, userID, tokenVersion, impersonatedBy)
 }
 
-func (a *JWTAuthenticator) createRefreshTokenTx(ctx context.Context, q *db.Queries, userID pgtype.UUID, tokenVersion int32) (string, error) {
+func (a *JWTAuthenticator) createRefreshTokenTx(ctx context.Context, q *db.Queries, userID pgtype.UUID, tokenVersion int32, impersonatedBy pgtype.UUID) (string, error) {
 	raw, err := generateOpaqueToken()
 	if err != nil {
 		return "", fmt.Errorf("error generating opaque token: %w", err)
@@ -235,7 +286,8 @@ func (a *JWTAuthenticator) createRefreshTokenTx(ctx context.Context, q *db.Queri
 			Time:  time.Now().Add(a.refreshTokenTTL),
 			Valid: true,
 		},
-		TokenVersion: tokenVersion,
+		TokenVersion:   tokenVersion,
+		ImpersonatedBy: impersonatedBy,
 	})
 	if err != nil {
 		return "", fmt.Errorf("error storing refresh token: %w", err)

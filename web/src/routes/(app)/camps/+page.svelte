@@ -178,10 +178,10 @@
 						</Table.TableCell>
 						<Table.TableCell>
 							<div class="flex items-center justify-end gap-1">
-								<Button variant="ghost" size="icon-sm" onclick={() => openEdit(camp)} aria-label="Edit {camp.name}">
-									<PencilIcon class="size-4" />
-								</Button>
-								<Button variant="ghost" size="icon-sm" onclick={() => openDelete(camp)} aria-label="Delete {camp.name}">
+							<Button variant="ghost" size="icon-sm" onclick={() => openEdit(camp)} title="Edit" aria-label="Edit {camp.name}">
+								<PencilIcon class="size-4" />
+							</Button>
+							<Button variant="ghost" size="icon-sm" onclick={() => openDelete(camp)} title="Delete" aria-label="Delete {camp.name}">
 									<TrashIcon class="size-4" />
 								</Button>
 							</div>

@@ -1,13 +1,17 @@
 <script lang="ts">
 	import { onMount } from "svelte";
+	import { goto } from "$app/navigation";
+	import { base } from "$app/paths";
 	import { campApi, userApi } from "$lib/api";
 	import { ApiClientError } from "$lib/api/client";
+	import { auth } from "$lib/stores/auth.svelte";
 	import type { Camp, User, CreateUserRequest, UpdateUserRequest } from "$lib/api/types";
 	import { capitalizeFirst } from "$lib/utils";
 	import { toast } from "svelte-sonner";
 	import { Button } from "$lib/components/ui/button";
 	import { Input } from "$lib/components/ui/input";
 	import { Label } from "$lib/components/ui/label";
+	import PasswordInput from "$lib/components/password-input.svelte";
 	import { Badge } from "$lib/components/ui/badge";
 	import * as Table from "$lib/components/ui/table";
 	import * as Dialog from "$lib/components/ui/dialog";
@@ -17,6 +21,7 @@
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import TrashIcon from "@lucide/svelte/icons/trash";
 	import KeyIcon from "@lucide/svelte/icons/key-round";
+	import UserCheckIcon from "@lucide/svelte/icons/user-check";
 
 	let users = $state<User[]>([]);
 	let camps = $state<Camp[]>([]);
@@ -201,6 +206,17 @@
 		}
 	}
 
+	async function handleImpersonate(user: User) {
+		try {
+			const tokens = await userApi.impersonate(user.id);
+			auth.startImpersonation(tokens);
+			goto(`${base}/camp`);
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to impersonate user";
+			toast.error(capitalizeFirst(message));
+		}
+	}
+
 	onMount(() => {
 		loadData();
 	});
@@ -258,13 +274,18 @@
 						</Table.TableCell>
 						<Table.TableCell>
 							<div class="flex items-center justify-end gap-1">
-								<Button variant="ghost" size="icon-sm" onclick={() => openPassword(user)} aria-label="Change password for {user.username}">
+								{#if user.role !== "super_admin"}
+									<Button variant="ghost" size="icon-sm" onclick={() => handleImpersonate(user)} title="Impersonate" aria-label="Impersonate {user.username}">
+										<UserCheckIcon class="size-4" />
+									</Button>
+								{/if}
+								<Button variant="ghost" size="icon-sm" onclick={() => openPassword(user)} title="Change password" aria-label="Change password for {user.username}">
 									<KeyIcon class="size-4" />
 								</Button>
-								<Button variant="ghost" size="icon-sm" onclick={() => openEdit(user)} aria-label="Edit {user.username}">
+								<Button variant="ghost" size="icon-sm" onclick={() => openEdit(user)} title="Edit" aria-label="Edit {user.username}">
 									<PencilIcon class="size-4" />
 								</Button>
-								<Button variant="ghost" size="icon-sm" onclick={() => openDelete(user)} aria-label="Delete {user.username}">
+								<Button variant="ghost" size="icon-sm" onclick={() => openDelete(user)} title="Delete" aria-label="Delete {user.username}">
 									<TrashIcon class="size-4" />
 								</Button>
 							</div>
@@ -338,20 +359,19 @@
 					disabled={saving}
 				/>
 			</div>
-			{#if dialogMode === "create"}
-				<div class="grid gap-2">
-					<Label for="user-password">Password</Label>
-					<Input
-						id="user-password"
-						type="password"
-						bind:value={formPassword}
-						placeholder="Minimum 8 characters"
-						required
-						minlength={8}
-						disabled={saving}
-					/>
-				</div>
-			{/if}
+		{#if dialogMode === "create"}
+			<div class="grid gap-2">
+				<Label for="user-password">Password</Label>
+				<PasswordInput
+					id="user-password"
+					bind:value={formPassword}
+					placeholder="Minimum 8 characters"
+					required
+					minlength={8}
+					disabled={saving}
+				/>
+			</div>
+		{/if}
 			<div class="grid gap-2">
 				<Label for="user-role">Role</Label>
 				<Select.Select type="single" bind:value={formRole}>
@@ -406,18 +426,17 @@
 					{passwordError}
 				</div>
 			{/if}
-			<div class="grid gap-2">
-				<Label for="new-password">New Password</Label>
-				<Input
-					id="new-password"
-					type="password"
-					bind:value={passwordValue}
-					placeholder="Minimum 8 characters"
-					required
-					minlength={8}
-					disabled={passwordSaving}
-				/>
-			</div>
+		<div class="grid gap-2">
+			<Label for="new-password">New Password</Label>
+			<PasswordInput
+				id="new-password"
+				bind:value={passwordValue}
+				placeholder="Minimum 8 characters"
+				required
+				minlength={8}
+				disabled={passwordSaving}
+			/>
+		</div>
 			<Dialog.DialogFooter>
 				<Button type="button" variant="outline" onclick={() => (passwordDialogOpen = false)} disabled={passwordSaving}>
 					Cancel

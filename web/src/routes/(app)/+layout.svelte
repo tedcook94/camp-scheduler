@@ -17,79 +17,108 @@
 
 	let { children } = $props();
 
-	if (browser && (!auth.isAuthenticated || auth.role !== "super_admin")) {
+	if (browser && !auth.isAuthenticated) {
+		auth.clear();
+		goto(base || "/");
+	}
+
+	// Super-admins who are not impersonating must have super_admin role
+	if (browser && auth.isAuthenticated && !auth.isImpersonating && auth.role !== "super_admin") {
 		auth.clear();
 		goto(base || "/");
 	}
 
 	function handleLogout() {
+		if (auth.isImpersonating) {
+			auth.stopImpersonation();
+			goto(`${base}/users`);
+			return;
+		}
 		auth.clear();
 		goto(base || "/");
 	}
 
-	const navItems = [
+	function handleStopImpersonation() {
+		auth.stopImpersonation();
+		goto(`${base}/users`);
+	}
+
+	const adminNavItems = [
 		{ href: `${base}/camps`, label: "Camps", icon: TentTreeIcon },
 		{ href: `${base}/users`, label: "Users", icon: UsersIcon },
 	];
+
+	const impersonatingNavItems = [
+		{ href: `${base}/camp`, label: "Camp", icon: TentTreeIcon },
+	];
 </script>
 
-{#if auth.isAuthenticated && auth.role === "super_admin"}
-	<div class="flex min-h-svh">
-		<!-- Sidebar -->
-		<aside class="bg-sidebar text-sidebar-foreground border-sidebar-border flex w-56 flex-col border-r">
-			<div class="flex h-12 items-center gap-2 px-4">
-				<TentTreeIcon class="text-sidebar-primary size-5" />
-				<span class="text-sm font-semibold">Camp Scheduler</span>
+{#if auth.isAuthenticated}
+	{@const navItems = auth.isImpersonating ? impersonatingNavItems : adminNavItems}
+	<div class="flex min-h-svh flex-col">
+		{#if auth.isImpersonating}
+			<div class="flex items-center justify-between bg-amber-300 px-4 py-2 text-sm text-black">
+				<span>You are impersonating <strong>{auth.username}</strong></span>
+				<Button size="sm" class="border-black/20 bg-black/10 text-black hover:bg-black/20" onclick={handleStopImpersonation}>Exit</Button>
 			</div>
-			<Separator />
-			<nav class="flex-1 p-2">
-				<ul class="grid gap-0.5">
-					{#each navItems as item}
-						{@const active = $page.url.pathname.startsWith(item.href)}
-						<li>
-							<a
-								href={item.href}
-								class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors {active
-									? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-									: 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'}"
-							>
-								<item.icon class="size-4" />
-								{item.label}
-							</a>
-						</li>
-					{/each}
-				</ul>
-			</nav>
-			<Separator />
-			<div class="flex items-center justify-between p-2">
-				<DropdownMenu.DropdownMenu>
-					<DropdownMenu.Trigger>
-						{#snippet children()}
-							<Button variant="ghost" size="sm" class="gap-2 px-2">
-								<CircleUserIcon class="size-4" />
-								<span class="truncate text-xs">{auth.username}</span>
-							</Button>
-						{/snippet}
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="start" class="w-40">
-						<DropdownMenu.Item onclick={handleLogout}>
-							<LogOutIcon class="mr-2 size-4" />
-							Sign out
-						</DropdownMenu.Item>
-					</DropdownMenu.Content>
-				</DropdownMenu.DropdownMenu>
-				<Button variant="ghost" size="icon-sm" onclick={toggleMode} aria-label="Toggle dark mode">
-					<SunIcon class="size-4 scale-100 rotate-0 transition-transform dark:scale-0 dark:-rotate-90" />
-					<MoonIcon class="absolute size-4 scale-0 rotate-90 transition-transform dark:scale-100 dark:rotate-0" />
-				</Button>
-			</div>
-		</aside>
+		{/if}
+		<div class="flex flex-1">
+			<!-- Sidebar -->
+			<aside class="bg-sidebar text-sidebar-foreground border-sidebar-border flex w-56 flex-col border-r">
+				<div class="flex h-12 items-center gap-2 px-4">
+					<TentTreeIcon class="text-sidebar-primary size-5" />
+					<span class="text-sm font-semibold">Camp Scheduler</span>
+				</div>
+				<Separator />
+				<nav class="flex-1 p-2">
+					<ul class="grid gap-0.5">
+						{#each navItems as item}
+							{@const active = $page.url.pathname.startsWith(item.href)}
+							<li>
+								<a
+									href={item.href}
+									class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors {active
+										? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+										: 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'}"
+								>
+									<item.icon class="size-4" />
+									{item.label}
+								</a>
+							</li>
+						{/each}
+					</ul>
+				</nav>
+				<Separator />
+				<div class="flex items-center justify-between p-2">
+					<DropdownMenu.DropdownMenu>
+						<DropdownMenu.Trigger>
+							{#snippet children()}
+								<Button variant="ghost" size="sm" class="gap-2 px-2">
+									<CircleUserIcon class="size-4" />
+									<span class="truncate text-xs">{auth.username}</span>
+								</Button>
+							{/snippet}
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content align="start" class="w-40">
+							<DropdownMenu.Item onclick={handleLogout}>
+								<LogOutIcon class="mr-2 size-4" />
+								Sign out
+							</DropdownMenu.Item>
+						</DropdownMenu.Content>
+					</DropdownMenu.DropdownMenu>
+					<Button variant="ghost" size="icon-sm" onclick={toggleMode} aria-label="Toggle dark mode">
+						<SunIcon class="size-4 scale-100 rotate-0 transition-transform dark:scale-0 dark:-rotate-90" />
+						<MoonIcon class="absolute size-4 scale-0 rotate-90 transition-transform dark:scale-100 dark:rotate-0" />
+					</Button>
+				</div>
+			</aside>
 
-		<!-- Main content -->
-		<main class="flex-1 overflow-auto">
-			<div class="mx-auto max-w-5xl p-6">
-				{@render children()}
-			</div>
-		</main>
+			<!-- Main content -->
+			<main class="flex-1 overflow-auto">
+				<div class="mx-auto max-w-5xl p-6">
+					{@render children()}
+				</div>
+			</main>
+		</div>
 	</div>
 {/if}

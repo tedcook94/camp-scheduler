@@ -15,6 +15,14 @@ export { ApiClientError };
 
 let refreshPromise: Promise<boolean> | null = null;
 
+function handleAuthFailure() {
+	if (auth.isImpersonating) {
+		auth.stopImpersonation();
+	} else {
+		auth.clear();
+	}
+}
+
 async function refreshTokens(): Promise<boolean> {
 	if (!auth.refreshToken) return false;
 
@@ -26,7 +34,7 @@ async function refreshTokens(): Promise<boolean> {
 		});
 
 		if (!res.ok) {
-			auth.clear();
+			handleAuthFailure();
 			return false;
 		}
 
@@ -34,7 +42,7 @@ async function refreshTokens(): Promise<boolean> {
 		auth.setTokens(tokens);
 		return true;
 	} catch {
-		auth.clear();
+		handleAuthFailure();
 		return false;
 	}
 }
@@ -82,7 +90,6 @@ async function request<T>(
 			const retryRes = await fetch(path, { ...options, headers });
 			return handleResponse<T>(retryRes);
 		}
-		auth.clear();
 	}
 
 	return handleResponse<T>(res);

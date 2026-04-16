@@ -52,4 +52,11 @@ export const userApi = {
 		api.put<void>(`/api/v1/admin/users/${id}/password`, data),
 
 	delete: (id: string) => api.delete<void>(`/api/v1/admin/users/${id}`),
+
+	impersonate: (id: string) =>
+		api.post<TokenResponse>(`/api/v1/admin/users/${id}/impersonate`),
+};
+
+export const myCampApi = {
+	get: () => api.get<Camp>("/api/v1/camp"),
 };

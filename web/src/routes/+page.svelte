@@ -8,6 +8,7 @@
 	import { Button } from "$lib/components/ui/button";
 	import { Input } from "$lib/components/ui/input";
 	import { Label } from "$lib/components/ui/label";
+	import PasswordInput from "$lib/components/password-input.svelte";
 	import * as Card from "$lib/components/ui/card";
 
 	let username = $state("");
@@ -73,9 +74,8 @@
 				</div>
 				<div class="grid gap-2">
 					<Label for="password">Password</Label>
-					<Input
+					<PasswordInput
 						id="password"
-						type="password"
 						placeholder="Enter your password"
 						bind:value={password}
 						required

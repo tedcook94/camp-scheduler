@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
-	import { base } from "$app/paths";
 	import { campApi, userApi } from "$lib/api";
 	import { ApiClientError } from "$lib/api/client";
 	import { auth } from "$lib/stores/auth.svelte";
@@ -210,7 +209,7 @@
 		try {
 			const tokens = await userApi.impersonate(user.id);
 			auth.startImpersonation(tokens);
-			goto(`${base}/camp`);
+			goto("/app/dashboard");
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to impersonate user";
 			toast.error(capitalizeFirst(message));

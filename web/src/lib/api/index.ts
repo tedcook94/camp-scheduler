@@ -21,16 +21,18 @@ export const authApi = {
 };
 
 export const campApi = {
+	// Camp-scoped (requires camp_id in JWT)
+	get: () => api.get<Camp>("/api/v1/camp"),
+	update: (data: UpdateCampRequest) =>
+		api.put<Camp>("/api/v1/camp", data),
+
+	// Super-admin only
 	list: () => api.get<Camp[]>("/api/v1/admin/camps"),
-
-	get: (id: string) => api.get<Camp>(`/api/v1/admin/camps/${id}`),
-
+	getById: (id: string) => api.get<Camp>(`/api/v1/admin/camps/${id}`),
 	create: (data: CreateCampRequest) =>
 		api.post<Camp>("/api/v1/admin/camps", data),
-
-	update: (id: string, data: UpdateCampRequest) =>
+	updateById: (id: string, data: UpdateCampRequest) =>
 		api.put<Camp>(`/api/v1/admin/camps/${id}`, data),
-
 	delete: (id: string) => api.delete<void>(`/api/v1/admin/camps/${id}`),
 };
 
@@ -55,8 +57,4 @@ export const userApi = {
 
 	impersonate: (id: string) =>
 		api.post<TokenResponse>(`/api/v1/admin/users/${id}/impersonate`),
-};
-
-export const myCampApi = {
-	get: () => api.get<Camp>("/api/v1/camp"),
 };

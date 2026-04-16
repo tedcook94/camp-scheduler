@@ -91,7 +91,7 @@
 					location,
 					enabled: formEnabled,
 				};
-				await campApi.update(editingCamp.id, req);
+				await campApi.updateById(editingCamp.id, req);
 				toast.success("Camp updated.");
 			}
 

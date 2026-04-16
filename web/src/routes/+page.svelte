@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { browser } from "$app/environment";
-	import { base } from "$app/paths";
 	import { auth } from "$lib/stores/auth.svelte";
 	import { authApi } from "$lib/api";
 	import { ApiClientError } from "$lib/api/client";
@@ -16,8 +15,16 @@
 	let error = $state("");
 	let loading = $state(false);
 
+	function redirectForRole(role: string | null) {
+		if (role === "super_admin") {
+			goto("/admin/camps");
+		} else {
+			goto("/app/dashboard");
+		}
+	}
+
 	if (browser && auth.isAuthenticated) {
-		goto(`${base}/camps`);
+		redirectForRole(auth.role);
 	}
 
 	async function handleLogin(e: SubmitEvent) {
@@ -28,14 +35,7 @@
 		try {
 			const tokens = await authApi.login(username, password);
 			auth.setTokens(tokens);
-
-			if (auth.role !== "super_admin") {
-				auth.clear();
-				error = "This panel is for super-admin users only.";
-				return;
-			}
-
-			goto(`${base}/camps`);
+			redirectForRole(auth.role);
 		} catch (err) {
 			if (err instanceof ApiClientError) {
 				error = err.message;
@@ -52,7 +52,7 @@
 	<Card.Card class="w-full max-w-sm">
 		<Card.CardHeader>
 			<Card.CardTitle class="text-xl">Camp Scheduler</Card.CardTitle>
-			<Card.CardDescription>Super-Admin Panel</Card.CardDescription>
+			<Card.CardDescription>Sign in to your account</Card.CardDescription>
 		</Card.CardHeader>
 		<Card.CardContent>
 			<form onsubmit={handleLogin} class="grid gap-4">

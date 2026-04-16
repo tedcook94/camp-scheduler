@@ -2,7 +2,6 @@
 	import { goto } from "$app/navigation";
 	import { browser } from "$app/environment";
 	import { page } from "$app/stores";
-	import { base } from "$app/paths";
 	import { auth } from "$lib/stores/auth.svelte";
 	import { Button } from "$lib/components/ui/button";
 	import { Separator } from "$lib/components/ui/separator";
@@ -19,49 +18,28 @@
 
 	if (browser && !auth.isAuthenticated) {
 		auth.clear();
-		goto(base || "/");
+		goto("/");
 	}
 
-	// Super-admins who are not impersonating must have super_admin role
-	if (browser && auth.isAuthenticated && !auth.isImpersonating && auth.role !== "super_admin") {
+	if (browser && auth.isAuthenticated && auth.role !== "super_admin") {
 		auth.clear();
-		goto(base || "/");
+		goto("/");
 	}
 
 	function handleLogout() {
-		if (auth.isImpersonating) {
-			auth.stopImpersonation();
-			goto(`${base}/users`);
-			return;
-		}
 		auth.clear();
-		goto(base || "/");
-	}
-
-	function handleStopImpersonation() {
-		auth.stopImpersonation();
-		goto(`${base}/users`);
+		goto("/");
 	}
 
 	const adminNavItems = [
-		{ href: `${base}/camps`, label: "Camps", icon: TentTreeIcon },
-		{ href: `${base}/users`, label: "Users", icon: UsersIcon },
-	];
-
-	const impersonatingNavItems = [
-		{ href: `${base}/camp`, label: "Camp", icon: TentTreeIcon },
+		{ href: "/admin/camps", label: "Camps", icon: TentTreeIcon },
+		{ href: "/admin/users", label: "Users", icon: UsersIcon },
 	];
 </script>
 
 {#if auth.isAuthenticated}
-	{@const navItems = auth.isImpersonating ? impersonatingNavItems : adminNavItems}
-	<div class="flex min-h-svh flex-col">
-		{#if auth.isImpersonating}
-			<div class="flex items-center justify-between bg-amber-300 px-4 py-2 text-sm text-black">
-				<span>You are impersonating <strong>{auth.username}</strong></span>
-				<Button size="sm" class="border-black/20 bg-black/10 text-black hover:bg-black/20" onclick={handleStopImpersonation}>Exit</Button>
-			</div>
-		{/if}
+	{@const navItems = adminNavItems}
+	<div class="flex min-h-svh">
 		<div class="flex flex-1">
 			<!-- Sidebar -->
 			<aside class="bg-sidebar text-sidebar-foreground border-sidebar-border flex w-56 flex-col border-r">

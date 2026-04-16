@@ -2,7 +2,6 @@ package activity
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"camp-scheduler/internal/api"
@@ -61,6 +60,7 @@ type ActivityCertificationResponse struct {
 }
 
 func (ctrl *Controller) List(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 
 	activities, err := ctrl.svc.List(c.Request.Context(), campID)
@@ -69,8 +69,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("error", err).
 			Error("error listing activities")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
@@ -81,6 +80,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 }
 
 func (ctrl *Controller) Get(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	id := c.Param("activityId")
 
@@ -94,8 +94,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error getting activity")
@@ -107,6 +106,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 }
 
 func (ctrl *Controller) Create(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 
 	var req CreateActivityRequest
@@ -121,8 +121,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("error", err).
 			Error("error creating activity")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
@@ -133,6 +132,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 }
 
 func (ctrl *Controller) Update(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	id := c.Param("activityId")
 
@@ -152,8 +152,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error updating activity")
@@ -165,6 +164,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 }
 
 func (ctrl *Controller) Delete(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	id := c.Param("activityId")
 
@@ -182,8 +182,7 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "activity has dependent records and cannot be deleted"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error deleting activity")
@@ -195,6 +194,7 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 }
 
 func (ctrl *Controller) ListCertifications(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	activityID := c.Param("activityId")
 
@@ -204,8 +204,7 @@ func (ctrl *Controller) ListCertifications(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("activity_id", activityID).
 			With("error", err).
 			Error("error listing activity certifications")
@@ -217,6 +216,7 @@ func (ctrl *Controller) ListCertifications(c *gin.Context) {
 }
 
 func (ctrl *Controller) AddCertification(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	activityID := c.Param("activityId")
 
@@ -240,8 +240,7 @@ func (ctrl *Controller) AddCertification(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "certification already assigned to activity"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("activity_id", activityID).
 			With("error", err).
 			Error("error adding certification to activity")
@@ -253,6 +252,7 @@ func (ctrl *Controller) AddCertification(c *gin.Context) {
 }
 
 func (ctrl *Controller) RemoveCertification(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	activityID := c.Param("activityId")
 	id := c.Param("certId")
@@ -267,8 +267,7 @@ func (ctrl *Controller) RemoveCertification(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error removing certification from activity")

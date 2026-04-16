@@ -2,7 +2,6 @@ package camp
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"camp-scheduler/internal/auth"
@@ -41,6 +40,7 @@ type CampResponse struct {
 }
 
 func (ctrl *Controller) Get(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 
 	camp, err := ctrl.svc.GetByID(c.Request.Context(), campID)
@@ -49,7 +49,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "camp not found"})
 			return
 		}
-		slog.
+		log.
 			With("id", campID).
 			With("error", err).
 			Error("error getting camp")
@@ -61,6 +61,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 }
 
 func (ctrl *Controller) Update(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 
 	var req UpdateCampRequest
@@ -75,7 +76,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "camp not found"})
 			return
 		}
-		slog.
+		log.
 			With("id", campID).
 			With("error", err).
 			Error("error updating camp")

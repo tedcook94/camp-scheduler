@@ -10,6 +10,7 @@ import (
 )
 
 const claimsKey = "auth_claims"
+const loggerKey = "auth_logger"
 
 func Middleware(auth Authenticator) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -37,8 +38,34 @@ func Middleware(auth Authenticator) gin.HandlerFunc {
 		}
 
 		c.Set(claimsKey, claims)
+
+		log := slog.With("user_id", claims.UserID)
+		if claims.CampID != "" {
+			log = log.With("camp_id", claims.CampID)
+		}
+		if claims.ImpersonatedBy != "" {
+			log = log.With("impersonated_by", claims.ImpersonatedBy)
+		}
+		c.Set(loggerKey, log)
+
 		c.Next()
 	}
+}
+
+// Logger returns the request-scoped logger that the auth middleware
+// pre-configured with user context fields (user_id, camp_id, and
+// impersonated_by when present). Falls back to slog.Default() for
+// unauthenticated routes.
+func Logger(c *gin.Context) *slog.Logger {
+	v, exists := c.Get(loggerKey)
+	if !exists {
+		return slog.Default()
+	}
+	log, _ := v.(*slog.Logger)
+	if log == nil {
+		return slog.Default()
+	}
+	return log
 }
 
 func GetClaims(c *gin.Context) *Claims {

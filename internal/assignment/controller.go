@@ -106,6 +106,7 @@ type ExplanationResponse struct {
 }
 
 func (ctrl *Controller) TriggerRun(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 
@@ -130,7 +131,7 @@ func (ctrl *Controller) TriggerRun(c *gin.Context) {
 
 		run, err := ctrl.svc.TriggerRun(c.Request.Context(), campID, sessionID, cfg)
 		if err != nil {
-			ctrl.handleTriggerError(c, campID, sessionID, err)
+			ctrl.handleTriggerError(c, log, sessionID, err)
 			return
 		}
 
@@ -145,7 +146,7 @@ func (ctrl *Controller) TriggerRun(c *gin.Context) {
 
 		run, err := ctrl.svc.TriggerCamperRun(c.Request.Context(), campID, sessionID, cfg)
 		if err != nil {
-			ctrl.handleTriggerError(c, campID, sessionID, err)
+			ctrl.handleTriggerError(c, log, sessionID, err)
 			return
 		}
 
@@ -160,7 +161,7 @@ func (ctrl *Controller) TriggerRun(c *gin.Context) {
 
 		run, err := ctrl.svc.TriggerActivityRun(c.Request.Context(), campID, sessionID, cfg)
 		if err != nil {
-			ctrl.handleTriggerError(c, campID, sessionID, err)
+			ctrl.handleTriggerError(c, log, sessionID, err)
 			return
 		}
 
@@ -171,7 +172,7 @@ func (ctrl *Controller) TriggerRun(c *gin.Context) {
 	}
 }
 
-func (ctrl *Controller) handleTriggerError(c *gin.Context, campID, sessionID string, err error) {
+func (ctrl *Controller) handleTriggerError(c *gin.Context, log *slog.Logger, sessionID string, err error) {
 	if errors.Is(err, ErrNoSolutions) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "solver produced no valid solutions"})
 		return
@@ -184,8 +185,7 @@ func (ctrl *Controller) handleTriggerError(c *gin.Context, campID, sessionID str
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	slog.
-		With("camp_id", campID).
+	log.
 		With("session_id", sessionID).
 		With("error", err).
 		Error("error triggering assignment run")
@@ -193,6 +193,7 @@ func (ctrl *Controller) handleTriggerError(c *gin.Context, campID, sessionID str
 }
 
 func (ctrl *Controller) ListRuns(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 
@@ -202,8 +203,7 @@ func (ctrl *Controller) ListRuns(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("error", err).
 			Error("error listing assignment runs")
@@ -215,6 +215,7 @@ func (ctrl *Controller) ListRuns(c *gin.Context) {
 }
 
 func (ctrl *Controller) GetRun(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	runID := c.Param("runId")
 
@@ -228,8 +229,7 @@ func (ctrl *Controller) GetRun(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("run_id", runID).
 			With("error", err).
 			Error("error getting assignment run")
@@ -241,6 +241,7 @@ func (ctrl *Controller) GetRun(c *gin.Context) {
 }
 
 func (ctrl *Controller) DeleteRun(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	runID := c.Param("runId")
 
@@ -254,8 +255,7 @@ func (ctrl *Controller) DeleteRun(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("run_id", runID).
 			With("error", err).
 			Error("error deleting assignment run")
@@ -267,6 +267,7 @@ func (ctrl *Controller) DeleteRun(c *gin.Context) {
 }
 
 func (ctrl *Controller) GetSolution(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	runID := c.Param("runId")
 	solutionID := c.Param("solutionId")
@@ -285,8 +286,7 @@ func (ctrl *Controller) GetSolution(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("solution_id", solutionID).
 			With("error", err).
 			Error("error getting solution")
@@ -298,6 +298,7 @@ func (ctrl *Controller) GetSolution(c *gin.Context) {
 }
 
 func (ctrl *Controller) SelectSolution(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	runID := c.Param("runId")
 	solutionID := c.Param("solutionId")
@@ -316,8 +317,7 @@ func (ctrl *Controller) SelectSolution(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("run_id", runID).
 			With("solution_id", solutionID).
 			With("error", err).

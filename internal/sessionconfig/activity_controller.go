@@ -2,7 +2,6 @@ package sessionconfig
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"camp-scheduler/internal/api"
@@ -76,6 +75,7 @@ type SessionActivityResponse struct {
 }
 
 func (ctrl *ActivityController) ListTimeSlots(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 
@@ -85,8 +85,7 @@ func (ctrl *ActivityController) ListTimeSlots(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("error", err).
 			Error("error listing session time slots")
@@ -98,6 +97,7 @@ func (ctrl *ActivityController) ListTimeSlots(c *gin.Context) {
 }
 
 func (ctrl *ActivityController) GetTimeSlot(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("timeSlotId")
@@ -112,8 +112,7 @@ func (ctrl *ActivityController) GetTimeSlot(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("id", id).
 			With("error", err).
@@ -126,6 +125,7 @@ func (ctrl *ActivityController) GetTimeSlot(c *gin.Context) {
 }
 
 func (ctrl *ActivityController) CreateTimeSlot(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 
@@ -149,8 +149,7 @@ func (ctrl *ActivityController) CreateTimeSlot(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "time slot already added to session"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("error", err).
 			Error("error creating session time slot")
@@ -162,6 +161,7 @@ func (ctrl *ActivityController) CreateTimeSlot(c *gin.Context) {
 }
 
 func (ctrl *ActivityController) UpdateTimeSlot(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("timeSlotId")
@@ -190,8 +190,7 @@ func (ctrl *ActivityController) UpdateTimeSlot(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "time slot already added to session"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("id", id).
 			With("error", err).
@@ -204,6 +203,7 @@ func (ctrl *ActivityController) UpdateTimeSlot(c *gin.Context) {
 }
 
 func (ctrl *ActivityController) DeleteTimeSlot(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("timeSlotId")
@@ -222,8 +222,7 @@ func (ctrl *ActivityController) DeleteTimeSlot(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "session time slot has dependent records and cannot be deleted"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("id", id).
 			With("error", err).
@@ -236,6 +235,7 @@ func (ctrl *ActivityController) DeleteTimeSlot(c *gin.Context) {
 }
 
 func (ctrl *ActivityController) ListActivities(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	timeSlotID := c.Param("timeSlotId")
@@ -250,8 +250,7 @@ func (ctrl *ActivityController) ListActivities(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session time slot not found for this session"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("time_slot_id", timeSlotID).
 			With("error", err).
@@ -264,6 +263,7 @@ func (ctrl *ActivityController) ListActivities(c *gin.Context) {
 }
 
 func (ctrl *ActivityController) GetActivity(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("activityId")
@@ -278,8 +278,7 @@ func (ctrl *ActivityController) GetActivity(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("id", id).
 			With("error", err).
@@ -292,6 +291,7 @@ func (ctrl *ActivityController) GetActivity(c *gin.Context) {
 }
 
 func (ctrl *ActivityController) CreateActivity(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	timeSlotID := c.Param("timeSlotId")
@@ -324,8 +324,7 @@ func (ctrl *ActivityController) CreateActivity(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "capacity and required_counselors must be positive"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("time_slot_id", timeSlotID).
 			With("error", err).
@@ -338,6 +337,7 @@ func (ctrl *ActivityController) CreateActivity(c *gin.Context) {
 }
 
 func (ctrl *ActivityController) UpdateActivity(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("activityId")
@@ -370,8 +370,7 @@ func (ctrl *ActivityController) UpdateActivity(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "activity already added to this time slot"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("id", id).
 			With("error", err).
@@ -384,6 +383,7 @@ func (ctrl *ActivityController) UpdateActivity(c *gin.Context) {
 }
 
 func (ctrl *ActivityController) DeleteActivity(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("activityId")
@@ -402,8 +402,7 @@ func (ctrl *ActivityController) DeleteActivity(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "session activity has dependent records and cannot be deleted"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("id", id).
 			With("error", err).

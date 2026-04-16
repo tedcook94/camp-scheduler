@@ -2,7 +2,6 @@ package counselor
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"camp-scheduler/internal/api"
@@ -49,6 +48,7 @@ type CounselorResponse struct {
 }
 
 func (ctrl *Controller) List(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 
 	counselors, err := ctrl.svc.List(c.Request.Context(), campID)
@@ -57,8 +57,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("error", err).
 			Error("error listing counselors")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
@@ -69,6 +68,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 }
 
 func (ctrl *Controller) Get(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	id := c.Param("counselorId")
 
@@ -82,8 +82,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error getting counselor")
@@ -95,6 +94,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 }
 
 func (ctrl *Controller) Create(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 
 	var req CreateCounselorRequest
@@ -109,8 +109,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("error", err).
 			Error("error creating counselor")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
@@ -121,6 +120,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 }
 
 func (ctrl *Controller) Update(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	id := c.Param("counselorId")
 
@@ -140,8 +140,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error updating counselor")
@@ -153,6 +152,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 }
 
 func (ctrl *Controller) Delete(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	id := c.Param("counselorId")
 
@@ -170,8 +170,7 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "counselor has dependent records and cannot be deleted"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error deleting counselor")

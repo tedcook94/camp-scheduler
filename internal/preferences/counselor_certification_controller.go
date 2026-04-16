@@ -2,7 +2,6 @@ package preferences
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"camp-scheduler/internal/api"
@@ -39,6 +38,7 @@ type CounselorCertificationResponse struct {
 }
 
 func (ctrl *CounselorCertificationController) List(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	counselorID := c.Param("counselorId")
 
@@ -48,8 +48,7 @@ func (ctrl *CounselorCertificationController) List(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("counselor_id", counselorID).
 			With("error", err).
 			Error("error listing counselor certifications")
@@ -61,6 +60,7 @@ func (ctrl *CounselorCertificationController) List(c *gin.Context) {
 }
 
 func (ctrl *CounselorCertificationController) Add(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	counselorID := c.Param("counselorId")
 
@@ -84,8 +84,7 @@ func (ctrl *CounselorCertificationController) Add(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "counselor already has this certification"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("counselor_id", counselorID).
 			With("error", err).
 			Error("error adding counselor certification")
@@ -97,6 +96,7 @@ func (ctrl *CounselorCertificationController) Add(c *gin.Context) {
 }
 
 func (ctrl *CounselorCertificationController) Remove(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	counselorID := c.Param("counselorId")
 	id := c.Param("id")
@@ -111,8 +111,7 @@ func (ctrl *CounselorCertificationController) Remove(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error removing counselor certification")

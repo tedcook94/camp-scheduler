@@ -38,17 +38,18 @@ func doRequest(s *Server, method, path string) *httptest.ResponseRecorder {
 	return w
 }
 
-func TestSPA_AdminRoute_ServesIndexHTML(t *testing.T) {
+func TestSPA_Route_ServesIndexHTML(t *testing.T) {
 	s := newSPATestServer(testFS())
 
 	tests := []struct {
 		name string
 		path string
 	}{
-		{"exact /admin", "/admin"},
-		{"trailing slash", "/admin/"},
-		{"nested route", "/admin/camps"},
+		{"root", "/"},
+		{"admin route", "/admin/camps"},
+		{"app route", "/app/dashboard"},
 		{"deep nested route", "/admin/users/some-id"},
+		{"arbitrary path", "/foo"},
 	}
 
 	for _, tt := range tests {
@@ -73,8 +74,8 @@ func TestSPA_StaticAsset_ServesFile(t *testing.T) {
 		wantBody    string
 		wantContent string
 	}{
-		{"js asset", "/admin/_app/immutable.js", "console.log('app')", "text/javascript"},
-		{"css asset", "/admin/assets/style.css", "body{}", "text/css"},
+		{"js asset", "/_app/immutable.js", "console.log('app')", "text/javascript"},
+		{"css asset", "/assets/style.css", "body{}", "text/css"},
 	}
 
 	for _, tt := range tests {
@@ -97,32 +98,9 @@ func TestSPA_MissingAsset_Returns404(t *testing.T) {
 		name string
 		path string
 	}{
-		{"missing js", "/admin/_app/missing.js"},
-		{"missing css", "/admin/assets/missing.css"},
-		{"missing image", "/admin/favicon.png"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := doRequest(s, "GET", tt.path)
-			if w.Code != http.StatusNotFound {
-				t.Errorf("GET %s: status = %d, want %d", tt.path, w.Code, http.StatusNotFound)
-			}
-		})
-	}
-}
-
-func TestSPA_NonAdminPath_Returns404(t *testing.T) {
-	s := newSPATestServer(testFS())
-
-	tests := []struct {
-		name string
-		path string
-	}{
-		{"root", "/"},
-		{"random path", "/foo"},
-		{"adminfoo (no slash)", "/adminfoo"},
-		{"adminpanel", "/adminpanel/stuff"},
+		{"missing js", "/_app/missing.js"},
+		{"missing css", "/assets/missing.css"},
+		{"missing image", "/favicon.png"},
 	}
 
 	for _, tt := range tests {
@@ -138,14 +116,14 @@ func TestSPA_NonAdminPath_Returns404(t *testing.T) {
 func TestSPA_DirectoryPath_FallsBackToIndex(t *testing.T) {
 	s := newSPATestServer(testFS())
 
-	// /admin/_app/ is a directory in the FS — should fall back to index.html,
+	// /_app/ is a directory in the FS — should fall back to index.html,
 	// not expose a directory listing
 	tests := []struct {
 		name string
 		path string
 	}{
-		{"_app directory", "/admin/_app/"},
-		{"assets directory", "/admin/assets/"},
+		{"_app directory", "/_app/"},
+		{"assets directory", "/assets/"},
 	}
 
 	for _, tt := range tests {
@@ -167,6 +145,29 @@ func TestSPA_APIRoute_NotIntercepted(t *testing.T) {
 	w := doRequest(s, "GET", "/api/v1/test")
 	if w.Code != http.StatusOK {
 		t.Errorf("GET /api/v1/test: status = %d, want %d", w.Code, http.StatusOK)
+	}
+}
+
+func TestSPA_UnmatchedAPIPath_Returns404(t *testing.T) {
+	s := newSPATestServer(testFS())
+
+	w := doRequest(s, "GET", "/api/v1/nonexistent")
+	if w.Code != http.StatusNotFound {
+		t.Errorf("GET /api/v1/nonexistent: status = %d, want %d", w.Code, http.StatusNotFound)
+	}
+}
+
+func TestSPA_NonGETMethod_Returns404(t *testing.T) {
+	s := newSPATestServer(testFS())
+
+	methods := []string{"POST", "PUT", "DELETE", "PATCH"}
+	for _, method := range methods {
+		t.Run(method, func(t *testing.T) {
+			w := doRequest(s, method, "/app/dashboard")
+			if w.Code != http.StatusNotFound {
+				t.Errorf("%s /app/dashboard: status = %d, want %d", method, w.Code, http.StatusNotFound)
+			}
+		})
 	}
 }
 

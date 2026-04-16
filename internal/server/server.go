@@ -209,8 +209,8 @@ func (s *Server) routes() {
 	}
 }
 
-// serveSPA configures the router to serve the embedded SPA under /admin.
-// Requests for static assets are served directly; all other /admin paths
+// serveSPA configures the router to serve the embedded SPA for any path not
+// matched by API routes. Static assets are served directly; all other paths
 // fall back to index.html so that SvelteKit handles client-side routing.
 func (s *Server) serveSPA() {
 	indexHTML, err := fs.ReadFile(s.staticFS, "index.html")
@@ -224,26 +224,14 @@ func (s *Server) serveSPA() {
 	s.router.NoRoute(func(c *gin.Context) {
 		reqPath := c.Request.URL.Path
 
-		if reqPath != "/admin" && !strings.HasPrefix(reqPath, "/admin/") {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
-			return
-		}
-
-		// Strip the /admin prefix to get the path within the static FS
-		fsPath := strings.TrimPrefix(reqPath, "/admin")
-		if fsPath == "" {
-			fsPath = "/"
-		}
-
 		// Try to stat the file to check if it exists and is not a directory.
 		// Directories must not be served directly to avoid exposing a listing
 		// of the embedded files.
-		filePath := strings.TrimPrefix(fsPath, "/")
+		filePath := strings.TrimPrefix(reqPath, "/")
 		if filePath == "" {
 			filePath = "."
 		}
 		if info, err := fs.Stat(s.staticFS, filePath); err == nil && !info.IsDir() {
-			c.Request.URL.Path = fsPath
 			fileServer.ServeHTTP(c.Writer, c.Request)
 			return
 		}
@@ -251,7 +239,21 @@ func (s *Server) serveSPA() {
 		// If the path has a file extension it's a missing asset (JS, CSS, etc.)
 		// — return 404 instead of falling back to index.html, which would cause
 		// MIME-type errors in the browser.
-		if path.Ext(fsPath) != "" {
+		if path.Ext(reqPath) != "" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+
+		// API paths that weren't matched by the router are genuinely missing
+		// — return a JSON 404 instead of falling back to the SPA.
+		if strings.HasPrefix(reqPath, "/api/") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+
+		// Only GET/HEAD requests should fall through to the SPA. Other methods
+		// hitting an unmatched path are errors, not client-side routes.
+		if c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 			return
 		}

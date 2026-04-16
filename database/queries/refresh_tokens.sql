@@ -1,10 +1,10 @@
 -- name: CreateRefreshToken :one
-INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
-VALUES ($1, $2, $3)
-RETURNING id, user_id, token_hash, expires_at, revoked_at, created_at;
+INSERT INTO refresh_tokens (user_id, token_hash, expires_at, token_version)
+VALUES ($1, $2, $3, $4)
+RETURNING id, user_id, token_hash, expires_at, revoked_at, created_at, token_version;
 
 -- name: GetRefreshTokenByHash :one
-SELECT id, user_id, token_hash, expires_at, revoked_at, created_at
+SELECT id, user_id, token_hash, expires_at, revoked_at, created_at, token_version
 FROM refresh_tokens
 WHERE token_hash = $1 AND revoked_at IS NULL;
 
@@ -12,7 +12,7 @@ WHERE token_hash = $1 AND revoked_at IS NULL;
 UPDATE refresh_tokens
 SET revoked_at = now()
 WHERE id = $1 AND revoked_at IS NULL
-RETURNING id, user_id, token_hash, expires_at, revoked_at, created_at;
+RETURNING id, user_id, token_hash, expires_at, revoked_at, created_at, token_version;
 
 -- name: RevokeAllUserRefreshTokens :execrows
 UPDATE refresh_tokens

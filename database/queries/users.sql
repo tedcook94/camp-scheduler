@@ -1,17 +1,22 @@
 -- name: GetUserByID :one
-SELECT id, camp_id, username, email, password_hash, first_name, last_name, role, created_at, updated_at
+SELECT id, camp_id, username, email, password_hash, first_name, last_name, role, created_at, updated_at, token_version
 FROM users
 WHERE id = $1;
 
 -- name: GetUserByUsername :one
-SELECT id, camp_id, username, email, password_hash, first_name, last_name, role, created_at, updated_at
+SELECT id, camp_id, username, email, password_hash, first_name, last_name, role, created_at, updated_at, token_version
 FROM users
 WHERE username = $1;
+
+-- name: GetUserTokenVersion :one
+SELECT token_version
+FROM users
+WHERE id = $1;
 
 -- name: CreateUser :one
 INSERT INTO users (camp_id, username, email, password_hash, first_name, last_name, role)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, camp_id, username, email, password_hash, first_name, last_name, role, created_at, updated_at;
+RETURNING id, camp_id, username, email, password_hash, first_name, last_name, role, created_at, updated_at, token_version;
 
 -- name: ListUsers :many
 SELECT id, camp_id, username, email, first_name, last_name, role, created_at, updated_at
@@ -38,8 +43,9 @@ RETURNING id, camp_id, username, email, first_name, last_name, role, created_at,
 
 -- name: UpdateUserPassword :execrows
 UPDATE users
-SET password_hash = $2,
-    updated_at    = now()
+SET password_hash  = $2,
+    token_version  = token_version + 1,
+    updated_at     = now()
 WHERE id = $1;
 
 -- name: DeleteUser :execrows

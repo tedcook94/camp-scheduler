@@ -123,14 +123,14 @@ viable configurations and understand trade-offs.
 - [x] JWT authentication
   - [x] Remove camp_id from REST endpoint paths; derive camp context from JWT
 - [x] Migrate to Yaak for API testing
-- [ ] Super-admin management
+- [x] Super-admin management
   - [x] Camp management (create, update, delete camps)
   - [x] User management (create, update, delete users)
   - [x] Frontend panel for managing camps/users
   - [x] Ability to revoke a user's tokens/log out all devices
     - [x] Revoke refresh tokens on password reset
     - [x] Revoke access tokens on password reset (token version)
-  - [ ] Ghost mode (ability to log in as any user)
+  - [x] Impersonation (ability to log in as any user)
 - [ ] Web frontend
 - [ ] Overrides (locking assignments before solver runs)
 - [ ] Data import (CSV/spreadsheet)

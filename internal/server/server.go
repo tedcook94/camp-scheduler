@@ -201,7 +201,7 @@ func (s *Server) routes() {
 	adminController.RegisterRoutes(superAdmin)
 
 	userService := admin.NewUserService(queries, s.pool)
-	userController := admin.NewUserController(userService)
+	userController := admin.NewUserController(userService, authenticator)
 	userController.RegisterRoutes(superAdmin)
 
 	if s.staticFS != nil {

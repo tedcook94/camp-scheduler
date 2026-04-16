@@ -205,12 +205,29 @@ func (svc *UserService) Delete(ctx context.Context, id string) error {
 		return err
 	}
 
-	rows, err := svc.queries.DeleteUser(ctx, uid)
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := svc.queries.WithTx(tx)
+
+	// Revoke any impersonation sessions this user started
+	if _, err := qtx.RevokeImpersonationTokensByImpersonator(ctx, uid); err != nil {
+		return fmt.Errorf("error revoking impersonation tokens for user %s: %w", id, err)
+	}
+
+	rows, err := qtx.DeleteUser(ctx, uid)
 	if err != nil {
 		return fmt.Errorf("error deleting user %s: %w", id, err)
 	}
 	if rows == 0 {
 		return ErrUserNotFound
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing user deletion: %w", err)
 	}
 
 	return nil

@@ -127,9 +127,9 @@ viable configurations and understand trade-offs.
   - [x] Camp management (create, update, delete camps)
   - [x] User management (create, update, delete users)
   - [x] Frontend panel for managing camps/users
-  - [ ] Ability to revoke a user's tokens/log out all devices
+  - [x] Ability to revoke a user's tokens/log out all devices
     - [x] Revoke refresh tokens on password reset
-    - [ ] Revoke access tokens on password reset (token version — also closes refresh race window)
+    - [x] Revoke access tokens on password reset (token version)
   - [ ] Ghost mode (ability to log in as any user)
 - [ ] Web frontend
 - [ ] Overrides (locking assignments before solver runs)

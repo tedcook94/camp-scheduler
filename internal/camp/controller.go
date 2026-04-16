@@ -27,7 +27,7 @@ func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 type UpdateCampRequest struct {
 	Name     string  `json:"name" binding:"required"`
 	Location *string `json:"location"`
-	Enabled  bool    `json:"enabled"`
+	Enabled  *bool   `json:"enabled"`
 }
 
 // CampResponse is the shared response type for camp data, used by both
@@ -70,17 +70,8 @@ func (ctrl *Controller) Update(c *gin.Context) {
 		return
 	}
 
-	// Regular admins cannot change the enabled flag — preserve the current value
-	current, err := ctrl.svc.GetByID(c.Request.Context(), campID)
-	if err != nil {
-		log.
-			With("id", campID).
-			With("error", err).
-			Error("error getting camp for update")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
-		return
-	}
-	req.Enabled = current.Enabled
+	// Regular admins cannot change the enabled flag — nil tells the DB to keep the current value
+	req.Enabled = nil
 
 	camp, err := ctrl.svc.Update(c.Request.Context(), campID, req)
 	if err != nil {

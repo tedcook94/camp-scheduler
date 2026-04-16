@@ -42,7 +42,6 @@
 			camp = await campApi.update({
 				name: formName.trim(),
 				location,
-				enabled: camp.enabled,
 			});
 			formName = camp.name;
 			formLocation = camp.location ?? "";

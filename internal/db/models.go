@@ -219,12 +219,13 @@ type CounselorSessionHistory struct {
 }
 
 type RefreshToken struct {
-	ID        pgtype.UUID
-	UserID    pgtype.UUID
-	TokenHash string
-	ExpiresAt pgtype.Timestamptz
-	RevokedAt pgtype.Timestamptz
-	CreatedAt pgtype.Timestamptz
+	ID           pgtype.UUID
+	UserID       pgtype.UUID
+	TokenHash    string
+	ExpiresAt    pgtype.Timestamptz
+	RevokedAt    pgtype.Timestamptz
+	CreatedAt    pgtype.Timestamptz
+	TokenVersion int32
 }
 
 type Season struct {
@@ -294,4 +295,5 @@ type User struct {
 	Role         string
 	CreatedAt    pgtype.Timestamptz
 	UpdatedAt    pgtype.Timestamptz
+	TokenVersion int32
 }

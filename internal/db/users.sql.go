@@ -14,7 +14,7 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (camp_id, username, email, password_hash, first_name, last_name, role)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, camp_id, username, email, password_hash, first_name, last_name, role, created_at, updated_at
+RETURNING id, camp_id, username, email, password_hash, first_name, last_name, role, created_at, updated_at, token_version
 `
 
 type CreateUserParams struct {
@@ -49,6 +49,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Role,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TokenVersion,
 	)
 	return i, err
 }
@@ -67,7 +68,7 @@ func (q *Queries) DeleteUser(ctx context.Context, id pgtype.UUID) (int64, error)
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, camp_id, username, email, password_hash, first_name, last_name, role, created_at, updated_at
+SELECT id, camp_id, username, email, password_hash, first_name, last_name, role, created_at, updated_at, token_version
 FROM users
 WHERE id = $1
 `
@@ -86,12 +87,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.Role,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TokenVersion,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, camp_id, username, email, password_hash, first_name, last_name, role, created_at, updated_at
+SELECT id, camp_id, username, email, password_hash, first_name, last_name, role, created_at, updated_at, token_version
 FROM users
 WHERE username = $1
 `
@@ -110,8 +112,22 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Role,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TokenVersion,
 	)
 	return i, err
+}
+
+const getUserTokenVersion = `-- name: GetUserTokenVersion :one
+SELECT token_version
+FROM users
+WHERE id = $1
+`
+
+func (q *Queries) GetUserTokenVersion(ctx context.Context, id pgtype.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, getUserTokenVersion, id)
+	var token_version int32
+	err := row.Scan(&token_version)
+	return token_version, err
 }
 
 const listUsers = `-- name: ListUsers :many
@@ -273,8 +289,9 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (UpdateU
 
 const updateUserPassword = `-- name: UpdateUserPassword :execrows
 UPDATE users
-SET password_hash = $2,
-    updated_at    = now()
+SET password_hash  = $2,
+    token_version  = token_version + 1,
+    updated_at     = now()
 WHERE id = $1
 `
 

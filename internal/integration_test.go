@@ -2159,6 +2159,7 @@ func TestSuperAdminUserCRUD(t *testing.T) {
 	t.Run("full_lifecycle", testSuperAdminUserLifecycle)
 	t.Run("admin_rejected_from_user_routes", testAdminRejectedFromUserRoutes)
 	t.Run("constraint_violations", testUserConstraintViolations)
+	t.Run("password_change_revokes_tokens", testPasswordChangeRevokesTokens)
 }
 
 func testSuperAdminUserLifecycle(t *testing.T) {
@@ -2423,4 +2424,61 @@ func testUserConstraintViolations(t *testing.T) {
 	doRawRequest(t, http.MethodPut,
 		apiURL(ts, "/admin/users/00000000-0000-0000-0000-000000000000/password"),
 		map[string]any{"password": "short"}, http.StatusBadRequest, token)
+}
+
+func testPasswordChangeRevokesTokens(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+	superToken := mustLoginSuperAdmin(t, ts, pool)
+
+	// Create a camp and an admin user via the super-admin API.
+	camp := mustPost(t, apiURL(ts, "/admin/camps"),
+		map[string]any{"name": "Token Revoke Camp", "location": "Somewhere"}, superToken)
+	campID := str(camp, "id")
+
+	created := mustPost(t, apiURL(ts, "/admin/users"), map[string]any{
+		"camp_id":    campID,
+		"username":   "tokenuser",
+		"email":      "tokenuser@example.com",
+		"password":   "oldpassword123",
+		"first_name": "Token",
+		"last_name":  "User",
+		"role":       "admin",
+	}, superToken)
+	userID := str(created, "id")
+
+	// Login twice to simulate two devices with independent refresh tokens.
+	loginResp1 := doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
+		map[string]any{"username": "tokenuser", "password": "oldpassword123"},
+		http.StatusOK, "")
+	refreshToken1 := str(loginResp1, "refresh_token")
+	if refreshToken1 == "" {
+		t.Fatal("expected refresh_token in first login response")
+	}
+
+	loginResp2 := doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
+		map[string]any{"username": "tokenuser", "password": "oldpassword123"},
+		http.StatusOK, "")
+	refreshToken2 := str(loginResp2, "refresh_token")
+	if refreshToken2 == "" {
+		t.Fatal("expected refresh_token in second login response")
+	}
+
+	// Change the admin user's password via the super-admin endpoint.
+	doRawRequest(t, http.MethodPut,
+		apiURL(ts, "/admin/users/"+userID+"/password"),
+		map[string]any{"password": "newpassword123"}, http.StatusOK, superToken)
+
+	// Both refresh tokens should now be revoked.
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/auth/refresh"),
+		map[string]any{"refresh_token": refreshToken1},
+		http.StatusUnauthorized, "")
+
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/auth/refresh"),
+		map[string]any{"refresh_token": refreshToken2},
+		http.StatusUnauthorized, "")
+
+	// Login with the new password should succeed.
+	doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
+		map[string]any{"username": "tokenuser", "password": "newpassword123"},
+		http.StatusOK, "")
 }

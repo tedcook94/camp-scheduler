@@ -19,7 +19,7 @@
 
 	if (browser && !auth.isAuthenticated) {
 		auth.clear();
-		goto("/");
+		goto("/login");
 	}
 
 	if (browser && auth.isAuthenticated && auth.role === "super_admin" && !auth.isImpersonating) {
@@ -33,7 +33,7 @@
 			return;
 		}
 		auth.clear();
-		goto("/");
+		goto("/login");
 	}
 
 	const navItems = [

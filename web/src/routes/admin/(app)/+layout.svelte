@@ -18,17 +18,17 @@
 
 	if (browser && !auth.isAuthenticated) {
 		auth.clear();
-		goto("/");
+		goto("/login");
 	}
 
 	if (browser && auth.isAuthenticated && auth.role !== "super_admin") {
 		auth.clear();
-		goto("/");
+		goto("/login");
 	}
 
 	function handleLogout() {
 		auth.clear();
-		goto("/");
+		goto("/login");
 	}
 
 	const adminNavItems = [

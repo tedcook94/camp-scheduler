@@ -8,6 +8,7 @@ import (
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -15,10 +16,11 @@ var ErrUserNotFound = errors.New("user not found")
 
 type UserService struct {
 	queries *db.Queries
+	pool    *pgxpool.Pool
 }
 
-func NewUserService(queries *db.Queries) *UserService {
-	return &UserService{queries: queries}
+func NewUserService(queries *db.Queries, pool *pgxpool.Pool) *UserService {
+	return &UserService{queries: queries, pool: pool}
 }
 
 type UserResponse struct {
@@ -155,31 +157,46 @@ func (svc *UserService) Update(ctx context.Context, id string, req UpdateUserReq
 	return toUserResponseFromUpdateRow(u), nil
 }
 
-// TODO: when token revocation is implemented, this should also revoke all
-// refresh tokens for the user so that existing sessions are invalidated.
-func (svc *UserService) UpdatePassword(ctx context.Context, id string, req UpdatePasswordRequest) error {
+func (svc *UserService) UpdatePassword(ctx context.Context, id string, req UpdatePasswordRequest) (int64, error) {
 	uid, err := api.ParseUUID(id)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return fmt.Errorf("error hashing password: %w", err)
+		return 0, fmt.Errorf("error hashing password: %w", err)
 	}
 
-	rows, err := svc.queries.UpdateUserPassword(ctx, db.UpdateUserPasswordParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("error beginning transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := svc.queries.WithTx(tx)
+
+	rows, err := qtx.UpdateUserPassword(ctx, db.UpdateUserPasswordParams{
 		ID:           uid,
 		PasswordHash: string(hash),
 	})
 	if err != nil {
-		return fmt.Errorf("error updating password for user %s: %w", id, err)
+		return 0, fmt.Errorf("error updating password for user %s: %w", id, err)
 	}
 	if rows == 0 {
-		return ErrUserNotFound
+		return 0, ErrUserNotFound
 	}
 
-	return nil
+	revoked, err := qtx.RevokeAllUserRefreshTokens(ctx, uid)
+	if err != nil {
+		return 0, fmt.Errorf("error revoking refresh tokens for user %s: %w", id, err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return 0, fmt.Errorf("error committing password update: %w", err)
+	}
+
+	return revoked, nil
 }
 
 func (svc *UserService) Delete(ctx context.Context, id string) error {

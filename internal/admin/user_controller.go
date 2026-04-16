@@ -168,7 +168,7 @@ func (ctrl *UserController) UpdatePassword(c *gin.Context) {
 		return
 	}
 
-	err := ctrl.svc.UpdatePassword(c.Request.Context(), id, req)
+	revoked, err := ctrl.svc.UpdatePassword(c.Request.Context(), id, req)
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
@@ -185,6 +185,11 @@ func (ctrl *UserController) UpdatePassword(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
+
+	slog.
+		With("id", id).
+		With("revoked_tokens", revoked).
+		Info("password updated and refresh tokens revoked")
 
 	c.Status(http.StatusOK)
 }

@@ -200,7 +200,7 @@ func (s *Server) routes() {
 	adminController := admin.NewController(adminService)
 	adminController.RegisterRoutes(superAdmin)
 
-	userService := admin.NewUserService(queries)
+	userService := admin.NewUserService(queries, s.pool)
 	userController := admin.NewUserController(userService)
 	userController.RegisterRoutes(superAdmin)
 

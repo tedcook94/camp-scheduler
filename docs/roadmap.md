@@ -123,15 +123,28 @@ viable configurations and understand trade-offs.
 - [x] JWT authentication
   - [x] Remove camp_id from REST endpoint paths; derive camp context from JWT
 - [x] Migrate to Yaak for API testing
-- [ ] Super-admin management
+- [x] Super-admin management
   - [x] Camp management (create, update, delete camps)
   - [x] User management (create, update, delete users)
   - [x] Frontend panel for managing camps/users
   - [x] Ability to revoke a user's tokens/log out all devices
     - [x] Revoke refresh tokens on password reset
     - [x] Revoke access tokens on password reset (token version)
-  - [ ] Ghost mode (ability to log in as any user)
+  - [x] Impersonation (ability to log in as any user)
 - [ ] Web frontend
+  - [ ] Foundation: base path migration (`/admin` → `/`), route groups (`(admin)`, `(user)`), SPA handler update
+  - [ ] Login: unified login with role-based routing (super_admin → /admin, all other roles → /app)
+  - [ ] Dashboard: landing page with navigation cards to each section
+  - [ ] Camp settings: view and edit camp details
+  - [ ] Certifications: list, create, edit, delete
+  - [ ] Age groups: list, create, edit, delete
+  - [ ] Cabins: list, create, edit, delete (with age group assignment)
+  - [ ] Seasons & sessions: CRUD for seasons; manage sessions within a session
+  - [ ] Counselors: list, create, edit, delete; manage preferences (age group, co-counselor, activity); certifications; session history
+  - [ ] Campers: list, create, edit, delete; friend preferences; session enrollments
+  - [ ] Activities & time slots: CRUD for both; certification requirements; assign to sessions
+  - [ ] Session configuration: assign age groups, cabins, activities, and time slots to a session
+  - [ ] Assignment runs: trigger solver, view run history, compare ranked solutions, select a solution
 - [ ] Overrides (locking assignments before solver runs)
 - [ ] Data import (CSV/spreadsheet)
 - [ ] Auditing

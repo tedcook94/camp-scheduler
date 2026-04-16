@@ -2,21 +2,22 @@ package admin
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"camp-scheduler/internal/api"
+	"camp-scheduler/internal/auth"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 )
 
 type UserController struct {
-	svc *UserService
+	svc           *UserService
+	authenticator auth.Authenticator
 }
 
-func NewUserController(svc *UserService) *UserController {
-	return &UserController{svc: svc}
+func NewUserController(svc *UserService, authenticator auth.Authenticator) *UserController {
+	return &UserController{svc: svc, authenticator: authenticator}
 }
 
 func (ctrl *UserController) RegisterRoutes(rg *gin.RouterGroup) {
@@ -27,9 +28,12 @@ func (ctrl *UserController) RegisterRoutes(rg *gin.RouterGroup) {
 	users.PUT("/:id", ctrl.Update)
 	users.PUT("/:id/password", ctrl.UpdatePassword)
 	users.DELETE("/:id", ctrl.Delete)
+	users.POST("/:id/impersonate", ctrl.Impersonate)
 }
 
 func (ctrl *UserController) List(c *gin.Context) {
+	log := auth.Logger(c)
+
 	campID := c.Query("camp_id")
 
 	if campID != "" {
@@ -39,7 +43,7 @@ func (ctrl *UserController) List(c *gin.Context) {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-			slog.
+			log.
 				With("camp_id", campID).
 				With("error", err).
 				Error("error listing users by camp")
@@ -52,7 +56,7 @@ func (ctrl *UserController) List(c *gin.Context) {
 
 	users, err := ctrl.svc.List(c.Request.Context())
 	if err != nil {
-		slog.With("error", err).Error("error listing users")
+		log.With("error", err).Error("error listing users")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -61,6 +65,8 @@ func (ctrl *UserController) List(c *gin.Context) {
 }
 
 func (ctrl *UserController) Get(c *gin.Context) {
+	log := auth.Logger(c)
+
 	id := c.Param("id")
 
 	user, err := ctrl.svc.GetByID(c.Request.Context(), id)
@@ -73,7 +79,7 @@ func (ctrl *UserController) Get(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error getting user")
@@ -85,6 +91,8 @@ func (ctrl *UserController) Get(c *gin.Context) {
 }
 
 func (ctrl *UserController) Create(c *gin.Context) {
+	log := auth.Logger(c)
+
 	var req CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -109,7 +117,7 @@ func (ctrl *UserController) Create(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.With("error", err).Error("error creating user")
+		log.With("error", err).Error("error creating user")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -118,6 +126,8 @@ func (ctrl *UserController) Create(c *gin.Context) {
 }
 
 func (ctrl *UserController) Update(c *gin.Context) {
+	log := auth.Logger(c)
+
 	id := c.Param("id")
 
 	var req UpdateUserRequest
@@ -148,7 +158,7 @@ func (ctrl *UserController) Update(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "camp not found"})
 			return
 		}
-		slog.
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error updating user")
@@ -160,6 +170,8 @@ func (ctrl *UserController) Update(c *gin.Context) {
 }
 
 func (ctrl *UserController) UpdatePassword(c *gin.Context) {
+	log := auth.Logger(c)
+
 	id := c.Param("id")
 
 	var req UpdatePasswordRequest
@@ -178,7 +190,7 @@ func (ctrl *UserController) UpdatePassword(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error updating user password")
@@ -186,7 +198,7 @@ func (ctrl *UserController) UpdatePassword(c *gin.Context) {
 		return
 	}
 
-	slog.
+	log.
 		With("id", id).
 		With("revoked_tokens", revoked).
 		Info("password updated and refresh tokens revoked")
@@ -195,6 +207,8 @@ func (ctrl *UserController) UpdatePassword(c *gin.Context) {
 }
 
 func (ctrl *UserController) Delete(c *gin.Context) {
+	log := auth.Logger(c)
+
 	id := c.Param("id")
 
 	err := ctrl.svc.Delete(c.Request.Context(), id)
@@ -207,7 +221,7 @@ func (ctrl *UserController) Delete(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error deleting user")
@@ -216,4 +230,46 @@ func (ctrl *UserController) Delete(c *gin.Context) {
 	}
 
 	c.Status(http.StatusOK)
+}
+
+func (ctrl *UserController) Impersonate(c *gin.Context) {
+	log := auth.Logger(c)
+
+	targetID := c.Param("id")
+	claims := auth.GetClaims(c)
+	if claims == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing authentication claims"})
+		return
+	}
+
+	accessToken, refreshToken, err := ctrl.authenticator.ImpersonateUser(c.Request.Context(), targetID, claims.UserID)
+	if err != nil {
+		if errors.Is(err, auth.ErrCannotImpersonate) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "cannot impersonate a super-admin user"})
+			return
+		}
+		if errors.Is(err, auth.ErrUserNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			return
+		}
+		if api.IsBadInput(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		log.
+			With("target_user_id", targetID).
+			With("error", err).
+			Error("error impersonating user")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	log.
+		With("target_user_id", targetID).
+		Info("impersonation session started")
+
+	c.JSON(http.StatusOK, gin.H{
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
+	})
 }

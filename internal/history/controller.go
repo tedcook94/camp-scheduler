@@ -2,7 +2,6 @@ package history
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"camp-scheduler/internal/api"
@@ -63,6 +62,7 @@ type HistorySummaryEntry struct {
 }
 
 func (ctrl *Controller) List(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	counselorID := c.Param("counselorId")
 
@@ -72,8 +72,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("counselor_id", counselorID).
 			With("error", err).
 			Error("error listing session history")
@@ -85,6 +84,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 }
 
 func (ctrl *Controller) Get(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	counselorID := c.Param("counselorId")
 	id := c.Param("id")
@@ -99,8 +99,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("counselor_id", counselorID).
 			With("id", id).
 			With("error", err).
@@ -113,6 +112,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 }
 
 func (ctrl *Controller) Create(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	counselorID := c.Param("counselorId")
 
@@ -132,8 +132,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("counselor_id", counselorID).
 			With("error", err).
 			Error("error creating session history entry")
@@ -145,6 +144,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 }
 
 func (ctrl *Controller) Update(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	counselorID := c.Param("counselorId")
 	id := c.Param("id")
@@ -169,8 +169,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("counselor_id", counselorID).
 			With("id", id).
 			With("error", err).
@@ -183,6 +182,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 }
 
 func (ctrl *Controller) Delete(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	counselorID := c.Param("counselorId")
 	id := c.Param("id")
@@ -197,8 +197,7 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("counselor_id", counselorID).
 			With("id", id).
 			With("error", err).
@@ -211,6 +210,7 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 }
 
 func (ctrl *Controller) GetHistorySummary(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	counselorID := c.Param("counselorId")
 
@@ -225,8 +225,7 @@ func (ctrl *Controller) GetHistorySummary(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("counselor_id", counselorID).
 			With("error", err).
 			Error("error getting counselor history summary")

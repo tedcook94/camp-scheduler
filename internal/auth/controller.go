@@ -2,7 +2,6 @@ package auth
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -37,6 +36,8 @@ type TokenResponse struct {
 }
 
 func (ctrl *Controller) Login(c *gin.Context) {
+	log := Logger(c)
+
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -49,7 +50,7 @@ func (ctrl *Controller) Login(c *gin.Context) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid username or password"})
 			return
 		}
-		slog.With("error", err).Error("error during login")
+		log.With("error", err).Error("error during login")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -61,6 +62,8 @@ func (ctrl *Controller) Login(c *gin.Context) {
 }
 
 func (ctrl *Controller) Refresh(c *gin.Context) {
+	log := Logger(c)
+
 	var req RefreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -73,7 +76,7 @@ func (ctrl *Controller) Refresh(c *gin.Context) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired refresh token"})
 			return
 		}
-		slog.With("error", err).Error("error during token refresh")
+		log.With("error", err).Error("error during token refresh")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}

@@ -2,10 +2,10 @@ package admin
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"camp-scheduler/internal/api"
+	"camp-scheduler/internal/auth"
 	"camp-scheduler/internal/camp"
 
 	"github.com/gin-gonic/gin"
@@ -37,9 +37,11 @@ type CreateCampRequest struct {
 type UpdateCampRequest = camp.UpdateCampRequest
 
 func (ctrl *Controller) List(c *gin.Context) {
+	log := auth.Logger(c)
+
 	camps, err := ctrl.svc.List(c.Request.Context())
 	if err != nil {
-		slog.With("error", err).Error("error listing camps")
+		log.With("error", err).Error("error listing camps")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -48,6 +50,8 @@ func (ctrl *Controller) List(c *gin.Context) {
 }
 
 func (ctrl *Controller) Get(c *gin.Context) {
+	log := auth.Logger(c)
+
 	id := c.Param("id")
 
 	camp, err := ctrl.svc.GetByID(c.Request.Context(), id)
@@ -60,7 +64,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error getting camp")
@@ -72,6 +76,8 @@ func (ctrl *Controller) Get(c *gin.Context) {
 }
 
 func (ctrl *Controller) Create(c *gin.Context) {
+	log := auth.Logger(c)
+
 	var req CreateCampRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -84,7 +90,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "a camp with that name already exists"})
 			return
 		}
-		slog.With("error", err).Error("error creating camp")
+		log.With("error", err).Error("error creating camp")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -93,6 +99,8 @@ func (ctrl *Controller) Create(c *gin.Context) {
 }
 
 func (ctrl *Controller) Update(c *gin.Context) {
+	log := auth.Logger(c)
+
 	id := c.Param("id")
 
 	var req UpdateCampRequest
@@ -115,7 +123,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "a camp with that name already exists"})
 			return
 		}
-		slog.
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error updating camp")
@@ -127,6 +135,8 @@ func (ctrl *Controller) Update(c *gin.Context) {
 }
 
 func (ctrl *Controller) Delete(c *gin.Context) {
+	log := auth.Logger(c)
+
 	id := c.Param("id")
 
 	err := ctrl.svc.Delete(c.Request.Context(), id)
@@ -143,7 +153,7 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "camp has dependent records and cannot be deleted"})
 			return
 		}
-		slog.
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error deleting camp")

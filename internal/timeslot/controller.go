@@ -2,7 +2,6 @@ package timeslot
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"camp-scheduler/internal/api"
@@ -44,6 +43,7 @@ type TimeSlotResponse struct {
 }
 
 func (ctrl *Controller) List(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 
 	slots, err := ctrl.svc.List(c.Request.Context(), campID)
@@ -52,8 +52,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("error", err).
 			Error("error listing time slots")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
@@ -64,6 +63,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 }
 
 func (ctrl *Controller) Get(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	id := c.Param("id")
 
@@ -77,8 +77,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error getting time slot")
@@ -90,6 +89,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 }
 
 func (ctrl *Controller) Create(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 
 	var req CreateTimeSlotRequest
@@ -104,8 +104,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("error", err).
 			Error("error creating time slot")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
@@ -116,6 +115,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 }
 
 func (ctrl *Controller) Update(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	id := c.Param("id")
 
@@ -135,8 +135,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error updating time slot")
@@ -148,6 +147,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 }
 
 func (ctrl *Controller) Delete(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	id := c.Param("id")
 
@@ -165,8 +165,7 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "time slot has dependent records and cannot be deleted"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error deleting time slot")

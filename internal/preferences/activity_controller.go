@@ -2,7 +2,6 @@ package preferences
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"camp-scheduler/internal/api"
@@ -49,6 +48,7 @@ type ActivityPreferenceResponse struct {
 }
 
 func (ctrl *ActivityPreferenceController) List(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	counselorID := c.Param("counselorId")
@@ -59,8 +59,7 @@ func (ctrl *ActivityPreferenceController) List(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("counselor_id", counselorID).
 			With("error", err).
@@ -73,6 +72,7 @@ func (ctrl *ActivityPreferenceController) List(c *gin.Context) {
 }
 
 func (ctrl *ActivityPreferenceController) Get(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	counselorID := c.Param("counselorId")
@@ -88,8 +88,7 @@ func (ctrl *ActivityPreferenceController) Get(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("counselor_id", counselorID).
 			With("id", id).
@@ -103,6 +102,7 @@ func (ctrl *ActivityPreferenceController) Get(c *gin.Context) {
 }
 
 func (ctrl *ActivityPreferenceController) Create(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	counselorID := c.Param("counselorId")
@@ -127,8 +127,7 @@ func (ctrl *ActivityPreferenceController) Create(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "activity preference already exists for this counselor and activity"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("counselor_id", counselorID).
 			With("error", err).
@@ -141,6 +140,7 @@ func (ctrl *ActivityPreferenceController) Create(c *gin.Context) {
 }
 
 func (ctrl *ActivityPreferenceController) Update(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	counselorID := c.Param("counselorId")
@@ -170,8 +170,7 @@ func (ctrl *ActivityPreferenceController) Update(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "activity preference already exists for this counselor and activity"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("counselor_id", counselorID).
 			With("id", id).
@@ -185,6 +184,7 @@ func (ctrl *ActivityPreferenceController) Update(c *gin.Context) {
 }
 
 func (ctrl *ActivityPreferenceController) Delete(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	counselorID := c.Param("counselorId")
@@ -200,8 +200,7 @@ func (ctrl *ActivityPreferenceController) Delete(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("counselor_id", counselorID).
 			With("id", id).

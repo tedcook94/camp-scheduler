@@ -2,7 +2,6 @@ package preferences
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"camp-scheduler/internal/api"
@@ -49,6 +48,7 @@ type CocounselorPreferenceResponse struct {
 }
 
 func (ctrl *CocounselorController) List(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	counselorID := c.Param("counselorId")
@@ -59,8 +59,7 @@ func (ctrl *CocounselorController) List(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("counselor_id", counselorID).
 			With("error", err).
@@ -73,6 +72,7 @@ func (ctrl *CocounselorController) List(c *gin.Context) {
 }
 
 func (ctrl *CocounselorController) Get(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	counselorID := c.Param("counselorId")
@@ -88,8 +88,7 @@ func (ctrl *CocounselorController) Get(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("counselor_id", counselorID).
 			With("id", id).
@@ -103,6 +102,7 @@ func (ctrl *CocounselorController) Get(c *gin.Context) {
 }
 
 func (ctrl *CocounselorController) Create(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	counselorID := c.Param("counselorId")
@@ -123,8 +123,7 @@ func (ctrl *CocounselorController) Create(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("counselor_id", counselorID).
 			With("error", err).
@@ -137,6 +136,7 @@ func (ctrl *CocounselorController) Create(c *gin.Context) {
 }
 
 func (ctrl *CocounselorController) Update(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	counselorID := c.Param("counselorId")
@@ -162,8 +162,7 @@ func (ctrl *CocounselorController) Update(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("counselor_id", counselorID).
 			With("id", id).
@@ -177,6 +176,7 @@ func (ctrl *CocounselorController) Update(c *gin.Context) {
 }
 
 func (ctrl *CocounselorController) Delete(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	counselorID := c.Param("counselorId")
@@ -192,8 +192,7 @@ func (ctrl *CocounselorController) Delete(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("counselor_id", counselorID).
 			With("id", id).

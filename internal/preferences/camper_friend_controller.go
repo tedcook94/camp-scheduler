@@ -2,7 +2,6 @@ package preferences
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"camp-scheduler/internal/api"
@@ -49,6 +48,7 @@ type CamperFriendPreferenceResponse struct {
 }
 
 func (ctrl *CamperFriendController) List(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	camperID := c.Param("camperId")
@@ -59,8 +59,7 @@ func (ctrl *CamperFriendController) List(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("camper_id", camperID).
 			With("error", err).
@@ -73,6 +72,7 @@ func (ctrl *CamperFriendController) List(c *gin.Context) {
 }
 
 func (ctrl *CamperFriendController) Get(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	camperID := c.Param("camperId")
@@ -88,8 +88,7 @@ func (ctrl *CamperFriendController) Get(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("camper_id", camperID).
 			With("id", id).
@@ -103,6 +102,7 @@ func (ctrl *CamperFriendController) Get(c *gin.Context) {
 }
 
 func (ctrl *CamperFriendController) Create(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	camperID := c.Param("camperId")
@@ -131,8 +131,7 @@ func (ctrl *CamperFriendController) Create(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid preference: a camper cannot prefer themselves"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("camper_id", camperID).
 			With("error", err).
@@ -145,6 +144,7 @@ func (ctrl *CamperFriendController) Create(c *gin.Context) {
 }
 
 func (ctrl *CamperFriendController) Update(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	camperID := c.Param("camperId")
@@ -178,8 +178,7 @@ func (ctrl *CamperFriendController) Update(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid preference: a camper cannot prefer themselves"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("camper_id", camperID).
 			With("id", id).
@@ -193,6 +192,7 @@ func (ctrl *CamperFriendController) Update(c *gin.Context) {
 }
 
 func (ctrl *CamperFriendController) Delete(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	camperID := c.Param("camperId")
@@ -208,8 +208,7 @@ func (ctrl *CamperFriendController) Delete(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("camper_id", camperID).
 			With("id", id).

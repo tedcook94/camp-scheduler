@@ -2,7 +2,6 @@ package sessionconfig
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"camp-scheduler/internal/api"
@@ -84,6 +83,7 @@ type SessionCabinResponse struct {
 // Session age group handlers
 
 func (ctrl *Controller) ListAgeGroups(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 
@@ -93,8 +93,7 @@ func (ctrl *Controller) ListAgeGroups(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("error", err).
 			Error("error listing session age groups")
@@ -106,6 +105,7 @@ func (ctrl *Controller) ListAgeGroups(c *gin.Context) {
 }
 
 func (ctrl *Controller) GetAgeGroup(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("id")
@@ -120,8 +120,7 @@ func (ctrl *Controller) GetAgeGroup(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("id", id).
 			With("error", err).
@@ -134,6 +133,7 @@ func (ctrl *Controller) GetAgeGroup(c *gin.Context) {
 }
 
 func (ctrl *Controller) CreateAgeGroup(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 
@@ -153,8 +153,7 @@ func (ctrl *Controller) CreateAgeGroup(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("error", err).
 			Error("error creating session age group")
@@ -166,6 +165,7 @@ func (ctrl *Controller) CreateAgeGroup(c *gin.Context) {
 }
 
 func (ctrl *Controller) UpdateAgeGroup(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("id")
@@ -190,8 +190,7 @@ func (ctrl *Controller) UpdateAgeGroup(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("id", id).
 			With("error", err).
@@ -204,6 +203,7 @@ func (ctrl *Controller) UpdateAgeGroup(c *gin.Context) {
 }
 
 func (ctrl *Controller) DeleteAgeGroup(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("id")
@@ -222,8 +222,7 @@ func (ctrl *Controller) DeleteAgeGroup(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "session age group has dependent records and cannot be deleted"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("id", id).
 			With("error", err).
@@ -238,6 +237,7 @@ func (ctrl *Controller) DeleteAgeGroup(c *gin.Context) {
 // Session cabin handlers
 
 func (ctrl *Controller) ListCabins(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 
@@ -247,8 +247,7 @@ func (ctrl *Controller) ListCabins(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("error", err).
 			Error("error listing session cabins")
@@ -260,6 +259,7 @@ func (ctrl *Controller) ListCabins(c *gin.Context) {
 }
 
 func (ctrl *Controller) GetCabin(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("id")
@@ -274,8 +274,7 @@ func (ctrl *Controller) GetCabin(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("id", id).
 			With("error", err).
@@ -288,6 +287,7 @@ func (ctrl *Controller) GetCabin(c *gin.Context) {
 }
 
 func (ctrl *Controller) CreateCabin(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 
@@ -311,8 +311,7 @@ func (ctrl *Controller) CreateCabin(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("error", err).
 			Error("error creating session cabin")
@@ -324,6 +323,7 @@ func (ctrl *Controller) CreateCabin(c *gin.Context) {
 }
 
 func (ctrl *Controller) UpdateCabin(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("id")
@@ -348,8 +348,7 @@ func (ctrl *Controller) UpdateCabin(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("id", id).
 			With("error", err).
@@ -362,6 +361,7 @@ func (ctrl *Controller) UpdateCabin(c *gin.Context) {
 }
 
 func (ctrl *Controller) DeleteCabin(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	id := c.Param("id")
@@ -380,8 +380,7 @@ func (ctrl *Controller) DeleteCabin(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "session cabin has dependent records and cannot be deleted"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("session_id", sessionID).
 			With("id", id).
 			With("error", err).

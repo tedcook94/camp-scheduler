@@ -2,7 +2,6 @@ package session
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"camp-scheduler/internal/api"
@@ -50,6 +49,7 @@ type SessionResponse struct {
 }
 
 func (ctrl *Controller) List(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 
 	sessions, err := ctrl.svc.List(c.Request.Context(), campID)
@@ -58,10 +58,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
-			With("error", err).
-			Error("error listing sessions")
+		log.With("error", err).Error("error listing sessions")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -70,6 +67,7 @@ func (ctrl *Controller) List(c *gin.Context) {
 }
 
 func (ctrl *Controller) Get(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	id := c.Param("sessionId")
 
@@ -83,8 +81,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error getting session")
@@ -96,6 +93,7 @@ func (ctrl *Controller) Get(c *gin.Context) {
 }
 
 func (ctrl *Controller) Create(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 
 	var req CreateSessionRequest
@@ -110,10 +108,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
-			With("error", err).
-			Error("error creating session")
+		log.With("error", err).Error("error creating session")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -122,6 +117,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 }
 
 func (ctrl *Controller) Update(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	id := c.Param("sessionId")
 
@@ -141,8 +137,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error updating session")
@@ -154,6 +149,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 }
 
 func (ctrl *Controller) Delete(c *gin.Context) {
+	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	id := c.Param("sessionId")
 
@@ -171,8 +167,7 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "session has dependent records and cannot be deleted"})
 			return
 		}
-		slog.
-			With("camp_id", campID).
+		log.
 			With("id", id).
 			With("error", err).
 			Error("error deleting session")

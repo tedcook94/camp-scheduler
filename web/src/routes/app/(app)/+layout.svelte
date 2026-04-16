@@ -2,7 +2,11 @@
 	import { goto } from "$app/navigation";
 	import { browser } from "$app/environment";
 	import { page } from "$app/stores";
+	import { setContext } from "svelte";
+	import { onMount } from "svelte";
 	import { auth } from "$lib/stores/auth.svelte";
+	import { campApi } from "$lib/api";
+	import type { Camp } from "$lib/api/types";
 	import { Button } from "$lib/components/ui/button";
 	import { Separator } from "$lib/components/ui/separator";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
@@ -14,17 +18,33 @@
 	import SunIcon from "@lucide/svelte/icons/sun";
 	import LogOutIcon from "@lucide/svelte/icons/log-out";
 	import CircleUserIcon from "@lucide/svelte/icons/circle-user";
+	import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
 
 	let { children } = $props();
 
+	let campDisabled = $state(false);
+	let camp = $state<Camp | null>(null);
+
+	setContext("campDisabled", () => campDisabled);
+	setContext("camp", () => camp);
+
 	if (browser && !auth.isAuthenticated) {
 		auth.clear();
-		goto("/login");
+		goto("/login", { replaceState: true });
 	}
 
 	if (browser && auth.isAuthenticated && auth.role === "super_admin" && !auth.isImpersonating) {
-		goto("/admin/camps");
+		goto("/admin/camps", { replaceState: true });
 	}
+
+	onMount(async () => {
+		try {
+			camp = await campApi.get();
+			campDisabled = !camp.enabled;
+		} catch {
+			// Camp status check is best-effort; layout still renders
+		}
+	});
 
 	function handleLogout() {
 		if (auth.isImpersonating) {
@@ -48,6 +68,12 @@
 			<div class="flex items-center justify-between bg-amber-300 px-4 py-2 text-sm text-black">
 				<span>You are impersonating <strong>{auth.username}</strong></span>
 				<Button size="sm" class="border-black/20 bg-black/10 text-black hover:bg-black/20" onclick={handleLogout}>Exit</Button>
+			</div>
+		{/if}
+		{#if campDisabled}
+			<div class="flex items-center justify-center gap-2 bg-red-100 px-4 py-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
+				<TriangleAlertIcon class="size-4 shrink-0" />
+				<span>This camp has been disabled. You will not be able to make any changes until the camp has been re-enabled.</span>
 			</div>
 		{/if}
 		<div class="flex flex-1">

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from "svelte";
+	import { onMount, getContext } from "svelte";
 	import { campApi } from "$lib/api";
 	import { ApiClientError } from "$lib/api/client";
 	import { capitalizeFirst } from "$lib/utils";
@@ -11,12 +11,17 @@
 	import type { Camp } from "$lib/api/types";
 	import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
 
+	const getCampDisabled = getContext<() => boolean>("campDisabled");
+	const getCamp = getContext<() => Camp | null>("camp");
+
 	let camp = $state<Camp | null>(null);
 	let loading = $state(true);
 	let saving = $state(false);
 
 	let formName = $state("");
 	let formLocation = $state("");
+
+	let disabled = $derived(getCampDisabled());
 
 	async function loadCamp() {
 		loading = true;
@@ -55,7 +60,15 @@
 	}
 
 	onMount(() => {
-		loadCamp();
+		const contextCamp = getCamp();
+		if (contextCamp) {
+			camp = contextCamp;
+			formName = camp.name;
+			formLocation = camp.location ?? "";
+			loading = false;
+		} else {
+			loadCamp();
+		}
 	});
 </script>
 
@@ -81,7 +94,7 @@
 							type="text"
 							bind:value={formName}
 							required
-							disabled={saving}
+							disabled={saving || disabled}
 						/>
 					</div>
 					<div class="grid gap-2">
@@ -91,7 +104,7 @@
 							type="text"
 							placeholder="Optional"
 							bind:value={formLocation}
-							disabled={saving}
+							disabled={saving || disabled}
 						/>
 					</div>
 					<div class="flex items-center gap-2 text-sm">
@@ -101,7 +114,7 @@
 						</span>
 					</div>
 					<div class="flex justify-end">
-						<Button type="submit" disabled={saving}>
+						<Button type="submit" disabled={saving || disabled}>
 							{#if saving}
 								<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
 							{/if}

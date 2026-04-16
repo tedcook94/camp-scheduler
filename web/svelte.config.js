@@ -10,7 +10,7 @@ const config = {
 			fallback: 'index.html'
 		}),
 		paths: {
-			base: '/admin'
+			base: ''
 		}
 	}
 };

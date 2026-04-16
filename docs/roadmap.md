@@ -132,7 +132,7 @@ viable configurations and understand trade-offs.
     - [x] Revoke access tokens on password reset (token version)
   - [x] Impersonation (ability to log in as any user)
 - [ ] Web frontend
-  - [ ] Foundation: base path migration (`/admin` → `/`), route groups (`(admin)`, `(user)`), SPA handler update
+  - [x] Foundation: base path migration (`/admin` → `/`), route groups (`(admin)`, `(user)`), SPA handler update
   - [ ] Login: unified login with role-based routing (super_admin → /admin, all other roles → /app)
   - [ ] Dashboard: landing page with navigation cards to each section
   - [ ] Camp settings: view and edit camp details

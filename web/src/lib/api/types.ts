@@ -56,6 +56,18 @@ export interface UpdatePasswordRequest {
 	password: string;
 }
 
+export interface Certification {
+	id: string;
+	camp_id: string;
+	name: string;
+}
+
+export interface AgeGroup {
+	id: string;
+	camp_id: string;
+	name: string;
+}
+
 export interface ApiError {
 	error: string;
 }

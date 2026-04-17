@@ -36,8 +36,15 @@ func IsBadInput(err error) bool {
 }
 
 func BadInput(msg string) error {
-	return fmt.Errorf("%s: %w", msg, ErrBadInput)
+	return &badInputError{msg: msg}
 }
+
+type badInputError struct {
+	msg string
+}
+
+func (e *badInputError) Error() string { return e.msg }
+func (e *badInputError) Unwrap() error { return ErrBadInput }
 
 func ParseUUID(s string) (pgtype.UUID, error) {
 	var uid pgtype.UUID

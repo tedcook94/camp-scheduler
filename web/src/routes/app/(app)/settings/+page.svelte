@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, getContext } from "svelte";
+	import { getContext } from "svelte";
 	import { campApi } from "$lib/api";
 	import { ApiClientError } from "$lib/api/client";
 	import { toast } from "svelte-sonner";
@@ -13,28 +13,13 @@
 	const getCampDisabled = getContext<() => boolean>("campDisabled");
 	const getCamp = getContext<() => Camp | null>("camp");
 
-	let camp = $state<Camp | null>(null);
-	let loading = $state(true);
+	let camp = $state<Camp | null>(getCamp());
 	let saving = $state(false);
 
-	let formName = $state("");
-	let formLocation = $state("");
+	let formName = $state(camp?.name ?? "");
+	let formLocation = $state(camp?.location ?? "");
 
-	let disabled = $derived(getCampDisabled());
-
-	async function loadCamp() {
-		loading = true;
-		try {
-			camp = await campApi.get();
-			formName = camp.name;
-			formLocation = camp.location ?? "";
-		} catch (err) {
-			const message = err instanceof ApiClientError ? err.message : "Failed to load camp";
-			toast.error(message);
-		} finally {
-			loading = false;
-		}
-	}
+	let disabled = $derived.by(() => getCampDisabled());
 
 	async function handleSave(e: SubmitEvent) {
 		e.preventDefault();
@@ -57,18 +42,6 @@
 			saving = false;
 		}
 	}
-
-	onMount(() => {
-		const contextCamp = getCamp();
-		if (contextCamp) {
-			camp = contextCamp;
-			formName = camp.name;
-			formLocation = camp.location ?? "";
-			loading = false;
-		} else {
-			loadCamp();
-		}
-	});
 </script>
 
 <div class="grid gap-6">
@@ -77,9 +50,7 @@
 		<p class="text-muted-foreground text-sm">View and edit your camp details.</p>
 	</div>
 
-	{#if loading}
-		<div class="text-muted-foreground py-8 text-center text-sm">Loading camp settings...</div>
-	{:else if camp}
+	{#if camp}
 		<Card.Card>
 			<Card.CardHeader>
 				<Card.CardTitle>Camp Details</Card.CardTitle>

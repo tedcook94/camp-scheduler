@@ -139,7 +139,7 @@ viable configurations and understand trade-offs.
   - [x] Certifications: list, create, edit, delete
   - [x] Age groups: list, create, edit, delete
   - [x] Cabins: list, create, edit, delete (with age group assignment)
-  - [ ] Seasons & sessions: CRUD for seasons; manage sessions within a session
+  - [x] Seasons & sessions: CRUD for seasons; manage sessions within a season
   - [ ] Counselors: list, create, edit, delete; manage preferences (age group, co-counselor, activity); certifications; session history
   - [ ] Campers: list, create, edit, delete; friend preferences; session enrollments
   - [ ] Activities & time slots: CRUD for both; certification requirements; assign to sessions

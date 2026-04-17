@@ -9,10 +9,11 @@
 
 	const sections = [
 		{
-			label: "Seasons",
-			description: "Manage camp seasons and session schedules",
+			href: "/app/sessions",
+			label: "Sessions",
+			description: "Manage sessions and seasons for your camp",
 			icon: CalendarIcon,
-			enabled: false,
+			enabled: true,
 		},
 		{
 			href: "/app/cabins",

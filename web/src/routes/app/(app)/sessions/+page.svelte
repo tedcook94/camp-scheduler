@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { getContext, onMount } from "svelte";
 	import { ApiClientError } from "$lib/api/client";
-	import { cabinApi, ageGroupApi } from "$lib/api";
+	import { sessionApi, seasonApi } from "$lib/api";
 	import { toast } from "svelte-sonner";
 	import { Button } from "$lib/components/ui/button";
 	import { Input } from "$lib/components/ui/input";
@@ -10,7 +10,7 @@
 	import * as Dialog from "$lib/components/ui/dialog";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog";
 	import * as Select from "$lib/components/ui/select";
-	import type { AgeGroup, Cabin, Camp } from "$lib/api/types";
+	import type { Session, Season, Camp } from "$lib/api/types";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import TrashIcon from "@lucide/svelte/icons/trash";
@@ -22,43 +22,53 @@
 	let disabled = $derived.by(() => getCampDisabled());
 	let camp = $derived.by(() => getCamp());
 
-	let cabins = $state<Cabin[]>([]);
-	let ageGroups = $state<AgeGroup[]>([]);
+	let sessions = $state<Session[]>([]);
+	let seasons = $state<Season[]>([]);
 	let loading = $state(true);
 	let loadError = $state(false);
-	let noAgeGroups = $derived(!loading && ageGroups.length === 0);
+	let noSeasons = $derived(!loading && seasons.length === 0);
 
 	// Create/edit dialog
 	let dialogOpen = $state(false);
-	let editingCabin = $state<Cabin | null>(null);
+	let editingSession = $state<Session | null>(null);
 	let formName = $state("");
-	let formAgeGroupId = $state("");
+	let formSeasonId = $state("");
+	let formPreviousSessionId = $state<string | null>(null);
 	let submitting = $state(false);
 	let nameError = $state("");
-	let ageGroupError = $state("");
+	let seasonError = $state("");
 
-	let dialogTitle = $derived(editingCabin ? "Edit Cabin" : "Add Cabin");
+	let dialogTitle = $derived(editingSession ? "Edit Session" : "Add Session");
 	let dialogDescription = $derived(
-		editingCabin
-			? "Update the cabin name and default age group."
-			: "Enter a name and select a default age group for the new cabin."
+		editingSession
+			? "Update the session details."
+			: "Enter a name and select a season for the new session."
 	);
 
 	// Delete confirmation
 	let deleteOpen = $state(false);
-	let deleteTarget = $state<Cabin | null>(null);
+	let deleteTarget = $state<Session | null>(null);
 	let deleting = $state(false);
+
+	// Lookup helpers
+	let seasonMap = $derived(new Map(seasons.map((s) => [s.id, s.name])));
+	let sessionMap = $derived(new Map(sessions.map((s) => [s.id, s.name])));
+
+	// Sessions available as "previous" (exclude the one being edited)
+	let previousSessionOptions = $derived(
+		sessions.filter((s) => s.id !== editingSession?.id)
+	);
 
 	onMount(async () => {
 		try {
-			const [cabinList, ageGroupList] = await Promise.all([
-				cabinApi.list(),
-				ageGroupApi.list(),
+			const [sessionList, seasonList] = await Promise.all([
+				sessionApi.list(),
+				seasonApi.list(),
 			]);
-			cabins = cabinList;
-			ageGroups = ageGroupList;
+			sessions = sessionList;
+			seasons = seasonList;
 		} catch (err) {
-			const message = err instanceof ApiClientError ? err.message : "Failed to load cabins";
+			const message = err instanceof ApiClientError ? err.message : "Failed to load sessions";
 			toast.error(message);
 			loadError = true;
 		} finally {
@@ -68,21 +78,23 @@
 
 	function clearErrors() {
 		nameError = "";
-		ageGroupError = "";
+		seasonError = "";
 	}
 
 	function openCreate() {
-		editingCabin = null;
+		editingSession = null;
 		formName = "";
-		formAgeGroupId = "";
+		formSeasonId = "";
+		formPreviousSessionId = null;
 		clearErrors();
 		dialogOpen = true;
 	}
 
-	function openEdit(cabin: Cabin) {
-		editingCabin = cabin;
-		formName = cabin.name;
-		formAgeGroupId = cabin.default_age_group_id;
+	function openEdit(session: Session) {
+		editingSession = session;
+		formName = session.name;
+		formSeasonId = session.season_id;
+		formPreviousSessionId = session.previous_session_id;
 		clearErrors();
 		dialogOpen = true;
 	}
@@ -97,8 +109,8 @@
 			nameError = "Name is required.";
 			valid = false;
 		}
-		if (!formAgeGroupId) {
-			ageGroupError = "Age group is required.";
+		if (!formSeasonId) {
+			seasonError = "Season is required.";
 			valid = false;
 		}
 		if (!valid) return;
@@ -106,33 +118,32 @@
 		submitting = true;
 
 		try {
-			if (editingCabin) {
-				const updated = await cabinApi.update(editingCabin.id, {
-					name,
-					default_age_group_id: formAgeGroupId,
-				});
-				cabins = cabins.map((c) => (c.id === updated.id ? updated : c));
-				toast.success("Cabin updated");
+			const payload = {
+				name,
+				season_id: formSeasonId,
+				previous_session_id: formPreviousSessionId,
+			};
+			if (editingSession) {
+				const updated = await sessionApi.update(editingSession.id, payload);
+				sessions = sessions.map((s) => (s.id === updated.id ? updated : s));
+				toast.success("Session updated");
 			} else {
-				const created = await cabinApi.create({
-					name,
-					default_age_group_id: formAgeGroupId,
-				});
-				cabins = [...cabins, created];
-				toast.success("Cabin created");
+				const created = await sessionApi.create(payload);
+				sessions = [...sessions, created];
+				toast.success("Session created");
 			}
 			dialogOpen = false;
 		} catch (err) {
-			const action = editingCabin ? "update" : "create";
-			const message = err instanceof ApiClientError ? err.message : `Failed to ${action} cabin`;
+			const action = editingSession ? "update" : "create";
+			const message = err instanceof ApiClientError ? err.message : `Failed to ${action} session`;
 			toast.error(message);
 		} finally {
 			submitting = false;
 		}
 	}
 
-	function confirmDelete(cabin: Cabin) {
-		deleteTarget = cabin;
+	function confirmDelete(session: Session) {
+		deleteTarget = session;
 		deleteOpen = true;
 	}
 
@@ -141,13 +152,13 @@
 		deleting = true;
 
 		try {
-			await cabinApi.delete(deleteTarget.id);
-			cabins = cabins.filter((c) => c.id !== deleteTarget!.id);
-			toast.success("Cabin deleted");
+			await sessionApi.delete(deleteTarget.id);
+			sessions = sessions.filter((s) => s.id !== deleteTarget!.id);
+			toast.success("Session deleted");
 			deleteOpen = false;
 			deleteTarget = null;
 		} catch (err) {
-			const message = err instanceof ApiClientError ? err.message : "Failed to delete cabin";
+			const message = err instanceof ApiClientError ? err.message : "Failed to delete session";
 			toast.error(message);
 		} finally {
 			deleting = false;
@@ -158,13 +169,13 @@
 <div class="grid gap-6">
 	<div class="flex items-start justify-between">
 		<div>
-			<h1 class="text-2xl font-semibold tracking-tight">Cabins</h1>
-			<p class="text-muted-foreground text-sm">Manage camp cabins and their default age group assignments.</p>
+			<h1 class="text-2xl font-semibold tracking-tight">Sessions</h1>
+			<p class="text-muted-foreground text-sm">Manage sessions within your camp seasons.</p>
 		</div>
 		{#if camp}
-			<Button size="sm" disabled={disabled || loading || loadError || noAgeGroups} onclick={openCreate}>
+			<Button size="sm" disabled={loading || disabled || noSeasons} onclick={openCreate}>
 				<PlusIcon class="mr-2 size-4" />
-				Add Cabin
+				Add Session
 			</Button>
 		{/if}
 	</div>
@@ -175,39 +186,47 @@
 		<div class="text-muted-foreground py-8 text-center text-sm">No camp data available.</div>
 	{:else if loadError}
 		<div class="text-muted-foreground py-8 text-center text-sm">
-			Failed to load cabins. Try refreshing the page.
+			Failed to load sessions. Try refreshing the page.
 		</div>
-	{:else if noAgeGroups}
+	{:else if noSeasons}
 		<div class="text-muted-foreground py-8 text-center text-sm">
-			No age groups found. <a href="/app/age-groups" class="text-foreground underline">Create an age group</a> before adding cabins.
+			No seasons found. <a href="/app/seasons" class="text-foreground underline">Create a season</a> before adding sessions.
 		</div>
-	{:else if cabins.length === 0}
+	{:else if sessions.length === 0}
 		<div class="text-muted-foreground py-8 text-center text-sm">
-			No cabins yet. Click "Add Cabin" to create one.
+			No sessions yet. Click "Add Session" to create one.
 		</div>
 	{:else}
 		<Table.Table>
 			<Table.TableHeader>
 				<Table.TableRow>
 					<Table.TableHead>Name</Table.TableHead>
-					<Table.TableHead>Default Age Group</Table.TableHead>
+					<Table.TableHead>Season</Table.TableHead>
+					<Table.TableHead>Previous Session</Table.TableHead>
 					<Table.TableHead class="w-24">
 						<span class="sr-only">Actions</span>
 					</Table.TableHead>
 				</Table.TableRow>
 			</Table.TableHeader>
 			<Table.TableBody>
-				{#each cabins as cabin (cabin.id)}
+				{#each sessions as session (session.id)}
 					<Table.TableRow>
-						<Table.TableCell>{cabin.name}</Table.TableCell>
-						<Table.TableCell>{cabin.default_age_group_name}</Table.TableCell>
+						<Table.TableCell>{session.name}</Table.TableCell>
+						<Table.TableCell>{seasonMap.get(session.season_id) ?? "Unknown"}</Table.TableCell>
+						<Table.TableCell>
+							{#if session.previous_session_id}
+								{sessionMap.get(session.previous_session_id) ?? "Unknown"}
+							{:else}
+								<span class="text-muted-foreground">—</span>
+							{/if}
+						</Table.TableCell>
 						<Table.TableCell>
 							<div class="flex justify-end gap-1">
 								<Button
 									variant="ghost"
 									size="icon-sm"
 									disabled={disabled}
-									onclick={() => openEdit(cabin)}
+									onclick={() => openEdit(session)}
 								>
 									<PencilIcon class="size-4" />
 									<span class="sr-only">Edit</span>
@@ -216,7 +235,7 @@
 									variant="ghost"
 									size="icon-sm"
 									disabled={disabled}
-									onclick={() => confirmDelete(cabin)}
+									onclick={() => confirmDelete(session)}
 								>
 									<TrashIcon class="size-4" />
 									<span class="sr-only">Delete</span>
@@ -239,11 +258,11 @@
 		</Dialog.DialogHeader>
 		<form onsubmit={handleSubmit} class="grid gap-4">
 			<div class="grid gap-2">
-				<Label for="cabin-name">Name</Label>
+				<Label for="session-name">Name</Label>
 				<Input
-					id="cabin-name"
+					id="session-name"
 					type="text"
-					placeholder="Cabin name"
+					placeholder="Session name"
 					bind:value={formName}
 					disabled={submitting}
 					oninput={() => (nameError = "")}
@@ -253,24 +272,47 @@
 				{/if}
 			</div>
 			<div class="grid gap-2">
-				<Label for="cabin-age-group">Default Age Group</Label>
-				<Select.Select type="single" bind:value={formAgeGroupId} disabled={submitting} onValueChange={() => (ageGroupError = "")}>
-					<Select.SelectTrigger id="cabin-age-group" class="w-full">
-						{#if formAgeGroupId}
-							{ageGroups.find((ag) => ag.id === formAgeGroupId)?.name ?? "Select age group"}
+				<Label for="session-season">Season</Label>
+				<Select.Select type="single" bind:value={formSeasonId} disabled={submitting} onValueChange={() => (seasonError = "")}>
+					<Select.SelectTrigger id="session-season" class="w-full">
+						{#if formSeasonId}
+							{seasonMap.get(formSeasonId) ?? "Select season"}
 						{:else}
-							<span class="text-muted-foreground">Select age group</span>
+							<span class="text-muted-foreground">Select season</span>
 						{/if}
 					</Select.SelectTrigger>
 					<Select.SelectContent>
-						{#each ageGroups as ag (ag.id)}
-							<Select.SelectItem value={ag.id}>{ag.name}</Select.SelectItem>
+						{#each seasons as season (season.id)}
+							<Select.SelectItem value={season.id}>{season.name}</Select.SelectItem>
 						{/each}
 					</Select.SelectContent>
 				</Select.Select>
-				{#if ageGroupError}
-					<p class="text-destructive text-sm">{ageGroupError}</p>
+				{#if seasonError}
+					<p class="text-destructive text-sm">{seasonError}</p>
 				{/if}
+			</div>
+			<div class="grid gap-2">
+				<Label for="session-previous">Previous Session</Label>
+				<Select.Select
+					type="single"
+					value={formPreviousSessionId ?? ""}
+					disabled={submitting}
+					onValueChange={(v) => (formPreviousSessionId = v || null)}
+				>
+					<Select.SelectTrigger id="session-previous" class="w-full">
+						{#if formPreviousSessionId}
+							{sessionMap.get(formPreviousSessionId!) ?? "Select session"}
+						{:else}
+							<span class="text-muted-foreground">None</span>
+						{/if}
+					</Select.SelectTrigger>
+					<Select.SelectContent>
+						<Select.SelectItem value="">None</Select.SelectItem>
+						{#each previousSessionOptions as s (s.id)}
+							<Select.SelectItem value={s.id}>{s.name}</Select.SelectItem>
+						{/each}
+					</Select.SelectContent>
+				</Select.Select>
 			</div>
 			<Dialog.DialogFooter>
 				<Button type="button" variant="outline" disabled={submitting} onclick={() => (dialogOpen = false)}>
@@ -280,7 +322,7 @@
 					{#if submitting}
 						<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
 					{/if}
-					{editingCabin ? "Save" : "Create"}
+					{editingSession ? "Save" : "Create"}
 				</Button>
 			</Dialog.DialogFooter>
 		</form>
@@ -291,7 +333,7 @@
 <AlertDialog.AlertDialog bind:open={deleteOpen}>
 	<AlertDialog.AlertDialogContent>
 		<AlertDialog.AlertDialogHeader>
-			<AlertDialog.AlertDialogTitle>Delete Cabin</AlertDialog.AlertDialogTitle>
+			<AlertDialog.AlertDialogTitle>Delete Session</AlertDialog.AlertDialogTitle>
 			<AlertDialog.AlertDialogDescription>
 				Are you sure you want to delete "{deleteTarget?.name}"? This action cannot be undone.
 			</AlertDialog.AlertDialogDescription>

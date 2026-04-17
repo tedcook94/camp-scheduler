@@ -84,9 +84,12 @@
 
 	const navItems: NavItem[] = [
 		{
-			label: "Seasons",
+			label: "Sessions",
 			icon: CalendarIcon,
-			children: [],
+			href: "/app/sessions",
+			children: [
+				{ href: "/app/seasons", label: "Seasons" },
+			],
 		},
 		{
 			label: "Cabins",

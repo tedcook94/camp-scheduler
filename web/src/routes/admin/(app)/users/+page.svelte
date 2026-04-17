@@ -343,7 +343,7 @@
 					bind:value={formUsername}
 					placeholder="Username"
 					required
-					minlength={3}
+					minlength={8}
 					pattern="[a-zA-Z0-9._\\-]+"
 					title="Letters, numbers, dots, hyphens, and underscores only"
 					disabled={saving}

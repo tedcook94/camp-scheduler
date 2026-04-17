@@ -35,6 +35,10 @@ func IsBadInput(err error) bool {
 	return errors.Is(err, ErrBadInput)
 }
 
+func BadInput(msg string) error {
+	return fmt.Errorf("%s: %w", msg, ErrBadInput)
+}
+
 func ParseUUID(s string) (pgtype.UUID, error) {
 	var uid pgtype.UUID
 	if err := uid.Scan(s); err != nil {

@@ -1,6 +1,8 @@
 import { api } from "./client";
 import type {
+	AgeGroup,
 	Camp,
+	Certification,
 	CreateCampRequest,
 	CreateUserRequest,
 	TokenResponse,
@@ -57,4 +59,22 @@ export const userApi = {
 
 	impersonate: (id: string) =>
 		api.post<TokenResponse>(`/api/v1/admin/users/${id}/impersonate`),
+};
+
+export const certificationApi = {
+	list: () => api.get<Certification[]>("/api/v1/certifications"),
+	get: (id: string) => api.get<Certification>(`/api/v1/certifications/${id}`),
+	create: (name: string) => api.post<Certification>("/api/v1/certifications", { name }),
+	update: (id: string, name: string) =>
+		api.put<Certification>(`/api/v1/certifications/${id}`, { name }),
+	delete: (id: string) => api.delete<void>(`/api/v1/certifications/${id}`),
+};
+
+export const ageGroupApi = {
+	list: () => api.get<AgeGroup[]>("/api/v1/age-groups"),
+	get: (id: string) => api.get<AgeGroup>(`/api/v1/age-groups/${id}`),
+	create: (name: string) => api.post<AgeGroup>("/api/v1/age-groups", { name }),
+	update: (id: string, name: string) =>
+		api.put<AgeGroup>(`/api/v1/age-groups/${id}`, { name }),
+	delete: (id: string) => api.delete<void>(`/api/v1/age-groups/${id}`),
 };

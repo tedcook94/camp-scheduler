@@ -2306,7 +2306,7 @@ func testSuperAdminUserLifecycle(t *testing.T) {
 		apiURL(ts, "/admin/users/00000000-0000-0000-0000-000000000000"),
 		map[string]any{
 			"camp_id":    campID,
-			"username":   "ghost",
+			"username":   "test-user",
 			"email":      "ghost@example.com",
 			"first_name": "Ghost",
 			"last_name":  "User",

@@ -9,32 +9,27 @@
 
 	const sections = [
 		{
-			href: "/app/settings",
-			label: "Camp Settings",
-			description: "View and edit your camp details",
-			icon: SettingsIcon,
-			enabled: true,
-		},
-		{
-			label: "Seasons & Sessions",
+			label: "Seasons",
 			description: "Manage camp seasons and session schedules",
 			icon: CalendarIcon,
 			enabled: false,
 		},
 		{
-			label: "Cabins & Age Groups",
-			description: "Configure cabins and age group assignments",
+			href: "/app/cabins",
+			label: "Cabins",
+			description: "Manage camp cabins and their configurations",
 			icon: TentTreeIcon,
-			enabled: false,
+			enabled: true,
 		},
 		{
+			href: "/app/counselors",
 			label: "Counselors",
 			description: "Manage counselor profiles, preferences, and certifications",
 			icon: UsersIcon,
-			enabled: false,
+			enabled: true,
 		},
 		{
-			label: "Campers & Enrollments",
+			label: "Campers",
 			description: "Track camper registrations and session enrollments",
 			icon: ClipboardListIcon,
 			enabled: false,
@@ -44,6 +39,13 @@
 			description: "Run the solver and review cabin and activity assignments",
 			icon: PlayIcon,
 			enabled: false,
+		},
+		{
+			href: "/app/settings",
+			label: "Camp Settings",
+			description: "View and edit your camp details",
+			icon: SettingsIcon,
+			enabled: true,
 		},
 	];
 </script>

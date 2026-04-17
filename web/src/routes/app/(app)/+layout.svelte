@@ -12,13 +12,30 @@
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import { toggleMode } from "mode-watcher";
 	import TentTreeIcon from "@lucide/svelte/icons/tent-tree";
-	import LayoutDashboardIcon from "@lucide/svelte/icons/layout-dashboard";
 	import SettingsIcon from "@lucide/svelte/icons/settings";
+	import CalendarIcon from "@lucide/svelte/icons/calendar";
+	import UsersIcon from "@lucide/svelte/icons/users";
+	import ClipboardListIcon from "@lucide/svelte/icons/clipboard-list";
+	import PlayIcon from "@lucide/svelte/icons/play";
 	import MoonIcon from "@lucide/svelte/icons/moon";
 	import SunIcon from "@lucide/svelte/icons/sun";
 	import LogOutIcon from "@lucide/svelte/icons/log-out";
 	import CircleUserIcon from "@lucide/svelte/icons/circle-user";
 	import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
+
+	import type { Component } from "svelte";
+
+	interface NavChild {
+		href: string;
+		label: string;
+	}
+
+	interface NavItem {
+		label: string;
+		icon: Component;
+		href?: string;
+		children?: NavChild[];
+	}
 
 	let { children } = $props();
 
@@ -59,8 +76,44 @@
 		goto("/login");
 	}
 
-	const navItems = [
-		{ href: "/app/dashboard", label: "Dashboard", icon: LayoutDashboardIcon },
+	function isParentActive(item: NavItem): boolean {
+		if (item.href && $page.url.pathname.startsWith(item.href)) return true;
+		if (!item.children) return false;
+		return item.children.some((child) => $page.url.pathname.startsWith(child.href));
+	}
+
+	const navItems: NavItem[] = [
+		{
+			label: "Seasons",
+			icon: CalendarIcon,
+			children: [],
+		},
+		{
+			label: "Cabins",
+			icon: TentTreeIcon,
+			href: "/app/cabins",
+			children: [
+				{ href: "/app/age-groups", label: "Age Groups" },
+			],
+		},
+		{
+			label: "Counselors",
+			icon: UsersIcon,
+			href: "/app/counselors",
+			children: [
+				{ href: "/app/certifications", label: "Certifications" },
+			],
+		},
+		{
+			label: "Campers",
+			icon: ClipboardListIcon,
+			children: [],
+		},
+		{
+			label: "Assignment Runs",
+			icon: PlayIcon,
+			children: [],
+		},
 		{ href: "/app/settings", label: "Camp Settings", icon: SettingsIcon },
 	];
 </script>
@@ -89,18 +142,67 @@
 			<nav class="flex-1 p-2">
 				<ul class="grid gap-0.5">
 					{#each navItems as item}
-						{@const active = $page.url.pathname.startsWith(item.href)}
-						<li>
-							<a
-								href={item.href}
-								class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors {active
-									? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-									: 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'}"
-							>
-								<item.icon class="size-4" />
-								{item.label}
-							</a>
-						</li>
+						{#if item.href && !item.children}
+							{@const active = $page.url.pathname.startsWith(item.href)}
+							<li>
+								<a
+									href={item.href}
+									class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors {active
+										? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+										: 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'}"
+								>
+									<item.icon class="size-4" />
+									{item.label}
+								</a>
+							</li>
+						{:else if item.children}
+							{@const expanded = isParentActive(item)}
+							{@const parentActive = item.href ? $page.url.pathname === item.href : false}
+							<li>
+								{#if item.href}
+									<a
+										href={item.href}
+										class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors
+											{parentActive
+												? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+												: expanded
+													? 'text-sidebar-foreground font-medium hover:bg-sidebar-accent/50'
+													: 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'}"
+									>
+										<item.icon class="size-4" />
+										{item.label}
+									</a>
+								{:else}
+									<div
+										class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors
+											{expanded
+												? 'text-sidebar-foreground font-medium'
+												: 'text-sidebar-foreground/70'}
+											{item.children.length === 0 ? 'opacity-50' : ''}"
+									>
+										<item.icon class="size-4" />
+										{item.label}
+									</div>
+								{/if}
+								{#if expanded && item.children.length > 0}
+									<ul class="mt-0.5 grid gap-0.5 pl-4">
+										{#each item.children as child}
+											{@const childActive = $page.url.pathname.startsWith(child.href)}
+											<li>
+												<a
+													href={child.href}
+													class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors {childActive
+														? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+														: 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'}"
+												>
+													{child.label}
+												</a>
+											</li>
+										{/each}
+									</ul>
+								{/if}
+							</li>
+						{/if}
 					{/each}
 				</ul>
 			</nav>

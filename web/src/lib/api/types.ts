@@ -89,3 +89,43 @@ export interface UpdateCabinRequest {
 	name: string;
 	default_age_group_id: string;
 }
+
+export interface Season {
+	id: string;
+	camp_id: string;
+	name: string;
+	start_date: string;
+	end_date: string;
+}
+
+export interface CreateSeasonRequest {
+	name: string;
+	start_date: string;
+	end_date: string;
+}
+
+export interface UpdateSeasonRequest {
+	name: string;
+	start_date: string;
+	end_date: string;
+}
+
+export interface Session {
+	id: string;
+	camp_id: string;
+	season_id: string;
+	name: string;
+	previous_session_id: string | null;
+}
+
+export interface CreateSessionRequest {
+	name: string;
+	season_id: string;
+	previous_session_id?: string | null;
+}
+
+export interface UpdateSessionRequest {
+	name: string;
+	season_id: string;
+	previous_session_id?: string | null;
+}

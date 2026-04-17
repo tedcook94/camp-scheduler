@@ -1,11 +1,14 @@
 import { api } from "./client";
 import type {
 	AgeGroup,
+	Cabin,
 	Camp,
 	Certification,
+	CreateCabinRequest,
 	CreateCampRequest,
 	CreateUserRequest,
 	TokenResponse,
+	UpdateCabinRequest,
 	UpdateCampRequest,
 	UpdatePasswordRequest,
 	UpdateUserRequest,
@@ -77,4 +80,14 @@ export const ageGroupApi = {
 	update: (id: string, name: string) =>
 		api.put<AgeGroup>(`/api/v1/age-groups/${id}`, { name }),
 	delete: (id: string) => api.delete<void>(`/api/v1/age-groups/${id}`),
+};
+
+export const cabinApi = {
+	list: () => api.get<Cabin[]>("/api/v1/cabins"),
+	get: (id: string) => api.get<Cabin>(`/api/v1/cabins/${id}`),
+	create: (data: CreateCabinRequest) =>
+		api.post<Cabin>("/api/v1/cabins", data),
+	update: (id: string, data: UpdateCabinRequest) =>
+		api.put<Cabin>(`/api/v1/cabins/${id}`, data),
+	delete: (id: string) => api.delete<void>(`/api/v1/cabins/${id}`),
 };

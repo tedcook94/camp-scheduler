@@ -71,3 +71,21 @@ export interface AgeGroup {
 export interface ApiError {
 	error: string;
 }
+
+export interface Cabin {
+	id: string;
+	camp_id: string;
+	default_age_group_id: string;
+	default_age_group_name: string;
+	name: string;
+}
+
+export interface CreateCabinRequest {
+	name: string;
+	default_age_group_id: string;
+}
+
+export interface UpdateCabinRequest {
+	name: string;
+	default_age_group_id: string;
+}

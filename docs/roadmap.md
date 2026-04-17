@@ -138,7 +138,7 @@ viable configurations and understand trade-offs.
   - [x] Camp settings: view and edit camp details
   - [x] Certifications: list, create, edit, delete
   - [x] Age groups: list, create, edit, delete
-  - [ ] Cabins: list, create, edit, delete (with age group assignment)
+  - [x] Cabins: list, create, edit, delete (with age group assignment)
   - [ ] Seasons & sessions: CRUD for seasons; manage sessions within a session
   - [ ] Counselors: list, create, edit, delete; manage preferences (age group, co-counselor, activity); certifications; session history
   - [ ] Campers: list, create, edit, delete; friend preferences; session enrollments

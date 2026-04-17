@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
@@ -13,6 +14,18 @@ import (
 )
 
 var ErrUserNotFound = errors.New("user not found")
+
+var usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
+
+func validateUsername(username string) error {
+	if len(username) < 8 {
+		return api.BadInput("username must be at least 8 characters")
+	}
+	if !usernamePattern.MatchString(username) {
+		return api.BadInput("username may only contain letters, numbers, dots, hyphens, and underscores")
+	}
+	return nil
+}
 
 type UserService struct {
 	queries *db.Queries
@@ -104,6 +117,10 @@ func (svc *UserService) GetByID(ctx context.Context, id string) (UserResponse, e
 }
 
 func (svc *UserService) Create(ctx context.Context, req CreateUserRequest) (UserResponse, error) {
+	if err := validateUsername(req.Username); err != nil {
+		return UserResponse{}, err
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return UserResponse{}, fmt.Errorf("error hashing password: %w", err)
@@ -131,6 +148,10 @@ func (svc *UserService) Create(ctx context.Context, req CreateUserRequest) (User
 }
 
 func (svc *UserService) Update(ctx context.Context, id string, req UpdateUserRequest) (UserResponse, error) {
+	if err := validateUsername(req.Username); err != nil {
+		return UserResponse{}, err
+	}
+
 	uid, err := api.ParseUUID(id)
 	if err != nil {
 		return UserResponse{}, err

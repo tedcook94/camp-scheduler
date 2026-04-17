@@ -65,15 +65,15 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCabinRe
 		return CabinResponse{}, err
 	}
 
-	ageGroupUUID, err := api.ParseUUID(req.AgeGroupID)
+	ageGroupUUID, err := api.ParseUUID(req.DefaultAgeGroupID)
 	if err != nil {
 		return CabinResponse{}, err
 	}
 
 	cabin, err := svc.queries.CreateCabin(ctx, db.CreateCabinParams{
-		CampID:     campUUID,
-		AgeGroupID: ageGroupUUID,
-		CabinName:  req.Name,
+		CampID:            campUUID,
+		DefaultAgeGroupID: ageGroupUUID,
+		CabinName:         req.Name,
 	})
 	if err != nil {
 		return CabinResponse{}, fmt.Errorf("error creating cabin: %w", err)
@@ -93,16 +93,16 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCab
 		return CabinResponse{}, err
 	}
 
-	ageGroupUUID, err := api.ParseUUID(req.AgeGroupID)
+	ageGroupUUID, err := api.ParseUUID(req.DefaultAgeGroupID)
 	if err != nil {
 		return CabinResponse{}, err
 	}
 
 	cabin, err := svc.queries.UpdateCabin(ctx, db.UpdateCabinParams{
-		ID:         uid,
-		CampID:     campUUID,
-		AgeGroupID: ageGroupUUID,
-		CabinName:  req.Name,
+		ID:                uid,
+		CampID:            campUUID,
+		DefaultAgeGroupID: ageGroupUUID,
+		CabinName:         req.Name,
 	})
 	if err != nil {
 		return CabinResponse{}, fmt.Errorf("error updating cabin %s: %w", id, err)
@@ -138,9 +138,9 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 
 func toCabinResponse(c db.Cabin) CabinResponse {
 	return CabinResponse{
-		ID:         api.UUIDToString(c.ID),
-		CampID:     api.UUIDToString(c.CampID),
-		AgeGroupID: api.UUIDToString(c.AgeGroupID),
-		Name:       c.CabinName,
+		ID:                api.UUIDToString(c.ID),
+		CampID:            api.UUIDToString(c.CampID),
+		DefaultAgeGroupID: api.UUIDToString(c.DefaultAgeGroupID),
+		Name:              c.CabinName,
 	}
 }

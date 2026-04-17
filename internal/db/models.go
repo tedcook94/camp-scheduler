@@ -71,10 +71,10 @@ type AssignmentRunSelectedSolution struct {
 }
 
 type Cabin struct {
-	ID         pgtype.UUID
-	CampID     pgtype.UUID
-	AgeGroupID pgtype.UUID
-	CabinName  string
+	ID                pgtype.UUID
+	CampID            pgtype.UUID
+	DefaultAgeGroupID pgtype.UUID
+	CabinName         string
 }
 
 type Camp struct {

@@ -12,24 +12,24 @@ import (
 )
 
 const createCabin = `-- name: CreateCabin :one
-INSERT INTO cabins (camp_id, age_group_id, cabin_name)
+INSERT INTO cabins (camp_id, default_age_group_id, cabin_name)
 VALUES ($1, $2, $3)
-RETURNING id, camp_id, age_group_id, cabin_name
+RETURNING id, camp_id, default_age_group_id, cabin_name
 `
 
 type CreateCabinParams struct {
-	CampID     pgtype.UUID
-	AgeGroupID pgtype.UUID
-	CabinName  string
+	CampID            pgtype.UUID
+	DefaultAgeGroupID pgtype.UUID
+	CabinName         string
 }
 
 func (q *Queries) CreateCabin(ctx context.Context, arg CreateCabinParams) (Cabin, error) {
-	row := q.db.QueryRow(ctx, createCabin, arg.CampID, arg.AgeGroupID, arg.CabinName)
+	row := q.db.QueryRow(ctx, createCabin, arg.CampID, arg.DefaultAgeGroupID, arg.CabinName)
 	var i Cabin
 	err := row.Scan(
 		&i.ID,
 		&i.CampID,
-		&i.AgeGroupID,
+		&i.DefaultAgeGroupID,
 		&i.CabinName,
 	)
 	return i, err
@@ -54,7 +54,7 @@ func (q *Queries) DeleteCabin(ctx context.Context, arg DeleteCabinParams) (int64
 }
 
 const getCabin = `-- name: GetCabin :one
-SELECT id, camp_id, age_group_id, cabin_name
+SELECT id, camp_id, default_age_group_id, cabin_name
 FROM cabins
 WHERE id = $1 AND camp_id = $2
 `
@@ -70,14 +70,14 @@ func (q *Queries) GetCabin(ctx context.Context, arg GetCabinParams) (Cabin, erro
 	err := row.Scan(
 		&i.ID,
 		&i.CampID,
-		&i.AgeGroupID,
+		&i.DefaultAgeGroupID,
 		&i.CabinName,
 	)
 	return i, err
 }
 
 const listCabins = `-- name: ListCabins :many
-SELECT id, camp_id, age_group_id, cabin_name
+SELECT id, camp_id, default_age_group_id, cabin_name
 FROM cabins
 WHERE camp_id = $1
 ORDER BY cabin_name
@@ -95,7 +95,7 @@ func (q *Queries) ListCabins(ctx context.Context, campID pgtype.UUID) ([]Cabin, 
 		if err := rows.Scan(
 			&i.ID,
 			&i.CampID,
-			&i.AgeGroupID,
+			&i.DefaultAgeGroupID,
 			&i.CabinName,
 		); err != nil {
 			return nil, err
@@ -110,31 +110,31 @@ func (q *Queries) ListCabins(ctx context.Context, campID pgtype.UUID) ([]Cabin, 
 
 const updateCabin = `-- name: UpdateCabin :one
 UPDATE cabins
-SET age_group_id = $3,
+SET default_age_group_id = $3,
     cabin_name = $4
 WHERE id = $1 AND camp_id = $2
-RETURNING id, camp_id, age_group_id, cabin_name
+RETURNING id, camp_id, default_age_group_id, cabin_name
 `
 
 type UpdateCabinParams struct {
-	ID         pgtype.UUID
-	CampID     pgtype.UUID
-	AgeGroupID pgtype.UUID
-	CabinName  string
+	ID                pgtype.UUID
+	CampID            pgtype.UUID
+	DefaultAgeGroupID pgtype.UUID
+	CabinName         string
 }
 
 func (q *Queries) UpdateCabin(ctx context.Context, arg UpdateCabinParams) (Cabin, error) {
 	row := q.db.QueryRow(ctx, updateCabin,
 		arg.ID,
 		arg.CampID,
-		arg.AgeGroupID,
+		arg.DefaultAgeGroupID,
 		arg.CabinName,
 	)
 	var i Cabin
 	err := row.Scan(
 		&i.ID,
 		&i.CampID,
-		&i.AgeGroupID,
+		&i.DefaultAgeGroupID,
 		&i.CabinName,
 	)
 	return i, err

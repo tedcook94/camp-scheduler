@@ -29,20 +29,20 @@ func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 }
 
 type CreateCabinRequest struct {
-	Name       string `json:"name" binding:"required"`
-	AgeGroupID string `json:"age_group_id" binding:"required"`
+	Name              string `json:"name" binding:"required"`
+	DefaultAgeGroupID string `json:"default_age_group_id" binding:"required"`
 }
 
 type UpdateCabinRequest struct {
-	Name       string `json:"name" binding:"required"`
-	AgeGroupID string `json:"age_group_id" binding:"required"`
+	Name              string `json:"name" binding:"required"`
+	DefaultAgeGroupID string `json:"default_age_group_id" binding:"required"`
 }
 
 type CabinResponse struct {
-	ID         string `json:"id"`
-	CampID     string `json:"camp_id"`
-	AgeGroupID string `json:"age_group_id"`
-	Name       string `json:"name"`
+	ID                string `json:"id"`
+	CampID            string `json:"camp_id"`
+	DefaultAgeGroupID string `json:"default_age_group_id"`
+	Name              string `json:"name"`
 }
 
 func (ctrl *Controller) List(c *gin.Context) {

@@ -3,7 +3,6 @@
 	import { campApi } from "$lib/api";
 	import { ApiClientError } from "$lib/api/client";
 	import type { Camp, CreateCampRequest, UpdateCampRequest } from "$lib/api/types";
-	import { capitalizeFirst } from "$lib/utils";
 	import { toast } from "svelte-sonner";
 	import { Button } from "$lib/components/ui/button";
 	import { Input } from "$lib/components/ui/input";
@@ -42,7 +41,7 @@
 			camps = await campApi.list();
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to load camps";
-			toast.error(capitalizeFirst(message));
+			toast.error(message);
 		} finally {
 			loading = false;
 		}
@@ -120,7 +119,7 @@
 			await loadCamps();
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to delete camp";
-			toast.error(capitalizeFirst(message));
+			toast.error(message);
 			deleteDialogOpen = false;
 		} finally {
 			deleting = false;

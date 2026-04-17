@@ -5,7 +5,6 @@
 	import { ApiClientError } from "$lib/api/client";
 	import { auth } from "$lib/stores/auth.svelte";
 	import type { Camp, User, CreateUserRequest, UpdateUserRequest } from "$lib/api/types";
-	import { capitalizeFirst } from "$lib/utils";
 	import { toast } from "svelte-sonner";
 	import { Button } from "$lib/components/ui/button";
 	import { Input } from "$lib/components/ui/input";
@@ -60,7 +59,7 @@
 			[users, camps] = await Promise.all([userApi.list(), campApi.list()]);
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to load data";
-			toast.error(capitalizeFirst(message));
+			toast.error(message);
 		} finally {
 			loading = false;
 		}
@@ -198,7 +197,7 @@
 			await loadData();
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to delete user";
-			toast.error(capitalizeFirst(message));
+			toast.error(message);
 			deleteDialogOpen = false;
 		} finally {
 			deleting = false;
@@ -212,7 +211,7 @@
 			goto("/app/dashboard");
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to impersonate user";
-			toast.error(capitalizeFirst(message));
+			toast.error(message);
 		}
 	}
 
@@ -344,6 +343,9 @@
 					bind:value={formUsername}
 					placeholder="Username"
 					required
+					minlength={3}
+					pattern="[a-zA-Z0-9._\\-]+"
+					title="Letters, numbers, dots, hyphens, and underscores only"
 					disabled={saving}
 				/>
 			</div>

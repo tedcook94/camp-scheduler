@@ -176,7 +176,7 @@ const listSessionCabins = `-- name: ListSessionCabins :many
 SELECT
     c.id,
     c.cabin_name,
-    c.age_group_id,
+    sag.age_group_id,
     sagc.required_counselors
 FROM session_age_groups sag
 JOIN session_age_group_cabins sagc ON sagc.session_age_group_id = sag.id
@@ -226,7 +226,7 @@ const listSessionCabinsWithCapacity = `-- name: ListSessionCabinsWithCapacity :m
 SELECT
     c.id,
     c.cabin_name,
-    c.age_group_id,
+    sag.age_group_id,
     sagc.group_size,
     sagc.required_counselors
 FROM session_age_groups sag

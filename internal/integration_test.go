@@ -671,26 +671,26 @@ func testSimpleCamp(t *testing.T) {
 	seniorsID := str(seniors, "id")
 
 	pine := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
-		"name":         "Pine",
-		"age_group_id": juniorsID,
+		"name":                 "Pine",
+		"default_age_group_id": juniorsID,
 	}, token)
 	pineID := str(pine, "id")
 
 	oak := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
-		"name":         "Oak",
-		"age_group_id": juniorsID,
+		"name":                 "Oak",
+		"default_age_group_id": juniorsID,
 	}, token)
 	oakID := str(oak, "id")
 
 	maple := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
-		"name":         "Maple",
-		"age_group_id": seniorsID,
+		"name":                 "Maple",
+		"default_age_group_id": seniorsID,
 	}, token)
 	mapleID := str(maple, "id")
 
 	cedar := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
-		"name":         "Cedar",
-		"age_group_id": seniorsID,
+		"name":                 "Cedar",
+		"default_age_group_id": seniorsID,
 	}, token)
 	cedarID := str(cedar, "id")
 
@@ -959,8 +959,8 @@ func testComplexCamp(t *testing.T) {
 	cabins := make([]cabinInfo, len(cabinDefs))
 	for i, cd := range cabinDefs {
 		resp := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
-			"name":         cd.name,
-			"age_group_id": cd.ageGroupID,
+			"name":                 cd.name,
+			"default_age_group_id": cd.ageGroupID,
 		}, token)
 		cabins[i] = cabinInfo{id: str(resp, "id"), name: cd.name}
 	}
@@ -1234,12 +1234,12 @@ func testBasicCamperAssignment(t *testing.T) {
 
 	// Create cabins.
 	cabinA := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
-		"name": "Birch", "age_group_id": juniorsID,
+		"name": "Birch", "default_age_group_id": juniorsID,
 	}, token)
 	cabinAID := str(cabinA, "id")
 
 	cabinB := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
-		"name": "Elm", "age_group_id": juniorsID,
+		"name": "Elm", "default_age_group_id": juniorsID,
 	}, token)
 	cabinBID := str(cabinB, "id")
 

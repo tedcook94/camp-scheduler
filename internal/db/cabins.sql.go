@@ -12,9 +12,15 @@ import (
 )
 
 const createCabin = `-- name: CreateCabin :one
-INSERT INTO cabins (camp_id, default_age_group_id, cabin_name)
-VALUES ($1, $2, $3)
-RETURNING id, camp_id, default_age_group_id, cabin_name
+WITH inserted AS (
+    INSERT INTO cabins (camp_id, default_age_group_id, cabin_name)
+    VALUES ($1, $2, $3)
+    RETURNING id, camp_id, default_age_group_id, cabin_name
+)
+SELECT i.id, i.camp_id, i.default_age_group_id, i.cabin_name,
+       ag.age_group_name AS default_age_group_name
+FROM inserted i
+JOIN age_groups ag ON ag.id = i.default_age_group_id
 `
 
 type CreateCabinParams struct {
@@ -23,14 +29,23 @@ type CreateCabinParams struct {
 	CabinName         string
 }
 
-func (q *Queries) CreateCabin(ctx context.Context, arg CreateCabinParams) (Cabin, error) {
+type CreateCabinRow struct {
+	ID                  pgtype.UUID
+	CampID              pgtype.UUID
+	DefaultAgeGroupID   pgtype.UUID
+	CabinName           string
+	DefaultAgeGroupName string
+}
+
+func (q *Queries) CreateCabin(ctx context.Context, arg CreateCabinParams) (CreateCabinRow, error) {
 	row := q.db.QueryRow(ctx, createCabin, arg.CampID, arg.DefaultAgeGroupID, arg.CabinName)
-	var i Cabin
+	var i CreateCabinRow
 	err := row.Scan(
 		&i.ID,
 		&i.CampID,
 		&i.DefaultAgeGroupID,
 		&i.CabinName,
+		&i.DefaultAgeGroupName,
 	)
 	return i, err
 }
@@ -54,9 +69,11 @@ func (q *Queries) DeleteCabin(ctx context.Context, arg DeleteCabinParams) (int64
 }
 
 const getCabin = `-- name: GetCabin :one
-SELECT id, camp_id, default_age_group_id, cabin_name
-FROM cabins
-WHERE id = $1 AND camp_id = $2
+SELECT c.id, c.camp_id, c.default_age_group_id, c.cabin_name,
+       ag.age_group_name AS default_age_group_name
+FROM cabins c
+JOIN age_groups ag ON ag.id = c.default_age_group_id
+WHERE c.id = $1 AND c.camp_id = $2
 `
 
 type GetCabinParams struct {
@@ -64,39 +81,59 @@ type GetCabinParams struct {
 	CampID pgtype.UUID
 }
 
-func (q *Queries) GetCabin(ctx context.Context, arg GetCabinParams) (Cabin, error) {
+type GetCabinRow struct {
+	ID                  pgtype.UUID
+	CampID              pgtype.UUID
+	DefaultAgeGroupID   pgtype.UUID
+	CabinName           string
+	DefaultAgeGroupName string
+}
+
+func (q *Queries) GetCabin(ctx context.Context, arg GetCabinParams) (GetCabinRow, error) {
 	row := q.db.QueryRow(ctx, getCabin, arg.ID, arg.CampID)
-	var i Cabin
+	var i GetCabinRow
 	err := row.Scan(
 		&i.ID,
 		&i.CampID,
 		&i.DefaultAgeGroupID,
 		&i.CabinName,
+		&i.DefaultAgeGroupName,
 	)
 	return i, err
 }
 
 const listCabins = `-- name: ListCabins :many
-SELECT id, camp_id, default_age_group_id, cabin_name
-FROM cabins
-WHERE camp_id = $1
-ORDER BY cabin_name
+SELECT c.id, c.camp_id, c.default_age_group_id, c.cabin_name,
+       ag.age_group_name AS default_age_group_name
+FROM cabins c
+JOIN age_groups ag ON ag.id = c.default_age_group_id
+WHERE c.camp_id = $1
+ORDER BY c.cabin_name
 `
 
-func (q *Queries) ListCabins(ctx context.Context, campID pgtype.UUID) ([]Cabin, error) {
+type ListCabinsRow struct {
+	ID                  pgtype.UUID
+	CampID              pgtype.UUID
+	DefaultAgeGroupID   pgtype.UUID
+	CabinName           string
+	DefaultAgeGroupName string
+}
+
+func (q *Queries) ListCabins(ctx context.Context, campID pgtype.UUID) ([]ListCabinsRow, error) {
 	rows, err := q.db.Query(ctx, listCabins, campID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Cabin
+	var items []ListCabinsRow
 	for rows.Next() {
-		var i Cabin
+		var i ListCabinsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.CampID,
 			&i.DefaultAgeGroupID,
 			&i.CabinName,
+			&i.DefaultAgeGroupName,
 		); err != nil {
 			return nil, err
 		}
@@ -109,11 +146,17 @@ func (q *Queries) ListCabins(ctx context.Context, campID pgtype.UUID) ([]Cabin, 
 }
 
 const updateCabin = `-- name: UpdateCabin :one
-UPDATE cabins
-SET default_age_group_id = $3,
-    cabin_name = $4
-WHERE id = $1 AND camp_id = $2
-RETURNING id, camp_id, default_age_group_id, cabin_name
+WITH updated AS (
+    UPDATE cabins
+    SET default_age_group_id = $3,
+        cabin_name = $4
+    WHERE cabins.id = $1 AND cabins.camp_id = $2
+    RETURNING cabins.id, cabins.camp_id, cabins.default_age_group_id, cabins.cabin_name
+)
+SELECT u.id, u.camp_id, u.default_age_group_id, u.cabin_name,
+       ag.age_group_name AS default_age_group_name
+FROM updated u
+JOIN age_groups ag ON ag.id = u.default_age_group_id
 `
 
 type UpdateCabinParams struct {
@@ -123,19 +166,28 @@ type UpdateCabinParams struct {
 	CabinName         string
 }
 
-func (q *Queries) UpdateCabin(ctx context.Context, arg UpdateCabinParams) (Cabin, error) {
+type UpdateCabinRow struct {
+	ID                  pgtype.UUID
+	CampID              pgtype.UUID
+	DefaultAgeGroupID   pgtype.UUID
+	CabinName           string
+	DefaultAgeGroupName string
+}
+
+func (q *Queries) UpdateCabin(ctx context.Context, arg UpdateCabinParams) (UpdateCabinRow, error) {
 	row := q.db.QueryRow(ctx, updateCabin,
 		arg.ID,
 		arg.CampID,
 		arg.DefaultAgeGroupID,
 		arg.CabinName,
 	)
-	var i Cabin
+	var i UpdateCabinRow
 	err := row.Scan(
 		&i.ID,
 		&i.CampID,
 		&i.DefaultAgeGroupID,
 		&i.CabinName,
+		&i.DefaultAgeGroupName,
 	)
 	return i, err
 }

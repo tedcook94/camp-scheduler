@@ -39,10 +39,11 @@ type UpdateCabinRequest struct {
 }
 
 type CabinResponse struct {
-	ID                string `json:"id"`
-	CampID            string `json:"camp_id"`
-	DefaultAgeGroupID string `json:"default_age_group_id"`
-	Name              string `json:"name"`
+	ID                  string `json:"id"`
+	CampID              string `json:"camp_id"`
+	DefaultAgeGroupID   string `json:"default_age_group_id"`
+	DefaultAgeGroupName string `json:"default_age_group_name"`
+	Name                string `json:"name"`
 }
 
 func (ctrl *Controller) List(c *gin.Context) {

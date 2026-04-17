@@ -32,7 +32,13 @@ func (svc *Service) List(ctx context.Context, campID string) ([]CabinResponse, e
 
 	result := make([]CabinResponse, len(cabins))
 	for i, c := range cabins {
-		result[i] = toCabinResponse(c)
+		result[i] = CabinResponse{
+			ID:                  api.UUIDToString(c.ID),
+			CampID:              api.UUIDToString(c.CampID),
+			DefaultAgeGroupID:   api.UUIDToString(c.DefaultAgeGroupID),
+			DefaultAgeGroupName: c.DefaultAgeGroupName,
+			Name:                c.CabinName,
+		}
 	}
 	return result, nil
 }
@@ -56,7 +62,13 @@ func (svc *Service) GetByID(ctx context.Context, campID, id string) (CabinRespon
 		return CabinResponse{}, fmt.Errorf("error getting cabin %s: %w", id, err)
 	}
 
-	return toCabinResponse(cabin), nil
+	return CabinResponse{
+		ID:                  api.UUIDToString(cabin.ID),
+		CampID:              api.UUIDToString(cabin.CampID),
+		DefaultAgeGroupID:   api.UUIDToString(cabin.DefaultAgeGroupID),
+		DefaultAgeGroupName: cabin.DefaultAgeGroupName,
+		Name:                cabin.CabinName,
+	}, nil
 }
 
 func (svc *Service) Create(ctx context.Context, campID string, req CreateCabinRequest) (CabinResponse, error) {
@@ -79,7 +91,13 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCabinRe
 		return CabinResponse{}, fmt.Errorf("error creating cabin: %w", err)
 	}
 
-	return toCabinResponse(cabin), nil
+	return CabinResponse{
+		ID:                  api.UUIDToString(cabin.ID),
+		CampID:              api.UUIDToString(cabin.CampID),
+		DefaultAgeGroupID:   api.UUIDToString(cabin.DefaultAgeGroupID),
+		DefaultAgeGroupName: cabin.DefaultAgeGroupName,
+		Name:                cabin.CabinName,
+	}, nil
 }
 
 func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCabinRequest) (CabinResponse, error) {
@@ -108,7 +126,13 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCab
 		return CabinResponse{}, fmt.Errorf("error updating cabin %s: %w", id, err)
 	}
 
-	return toCabinResponse(cabin), nil
+	return CabinResponse{
+		ID:                  api.UUIDToString(cabin.ID),
+		CampID:              api.UUIDToString(cabin.CampID),
+		DefaultAgeGroupID:   api.UUIDToString(cabin.DefaultAgeGroupID),
+		DefaultAgeGroupName: cabin.DefaultAgeGroupName,
+		Name:                cabin.CabinName,
+	}, nil
 }
 
 func (svc *Service) Delete(ctx context.Context, campID, id string) error {
@@ -134,13 +158,4 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 	}
 
 	return nil
-}
-
-func toCabinResponse(c db.Cabin) CabinResponse {
-	return CabinResponse{
-		ID:                api.UUIDToString(c.ID),
-		CampID:            api.UUIDToString(c.CampID),
-		DefaultAgeGroupID: api.UUIDToString(c.DefaultAgeGroupID),
-		Name:              c.CabinName,
-	}
 }

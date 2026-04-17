@@ -136,8 +136,8 @@ viable configurations and understand trade-offs.
   - [x] Login: unified login with role-based routing (super_admin → /admin, all other roles → /app)
   - [x] Dashboard: landing page with navigation cards to each section
   - [x] Camp settings: view and edit camp details
-  - [ ] Certifications: list, create, edit, delete
-  - [ ] Age groups: list, create, edit, delete
+  - [x] Certifications: list, create, edit, delete
+  - [x] Age groups: list, create, edit, delete
   - [ ] Cabins: list, create, edit, delete (with age group assignment)
   - [ ] Seasons & sessions: CRUD for seasons; manage sessions within a session
   - [ ] Counselors: list, create, edit, delete; manage preferences (age group, co-counselor, activity); certifications; session history

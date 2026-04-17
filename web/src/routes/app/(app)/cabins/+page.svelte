@@ -33,6 +33,8 @@
 	let formName = $state("");
 	let formAgeGroupId = $state("");
 	let submitting = $state(false);
+	let nameError = $state("");
+	let ageGroupError = $state("");
 
 	let dialogTitle = $derived(editingCabin ? "Edit Cabin" : "Add Cabin");
 	let dialogDescription = $derived(
@@ -63,10 +65,16 @@
 		}
 	});
 
+	function clearErrors() {
+		nameError = "";
+		ageGroupError = "";
+	}
+
 	function openCreate() {
 		editingCabin = null;
 		formName = "";
 		formAgeGroupId = "";
+		clearErrors();
 		dialogOpen = true;
 	}
 
@@ -74,13 +82,26 @@
 		editingCabin = cabin;
 		formName = cabin.name;
 		formAgeGroupId = cabin.default_age_group_id;
+		clearErrors();
 		dialogOpen = true;
 	}
 
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
+		clearErrors();
+
 		const name = formName.trim();
-		if (!name || !formAgeGroupId) return;
+		let valid = true;
+		if (!name) {
+			nameError = "Name is required.";
+			valid = false;
+		}
+		if (!formAgeGroupId) {
+			ageGroupError = "Age group is required.";
+			valid = false;
+		}
+		if (!valid) return;
+
 		submitting = true;
 
 		try {
@@ -219,13 +240,16 @@
 					type="text"
 					placeholder="Cabin name"
 					bind:value={formName}
-					required
 					disabled={submitting}
+					oninput={() => (nameError = "")}
 				/>
+				{#if nameError}
+					<p class="text-destructive text-sm">{nameError}</p>
+				{/if}
 			</div>
 			<div class="grid gap-2">
 				<Label for="cabin-age-group">Default Age Group</Label>
-				<Select.Select type="single" bind:value={formAgeGroupId} disabled={submitting}>
+				<Select.Select type="single" bind:value={formAgeGroupId} disabled={submitting} onValueChange={() => (ageGroupError = "")}>
 					<Select.SelectTrigger id="cabin-age-group" class="w-full">
 						{#if formAgeGroupId}
 							{ageGroups.find((ag) => ag.id === formAgeGroupId)?.name ?? "Select age group"}
@@ -239,12 +263,15 @@
 						{/each}
 					</Select.SelectContent>
 				</Select.Select>
+				{#if ageGroupError}
+					<p class="text-destructive text-sm">{ageGroupError}</p>
+				{/if}
 			</div>
 			<Dialog.DialogFooter>
 				<Button type="button" variant="outline" disabled={submitting} onclick={() => (dialogOpen = false)}>
 					Cancel
 				</Button>
-				<Button type="submit" disabled={submitting || !formName.trim() || !formAgeGroupId}>
+				<Button type="submit" disabled={submitting}>
 					{#if submitting}
 						<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
 					{/if}

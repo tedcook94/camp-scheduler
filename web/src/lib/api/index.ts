@@ -6,11 +6,17 @@ import type {
 	Certification,
 	CreateCabinRequest,
 	CreateCampRequest,
+	CreateSeasonRequest,
+	CreateSessionRequest,
 	CreateUserRequest,
+	Season,
+	Session,
 	TokenResponse,
 	UpdateCabinRequest,
 	UpdateCampRequest,
 	UpdatePasswordRequest,
+	UpdateSeasonRequest,
+	UpdateSessionRequest,
 	UpdateUserRequest,
 	User,
 } from "./types";
@@ -90,4 +96,24 @@ export const cabinApi = {
 	update: (id: string, data: UpdateCabinRequest) =>
 		api.put<Cabin>(`/api/v1/cabins/${id}`, data),
 	delete: (id: string) => api.delete<void>(`/api/v1/cabins/${id}`),
+};
+
+export const seasonApi = {
+	list: () => api.get<Season[]>("/api/v1/seasons"),
+	get: (id: string) => api.get<Season>(`/api/v1/seasons/${id}`),
+	create: (data: CreateSeasonRequest) =>
+		api.post<Season>("/api/v1/seasons", data),
+	update: (id: string, data: UpdateSeasonRequest) =>
+		api.put<Season>(`/api/v1/seasons/${id}`, data),
+	delete: (id: string) => api.delete<void>(`/api/v1/seasons/${id}`),
+};
+
+export const sessionApi = {
+	list: () => api.get<Session[]>("/api/v1/sessions"),
+	get: (id: string) => api.get<Session>(`/api/v1/sessions/${id}`),
+	create: (data: CreateSessionRequest) =>
+		api.post<Session>("/api/v1/sessions", data),
+	update: (id: string, data: UpdateSessionRequest) =>
+		api.put<Session>(`/api/v1/sessions/${id}`, data),
+	delete: (id: string) => api.delete<void>(`/api/v1/sessions/${id}`),
 };

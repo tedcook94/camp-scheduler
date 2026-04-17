@@ -24,6 +24,7 @@
 
 	let campDisabled = $state(false);
 	let camp = $state<Camp | null>(null);
+	let loading = $state(true);
 
 	setContext("campDisabled", () => campDisabled);
 	setContext("camp", () => camp);
@@ -42,7 +43,9 @@
 			camp = await campApi.get();
 			campDisabled = !camp.enabled;
 		} catch {
-			// Camp status check is best-effort; layout still renders
+			// Camp fetch is best-effort; layout still renders
+		} finally {
+			loading = false;
 		}
 	});
 
@@ -129,7 +132,11 @@
 		<!-- Main content -->
 		<main class="flex-1 overflow-auto">
 			<div class="mx-auto max-w-5xl p-6">
-				{@render children()}
+				{#if loading}
+					<div class="text-muted-foreground py-8 text-center text-sm">Loading...</div>
+				{:else}
+					{@render children()}
+				{/if}
 			</div>
 		</main>
 		</div>

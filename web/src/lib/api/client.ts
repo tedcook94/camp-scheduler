@@ -5,7 +5,7 @@ class ApiClientError extends Error {
 	status: number;
 
 	constructor(status: number, message: string) {
-		super(message);
+		super(message.charAt(0).toUpperCase() + message.slice(1));
 		this.name = "ApiClientError";
 		this.status = status;
 	}

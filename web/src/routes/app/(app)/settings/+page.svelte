@@ -2,7 +2,6 @@
 	import { onMount, getContext } from "svelte";
 	import { campApi } from "$lib/api";
 	import { ApiClientError } from "$lib/api/client";
-	import { capitalizeFirst } from "$lib/utils";
 	import { toast } from "svelte-sonner";
 	import { Button } from "$lib/components/ui/button";
 	import { Input } from "$lib/components/ui/input";
@@ -31,7 +30,7 @@
 			formLocation = camp.location ?? "";
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to load camp";
-			toast.error(capitalizeFirst(message));
+			toast.error(message);
 		} finally {
 			loading = false;
 		}
@@ -53,7 +52,7 @@
 			toast.success("Camp settings updated");
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to update camp";
-			toast.error(capitalizeFirst(message));
+			toast.error(message);
 		} finally {
 			saving = false;
 		}

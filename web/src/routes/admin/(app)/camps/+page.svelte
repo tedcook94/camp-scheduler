@@ -14,9 +14,33 @@
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import TrashIcon from "@lucide/svelte/icons/trash";
+	import SortableTableHead from "$lib/components/sortable-table-head.svelte";
+	import { sortItems, type SortDirection, type SortAccessor } from "$lib/utils";
 
 	let camps = $state<Camp[]>([]);
 	let loading = $state(true);
+
+	type CampSortKey = "name" | "location" | "status";
+	let sortKey = $state<CampSortKey>("name");
+	let sortDirection = $state<SortDirection>("asc");
+
+	let sortAccessor = $derived<SortAccessor<Camp>>(
+		sortKey === "status"
+			? (c: Camp) => (c.enabled ? "Enabled" : "Disabled")
+			: sortKey === "location"
+				? (c: Camp) => c.location
+				: "name"
+	);
+	let sortedCamps = $derived(sortItems(camps, sortAccessor, sortDirection));
+
+	function toggleSort(key: CampSortKey) {
+		if (sortKey === key) {
+			sortDirection = sortDirection === "asc" ? "desc" : "asc";
+		} else {
+			sortKey = key;
+			sortDirection = "asc";
+		}
+	}
 
 	// Dialog state
 	let dialogOpen = $state(false);
@@ -153,16 +177,16 @@
 		<Table.Table>
 			<Table.TableHeader>
 				<Table.TableRow>
-					<Table.TableHead>Name</Table.TableHead>
-					<Table.TableHead>Location</Table.TableHead>
-					<Table.TableHead>Status</Table.TableHead>
+					<SortableTableHead label="Name" active={sortKey === "name"} direction={sortDirection} onclick={() => toggleSort("name")} />
+					<SortableTableHead label="Location" active={sortKey === "location"} direction={sortDirection} onclick={() => toggleSort("location")} />
+					<SortableTableHead label="Status" active={sortKey === "status"} direction={sortDirection} onclick={() => toggleSort("status")} />
 					<Table.TableHead class="w-24">
 						<span class="sr-only">Actions</span>
 					</Table.TableHead>
 				</Table.TableRow>
 			</Table.TableHeader>
 			<Table.TableBody>
-				{#each camps as camp (camp.id)}
+				{#each sortedCamps as camp (camp.id)}
 					<Table.TableRow>
 						<Table.TableCell class="font-medium">{camp.name}</Table.TableCell>
 						<Table.TableCell class="text-muted-foreground">

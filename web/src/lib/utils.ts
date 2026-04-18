@@ -13,3 +13,29 @@ export type WithElementRef<T, El extends HTMLElement = HTMLElement> = T & {
 export type WithoutChild<T> = Omit<T, "child">;
 
 export type WithoutChildrenOrChild<T> = Omit<T, "children" | "child">;
+
+export type SortDirection = "asc" | "desc";
+
+export type SortAccessor<T> = keyof T | ((item: T) => string | null | undefined);
+
+export function sortItems<T>(
+	items: T[],
+	key: SortAccessor<T>,
+	direction: SortDirection,
+): T[] {
+	const getValue = typeof key === "function" ? key : (item: T) => item[key] as unknown as string | null | undefined;
+
+	return [...items].sort((a, b) => {
+		const aVal = getValue(a);
+		const bVal = getValue(b);
+
+		// Nulls always sort last regardless of direction
+		if (aVal == null && bVal == null) return 0;
+		if (aVal == null) return 1;
+		if (bVal == null) return -1;
+
+		const cmp = String(aVal).localeCompare(String(bVal), undefined, { sensitivity: "base" });
+
+		return direction === "asc" ? cmp : -cmp;
+	});
+}

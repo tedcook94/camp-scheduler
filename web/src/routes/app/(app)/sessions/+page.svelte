@@ -15,6 +15,8 @@
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import TrashIcon from "@lucide/svelte/icons/trash";
 	import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
+	import SortableTableHead from "$lib/components/sortable-table-head.svelte";
+	import { sortItems, type SortDirection, type SortAccessor } from "$lib/utils";
 
 	const getCampDisabled = getContext<() => boolean>("campDisabled");
 	const getCamp = getContext<() => Camp | null>("camp");
@@ -53,6 +55,26 @@
 	// Lookup helpers
 	let seasonMap = $derived(new Map(seasons.map((s) => [s.id, s.name])));
 	let sessionMap = $derived(new Map(sessions.map((s) => [s.id, s.name])));
+
+	type SessionSortKey = "name" | "season_name";
+	let sortKey = $state<SessionSortKey>("name");
+	let sortDirection = $state<SortDirection>("asc");
+
+	let sortAccessor = $derived<SortAccessor<Session>>(
+		sortKey === "season_name"
+			? (s: Session) => seasonMap.get(s.season_id) ?? ""
+			: "name"
+	);
+	let sortedSessions = $derived(sortItems(sessions, sortAccessor, sortDirection));
+
+	function toggleSort(key: SessionSortKey) {
+		if (sortKey === key) {
+			sortDirection = sortDirection === "asc" ? "desc" : "asc";
+		} else {
+			sortKey = key;
+			sortDirection = "asc";
+		}
+	}
 
 	// Sessions available as "previous" (exclude the one being edited)
 	let previousSessionOptions = $derived(
@@ -200,8 +222,8 @@
 		<Table.Table>
 			<Table.TableHeader>
 				<Table.TableRow>
-					<Table.TableHead>Name</Table.TableHead>
-					<Table.TableHead>Season</Table.TableHead>
+					<SortableTableHead label="Name" active={sortKey === "name"} direction={sortDirection} onclick={() => toggleSort("name")} />
+					<SortableTableHead label="Season" active={sortKey === "season_name"} direction={sortDirection} onclick={() => toggleSort("season_name")} />
 					<Table.TableHead>Previous Session</Table.TableHead>
 					<Table.TableHead class="w-24">
 						<span class="sr-only">Actions</span>
@@ -209,7 +231,7 @@
 				</Table.TableRow>
 			</Table.TableHeader>
 			<Table.TableBody>
-				{#each sessions as session (session.id)}
+				{#each sortedSessions as session (session.id)}
 					<Table.TableRow>
 						<Table.TableCell>{session.name}</Table.TableCell>
 						<Table.TableCell>{seasonMap.get(session.season_id) ?? "Unknown"}</Table.TableCell>

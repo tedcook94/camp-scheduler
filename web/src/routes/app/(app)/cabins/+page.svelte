@@ -15,6 +15,8 @@
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import TrashIcon from "@lucide/svelte/icons/trash";
 	import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
+	import SortableTableHead from "$lib/components/sortable-table-head.svelte";
+	import { sortItems, type SortDirection } from "$lib/utils";
 
 	const getCampDisabled = getContext<() => boolean>("campDisabled");
 	const getCamp = getContext<() => Camp | null>("camp");
@@ -27,6 +29,19 @@
 	let loading = $state(true);
 	let loadError = $state(false);
 	let noAgeGroups = $derived(!loading && ageGroups.length === 0);
+
+	let sortKey = $state<"name" | "default_age_group_name">("name");
+	let sortDirection = $state<SortDirection>("asc");
+	let sortedCabins = $derived(sortItems(cabins, sortKey, sortDirection));
+
+	function toggleSort(key: "name" | "default_age_group_name") {
+		if (sortKey === key) {
+			sortDirection = sortDirection === "asc" ? "desc" : "asc";
+		} else {
+			sortKey = key;
+			sortDirection = "asc";
+		}
+	}
 
 	// Create/edit dialog
 	let dialogOpen = $state(false);
@@ -189,15 +204,15 @@
 		<Table.Table>
 			<Table.TableHeader>
 				<Table.TableRow>
-					<Table.TableHead>Name</Table.TableHead>
-					<Table.TableHead>Default Age Group</Table.TableHead>
+					<SortableTableHead label="Name" active={sortKey === "name"} direction={sortDirection} onclick={() => toggleSort("name")} />
+					<SortableTableHead label="Default Age Group" active={sortKey === "default_age_group_name"} direction={sortDirection} onclick={() => toggleSort("default_age_group_name")} />
 					<Table.TableHead class="w-24">
 						<span class="sr-only">Actions</span>
 					</Table.TableHead>
 				</Table.TableRow>
 			</Table.TableHeader>
 			<Table.TableBody>
-				{#each cabins as cabin (cabin.id)}
+				{#each sortedCabins as cabin (cabin.id)}
 					<Table.TableRow>
 						<Table.TableCell>{cabin.name}</Table.TableCell>
 						<Table.TableCell>{cabin.default_age_group_name}</Table.TableCell>

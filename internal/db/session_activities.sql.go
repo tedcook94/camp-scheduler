@@ -45,6 +45,24 @@ func (q *Queries) CreateSessionActivity(ctx context.Context, arg CreateSessionAc
 	return i, err
 }
 
+const deleteSessionActivitiesByTimeSlot = `-- name: DeleteSessionActivitiesByTimeSlot :execrows
+DELETE FROM session_activities
+WHERE session_time_slot_id = $1 AND camp_id = $2
+`
+
+type DeleteSessionActivitiesByTimeSlotParams struct {
+	SessionTimeSlotID pgtype.UUID
+	CampID            pgtype.UUID
+}
+
+func (q *Queries) DeleteSessionActivitiesByTimeSlot(ctx context.Context, arg DeleteSessionActivitiesByTimeSlotParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSessionActivitiesByTimeSlot, arg.SessionTimeSlotID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteSessionActivity = `-- name: DeleteSessionActivity :execrows
 DELETE FROM session_activities sa
 USING session_time_slots sts

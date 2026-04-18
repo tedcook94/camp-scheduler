@@ -7,6 +7,8 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var (
@@ -17,10 +19,11 @@ var (
 
 type ActivityService struct {
 	queries *db.Queries
+	pool    *pgxpool.Pool
 }
 
-func NewActivityService(queries *db.Queries) *ActivityService {
-	return &ActivityService{queries: queries}
+func NewActivityService(queries *db.Queries, pool *pgxpool.Pool) *ActivityService {
+	return &ActivityService{queries: queries, pool: pool}
 }
 
 func (svc *ActivityService) ListTimeSlots(ctx context.Context, campID, sessionID string) ([]SessionTimeSlotResponse, error) {
@@ -359,6 +362,96 @@ func (svc *ActivityService) DeleteActivity(ctx context.Context, campID, sessionI
 	}
 
 	return nil
+}
+
+func (svc *ActivityService) CopyActivities(ctx context.Context, campID, sessionID, targetTimeSlotID, sourceTimeSlotID string) ([]SessionActivityResponse, error) {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return nil, err
+	}
+
+	sessionUUID, err := api.ParseUUID(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	targetUUID, err := api.ParseUUID(targetTimeSlotID)
+	if err != nil {
+		return nil, err
+	}
+
+	sourceUUID, err := api.ParseUUID(sourceTimeSlotID)
+	if err != nil {
+		return nil, err
+	}
+
+	if targetUUID == sourceUUID {
+		return nil, api.BadInput("source and target time slots must be different")
+	}
+
+	// Verify both time slots belong to this session.
+	_, err = svc.queries.GetSessionTimeSlot(ctx, db.GetSessionTimeSlotParams{
+		ID:        targetUUID,
+		CampID:    campUUID,
+		SessionID: sessionUUID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error validating target session time slot %s: %w", targetTimeSlotID, err)
+	}
+
+	_, err = svc.queries.GetSessionTimeSlot(ctx, db.GetSessionTimeSlotParams{
+		ID:        sourceUUID,
+		CampID:    campUUID,
+		SessionID: sessionUUID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error validating source session time slot %s: %w", sourceTimeSlotID, err)
+	}
+
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error starting transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := svc.queries.WithTx(tx)
+
+	_, err = qtx.DeleteSessionActivitiesByTimeSlot(ctx, db.DeleteSessionActivitiesByTimeSlotParams{
+		SessionTimeSlotID: targetUUID,
+		CampID:            campUUID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error clearing target time slot activities: %w", err)
+	}
+
+	sourceActivities, err := qtx.ListSessionActivitiesByTimeSlot(ctx, db.ListSessionActivitiesByTimeSlotParams{
+		SessionTimeSlotID: sourceUUID,
+		CampID:            campUUID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error listing source activities: %w", err)
+	}
+
+	result := make([]SessionActivityResponse, 0, len(sourceActivities))
+	for _, sa := range sourceActivities {
+		created, err := qtx.CreateSessionActivity(ctx, db.CreateSessionActivityParams{
+			CampID:             campUUID,
+			SessionTimeSlotID:  targetUUID,
+			ActivityID:         sa.ActivityID,
+			Capacity:           sa.Capacity,
+			RequiredCounselors: sa.RequiredCounselors,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error copying activity: %w", err)
+		}
+		result = append(result, toSessionActivityResponse(created))
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("error committing transaction: %w", err)
+	}
+
+	return result, nil
 }
 
 func toSessionTimeSlotResponse(r db.SessionTimeSlot) SessionTimeSlotResponse {

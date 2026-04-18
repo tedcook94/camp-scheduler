@@ -164,7 +164,7 @@ func (s *Server) routes() {
 	sessionConfigController := sessionconfig.NewController(sessionConfigService)
 	sessionConfigController.RegisterRoutes(protected)
 
-	activityConfigService := sessionconfig.NewActivityService(queries)
+	activityConfigService := sessionconfig.NewActivityService(queries, s.pool)
 	activityConfigController := sessionconfig.NewActivityController(activityConfigService)
 	activityConfigController.RegisterRoutes(protected)
 

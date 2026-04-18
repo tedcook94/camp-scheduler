@@ -129,7 +129,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 
 	session, err := ctrl.svc.Update(c.Request.Context(), campID, id, req)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
 			return
 		}

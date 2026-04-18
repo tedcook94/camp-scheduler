@@ -217,6 +217,8 @@ func TestReviewFixes(t *testing.T) {
 	t.Run("get_solution_run_not_found", testGetSolutionRunNotFound)
 	t.Run("select_solution_camper_run", testSelectSolutionCamperRun)
 	t.Run("camper_run_invalid_session", testCamperRunInvalidSession)
+	t.Run("session_cross_season_previous", testSessionCrossSeasonPrevious)
+	t.Run("session_season_change_with_dependents", testSessionSeasonChangeWithDependents)
 }
 
 func TestActivitySchedulingSolver(t *testing.T) {
@@ -2535,4 +2537,79 @@ func testPasswordChangeRevokesTokens(t *testing.T) {
 
 	doRawRequest(t, http.MethodGet, apiURL(ts, "/camp"),
 		nil, http.StatusOK, newAccessToken)
+}
+
+// testSessionCrossSeasonPrevious verifies that creating or updating a session
+// with a previous_session_id from a different season is rejected with 400.
+func testSessionCrossSeasonPrevious(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp CrossSeason").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	season1 := mustPost(t, apiURL(ts, "/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-07-31"}, token)
+	season1ID := str(season1, "id")
+
+	season2 := mustPost(t, apiURL(ts, "/seasons"), map[string]any{"name": "Fall", "start_date": "2026-08-01", "end_date": "2026-09-30"}, token)
+	season2ID := str(season2, "id")
+
+	s1 := mustPost(t, apiURL(ts, "/sessions"), map[string]any{"name": "S1", "season_id": season1ID}, token)
+	s1ID := str(s1, "id")
+
+	// Create session in season2 with previous_session from season1 should fail.
+	doRequest(t, http.MethodPost, apiURL(ts, "/sessions"), map[string]any{
+		"name": "S2", "season_id": season2ID, "previous_session_id": s1ID,
+	}, http.StatusBadRequest, token)
+
+	// Create a valid session in season2, then try to update it with cross-season previous.
+	s2 := mustPost(t, apiURL(ts, "/sessions"), map[string]any{"name": "S2", "season_id": season2ID}, token)
+	s2ID := str(s2, "id")
+
+	doRequest(t, http.MethodPut, apiURL(ts, "/sessions/"+s2ID), map[string]any{
+		"name": "S2", "season_id": season2ID, "previous_session_id": s1ID,
+	}, http.StatusBadRequest, token)
+}
+
+// testSessionSeasonChangeWithDependents verifies that changing a session's
+// season is blocked when another session references it as previous_session.
+func testSessionSeasonChangeWithDependents(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Dependents").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	season1 := mustPost(t, apiURL(ts, "/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-07-31"}, token)
+	season1ID := str(season1, "id")
+
+	season2 := mustPost(t, apiURL(ts, "/seasons"), map[string]any{"name": "Fall", "start_date": "2026-08-01", "end_date": "2026-09-30"}, token)
+	season2ID := str(season2, "id")
+
+	s1 := mustPost(t, apiURL(ts, "/sessions"), map[string]any{"name": "S1", "season_id": season1ID}, token)
+	s1ID := str(s1, "id")
+
+	// S2 depends on S1 as previous session.
+	mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "S2", "season_id": season1ID, "previous_session_id": s1ID,
+	}, token)
+
+	// Moving S1 to season2 should fail because S2 depends on it.
+	doRequest(t, http.MethodPut, apiURL(ts, "/sessions/"+s1ID), map[string]any{
+		"name": "S1", "season_id": season2ID,
+	}, http.StatusBadRequest, token)
+
+	// S1 should still be in season1 (unchanged).
+	got := mustGet(t, apiURL(ts, "/sessions/"+s1ID), token)
+	if str(got, "season_id") != season1ID {
+		t.Fatalf("expected season_id %s, got %s", season1ID, str(got, "season_id"))
+	}
 }

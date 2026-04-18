@@ -7,6 +7,9 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 var ErrNotFound = errors.New("session not found")
@@ -75,6 +78,10 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateSession
 		return SessionResponse{}, err
 	}
 
+	if err := svc.validatePreviousSession(ctx, campUUID, seasonUUID, pgtype.UUID{}, req.PreviousSessionID); err != nil {
+		return SessionResponse{}, err
+	}
+
 	session, err := svc.queries.CreateSession(ctx, db.CreateSessionParams{
 		CampID:          campUUID,
 		SeasonID:        seasonUUID,
@@ -109,6 +116,34 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateSes
 		return SessionResponse{}, err
 	}
 
+	current, err := svc.queries.GetSession(ctx, db.GetSessionParams{
+		ID:     uid,
+		CampID: campUUID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return SessionResponse{}, ErrNotFound
+		}
+		return SessionResponse{}, fmt.Errorf("error getting session %s: %w", id, err)
+	}
+
+	if err := svc.validatePreviousSession(ctx, campUUID, seasonUUID, uid, req.PreviousSessionID); err != nil {
+		return SessionResponse{}, err
+	}
+
+	if current.SeasonID != seasonUUID {
+		hasDeps, err := svc.queries.HasDependentSessions(ctx, db.HasDependentSessionsParams{
+			PreviousSession: uid,
+			CampID:          campUUID,
+		})
+		if err != nil {
+			return SessionResponse{}, fmt.Errorf("error checking session dependents: %w", err)
+		}
+		if hasDeps {
+			return SessionResponse{}, api.BadInput("cannot change season: other sessions reference this session as previous")
+		}
+	}
+
 	session, err := svc.queries.UpdateSession(ctx, db.UpdateSessionParams{
 		ID:              uid,
 		CampID:          campUUID,
@@ -117,6 +152,9 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateSes
 		PreviousSession: prevUUID,
 	})
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return SessionResponse{}, ErrNotFound
+		}
 		return SessionResponse{}, fmt.Errorf("error updating session %s: %w", id, err)
 	}
 
@@ -156,4 +194,38 @@ func toSessionResponse(s db.Session) SessionResponse {
 		Name:              s.SessionName,
 		PreviousSessionID: api.UUIDToStringPtr(s.PreviousSession),
 	}
+}
+
+// validatePreviousSession checks that the referenced previous session belongs
+// to the same season and is not a self-reference. No-op when previousSessionID is nil.
+func (svc *Service) validatePreviousSession(ctx context.Context, campID, seasonID, sessionID pgtype.UUID, previousSessionID *string) error {
+	if previousSessionID == nil {
+		return nil
+	}
+
+	prevUUID, err := api.ParseUUID(*previousSessionID)
+	if err != nil {
+		return err
+	}
+
+	if sessionID.Valid && prevUUID == sessionID {
+		return api.BadInput("previous session cannot be the same session")
+	}
+
+	prev, err := svc.queries.GetSession(ctx, db.GetSessionParams{
+		ID:     prevUUID,
+		CampID: campID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return api.BadInput("previous session not found")
+		}
+		return fmt.Errorf("error looking up previous session: %w", err)
+	}
+
+	if prev.SeasonID != seasonID {
+		return api.BadInput("previous session must belong to the same season")
+	}
+
+	return nil
 }

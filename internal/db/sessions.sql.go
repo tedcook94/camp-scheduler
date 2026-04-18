@@ -84,6 +84,25 @@ func (q *Queries) GetSession(ctx context.Context, arg GetSessionParams) (Session
 	return i, err
 }
 
+const hasDependentSessions = `-- name: HasDependentSessions :one
+SELECT EXISTS (
+    SELECT 1 FROM sessions
+    WHERE previous_session = $1 AND camp_id = $2
+) AS has_dependents
+`
+
+type HasDependentSessionsParams struct {
+	PreviousSession pgtype.UUID
+	CampID          pgtype.UUID
+}
+
+func (q *Queries) HasDependentSessions(ctx context.Context, arg HasDependentSessionsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasDependentSessions, arg.PreviousSession, arg.CampID)
+	var has_dependents bool
+	err := row.Scan(&has_dependents)
+	return has_dependents, err
+}
+
 const listSessions = `-- name: ListSessions :many
 SELECT id, camp_id, season_id, session_name, previous_session
 FROM sessions

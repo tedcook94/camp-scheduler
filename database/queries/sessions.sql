@@ -22,6 +22,12 @@ SET season_id = $3,
 WHERE id = $1 AND camp_id = $2
 RETURNING id, camp_id, season_id, session_name, previous_session;
 
+-- name: HasDependentSessions :one
+SELECT EXISTS (
+    SELECT 1 FROM sessions
+    WHERE previous_session = $1 AND camp_id = $2
+) AS has_dependents;
+
 -- name: DeleteSession :execrows
 DELETE FROM sessions
 WHERE id = $1 AND camp_id = $2;

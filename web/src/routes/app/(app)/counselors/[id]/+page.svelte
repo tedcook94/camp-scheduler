@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getContext, onMount } from "svelte";
+	import { getContext, onMount, onDestroy } from "svelte";
 	import { page } from "$app/state";
 	import { goto } from "$app/navigation";
 	import { ApiClientError } from "$lib/api/client";
@@ -12,11 +12,16 @@
 		sessionApi,
 		ageGroupApi,
 		cabinApi,
+		activityApi,
+		ageGroupPreferenceApi,
+		cocounselorPreferenceApi,
+		activityPreferenceApi,
 	} from "$lib/api";
 	import { toast } from "svelte-sonner";
 	import { Button } from "$lib/components/ui/button";
 	import { Badge } from "$lib/components/ui/badge";
 	import { Label } from "$lib/components/ui/label";
+	import { Separator } from "$lib/components/ui/separator";
 	import * as Table from "$lib/components/ui/table";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog";
@@ -32,8 +37,14 @@
 		Session,
 		AgeGroup,
 		Cabin,
+		Activity,
+		AgeGroupPreference,
+		CocounselorPreference,
+		ActivityPreference,
 	} from "$lib/api/types";
 	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+	import ArrowUpIcon from "@lucide/svelte/icons/arrow-up";
+	import ArrowDownIcon from "@lucide/svelte/icons/arrow-down";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import TrashIcon from "@lucide/svelte/icons/trash";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
@@ -74,7 +85,7 @@
 	let sessions = $state<Session[]>([]);
 	let ageGroups = $state<AgeGroup[]>([]);
 	let cabins = $state<Cabin[]>([]);
-	let historyFilterSeasonId = $state("");
+	let historyFilterSeasonId = $state(page.url.searchParams.get("season") ?? "");
 
 	let filteredHistory = $derived(
 		historyFilterSeasonId
@@ -112,9 +123,41 @@
 	let deleteHistoryTarget = $state<HistorySummary | null>(null);
 	let deletingHistory = $state(false);
 
+	// Preferences
+	let allActivities = $state<Activity[]>([]);
+	let allCounselors = $state<Counselor[]>([]);
+	let activeTab = $state(page.url.searchParams.get("tab") ?? "certifications");
+	let prefSessionId = $state(page.url.searchParams.get("prefSession") ?? "");
+	let prefLoading = $state(false);
+	let prefAbortController: AbortController | null = null;
+
+	let ageGroupPrefs = $state<AgeGroupPreference[]>([]);
+	let cocounselorPrefs = $state<CocounselorPreference[]>([]);
+	let activityPrefs = $state<ActivityPreference[]>([]);
+
+	let addAgeGroupId = $state("");
+	let addCocounselorId = $state("");
+	let addActivityId = $state("");
+
+	let availableAgeGroupsForPref = $derived(
+		ageGroups.filter((ag) => !ageGroupPrefs.some((p) => p.age_group_id === ag.id))
+	);
+	let availableCounselorsForPref = $derived(
+		allCounselors.filter(
+			(c) => c.id !== counselorId && !cocounselorPrefs.some((p) => p.preferred_counselor_id === c.id)
+		)
+	);
+	let availableActivitiesForPref = $derived(
+		allActivities.filter((a) => !activityPrefs.some((p) => p.activity_id === a.id))
+	);
+
+	onDestroy(() => {
+		prefAbortController?.abort();
+	});
+
 	onMount(async () => {
 		try {
-			const [c, certs, allCerts, summary, s, sess, ag, cab] = await Promise.all([
+			const [c, certs, allCerts, summary, s, sess, ag, cab, acts, couns] = await Promise.all([
 				counselorApi.get(counselorId),
 				counselorCertificationApi.list(counselorId),
 				certificationApi.list(),
@@ -123,6 +166,8 @@
 				sessionApi.list(),
 				ageGroupApi.list(),
 				cabinApi.list(),
+				activityApi.list(),
+				counselorApi.list(),
 			]);
 			counselor = c;
 			counselorCerts = certs;
@@ -132,6 +177,14 @@
 			sessions = sess;
 			ageGroups = ag;
 			cabins = cab;
+			allActivities = acts;
+			allCounselors = couns;
+
+			if (prefSessionId && sessions.some((s) => s.id === prefSessionId)) {
+				loadPreferences(prefSessionId);
+			} else {
+				prefSessionId = "";
+			}
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to load counselor";
 			toast.error(message);
@@ -271,6 +324,215 @@
 			deletingHistory = false;
 		}
 	}
+
+	// Preference handlers
+	async function loadPreferences(sessionId: string) {
+		prefAbortController?.abort();
+		prefAbortController = null;
+
+		if (!sessionId) {
+			ageGroupPrefs = [];
+			cocounselorPrefs = [];
+			activityPrefs = [];
+			prefLoading = false;
+			return;
+		}
+
+		const controller = new AbortController();
+		prefAbortController = controller;
+		const { signal } = controller;
+		prefLoading = true;
+
+		try {
+			const [agp, cop, acp] = await Promise.all([
+				ageGroupPreferenceApi.list(sessionId, counselorId, signal),
+				cocounselorPreferenceApi.list(sessionId, counselorId, signal),
+				activityPreferenceApi.list(sessionId, counselorId, signal),
+			]);
+			if (signal.aborted) return;
+			ageGroupPrefs = agp.sort((a, b) => a.rank - b.rank);
+			cocounselorPrefs = cop.sort((a, b) => a.rank - b.rank);
+			activityPrefs = acp.sort((a, b) => a.rank - b.rank);
+		} catch (err) {
+			if (signal.aborted) return;
+			const message = err instanceof ApiClientError ? err.message : "Failed to load preferences";
+			toast.error(message);
+		} finally {
+			if (!signal.aborted) prefLoading = false;
+		}
+	}
+
+	function handlePrefSessionChange(sessionId: string | undefined) {
+		prefSessionId = sessionId ?? "";
+		addAgeGroupId = "";
+		addCocounselorId = "";
+		addActivityId = "";
+		updateUrl();
+		loadPreferences(prefSessionId);
+	}
+
+	function handleTabChange(tab: string) {
+		activeTab = tab;
+		updateUrl();
+	}
+
+	function updateUrl() {
+		const params = new URLSearchParams();
+		if (activeTab !== "certifications") params.set("tab", activeTab);
+		if (prefSessionId) params.set("prefSession", prefSessionId);
+		if (historyFilterSeasonId) params.set("season", historyFilterSeasonId);
+		const qs = params.toString();
+		goto(`?${qs}`, { replaceState: true, keepFocus: true, noScroll: true });
+	}
+
+	async function addAgeGroupPref() {
+		if (!addAgeGroupId || !prefSessionId) return;
+		const items = [
+			...ageGroupPrefs.map((p, i) => ({ age_group_id: p.age_group_id, rank: i + 1 })),
+			{ age_group_id: addAgeGroupId, rank: ageGroupPrefs.length + 1 },
+		];
+		try {
+			ageGroupPrefs = await ageGroupPreferenceApi.replaceAll(prefSessionId, counselorId, items);
+			ageGroupPrefs = ageGroupPrefs.sort((a, b) => a.rank - b.rank);
+			addAgeGroupId = "";
+			toast.success("Age group preference added");
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to update preferences";
+			toast.error(message);
+		}
+	}
+
+	async function addCocounselorPref() {
+		if (!addCocounselorId || !prefSessionId) return;
+		const items = [
+			...cocounselorPrefs.map((p, i) => ({ preferred_counselor_id: p.preferred_counselor_id, rank: i + 1 })),
+			{ preferred_counselor_id: addCocounselorId, rank: cocounselorPrefs.length + 1 },
+		];
+		try {
+			cocounselorPrefs = await cocounselorPreferenceApi.replaceAll(prefSessionId, counselorId, items);
+			cocounselorPrefs = cocounselorPrefs.sort((a, b) => a.rank - b.rank);
+			addCocounselorId = "";
+			toast.success("Co-counselor preference added");
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to update preferences";
+			toast.error(message);
+		}
+	}
+
+	async function addActivityPref() {
+		if (!addActivityId || !prefSessionId) return;
+		const items = [
+			...activityPrefs.map((p, i) => ({ activity_id: p.activity_id, rank: i + 1 })),
+			{ activity_id: addActivityId, rank: activityPrefs.length + 1 },
+		];
+		try {
+			activityPrefs = await activityPreferenceApi.replaceAll(prefSessionId, counselorId, items);
+			activityPrefs = activityPrefs.sort((a, b) => a.rank - b.rank);
+			addActivityId = "";
+			toast.success("Activity preference added");
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to update preferences";
+			toast.error(message);
+		}
+	}
+
+	async function moveAgeGroupPref(index: number, direction: -1 | 1) {
+		const newIndex = index + direction;
+		const reordered = [...ageGroupPrefs];
+		[reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]];
+		const items = reordered.map((p, i) => ({ age_group_id: p.age_group_id, rank: i + 1 }));
+		try {
+			ageGroupPrefs = await ageGroupPreferenceApi.replaceAll(prefSessionId, counselorId, items);
+			ageGroupPrefs = ageGroupPrefs.sort((a, b) => a.rank - b.rank);
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to reorder preferences";
+			toast.error(message);
+		}
+	}
+
+	async function moveCocounselorPref(index: number, direction: -1 | 1) {
+		const newIndex = index + direction;
+		const reordered = [...cocounselorPrefs];
+		[reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]];
+		const items = reordered.map((p, i) => ({ preferred_counselor_id: p.preferred_counselor_id, rank: i + 1 }));
+		try {
+			cocounselorPrefs = await cocounselorPreferenceApi.replaceAll(prefSessionId, counselorId, items);
+			cocounselorPrefs = cocounselorPrefs.sort((a, b) => a.rank - b.rank);
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to reorder preferences";
+			toast.error(message);
+		}
+	}
+
+	async function moveActivityPref(index: number, direction: -1 | 1) {
+		const newIndex = index + direction;
+		const reordered = [...activityPrefs];
+		[reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]];
+		const items = reordered.map((p, i) => ({ activity_id: p.activity_id, rank: i + 1 }));
+		try {
+			activityPrefs = await activityPreferenceApi.replaceAll(prefSessionId, counselorId, items);
+			activityPrefs = activityPrefs.sort((a, b) => a.rank - b.rank);
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to reorder preferences";
+			toast.error(message);
+		}
+	}
+
+	async function removeAgeGroupPref(index: number) {
+		const remaining = ageGroupPrefs.filter((_, i) => i !== index);
+		const items = remaining.map((p, i) => ({ age_group_id: p.age_group_id, rank: i + 1 }));
+		try {
+			ageGroupPrefs = await ageGroupPreferenceApi.replaceAll(prefSessionId, counselorId, items);
+			ageGroupPrefs = ageGroupPrefs.sort((a, b) => a.rank - b.rank);
+			toast.success("Age group preference removed");
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to update preferences";
+			toast.error(message);
+		}
+	}
+
+	async function removeCocounselorPref(index: number) {
+		const remaining = cocounselorPrefs.filter((_, i) => i !== index);
+		const items = remaining.map((p, i) => ({ preferred_counselor_id: p.preferred_counselor_id, rank: i + 1 }));
+		try {
+			cocounselorPrefs = await cocounselorPreferenceApi.replaceAll(prefSessionId, counselorId, items);
+			cocounselorPrefs = cocounselorPrefs.sort((a, b) => a.rank - b.rank);
+			toast.success("Co-counselor preference removed");
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to update preferences";
+			toast.error(message);
+		}
+	}
+
+	async function removeActivityPref(index: number) {
+		const remaining = activityPrefs.filter((_, i) => i !== index);
+		const items = remaining.map((p, i) => ({ activity_id: p.activity_id, rank: i + 1 }));
+		try {
+			activityPrefs = await activityPreferenceApi.replaceAll(prefSessionId, counselorId, items);
+			activityPrefs = activityPrefs.sort((a, b) => a.rank - b.rank);
+			toast.success("Activity preference removed");
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to update preferences";
+			toast.error(message);
+		}
+	}
+
+	function getSessionLabel(session: Session): string {
+		const season = seasons.find((s) => s.id === session.season_id);
+		return season ? `${season.name} - ${session.name}` : session.name;
+	}
+
+	function getAgeGroupName(id: string) {
+		return ageGroups.find((ag) => ag.id === id)?.name ?? id;
+	}
+
+	function getCounselorName(id: string) {
+		return allCounselors.find((c) => c.id === id)?.name ?? id;
+	}
+
+	function getActivityName(id: string) {
+		return allActivities.find((a) => a.id === id)?.name ?? id;
+	}
 </script>
 
 <div class="grid gap-6">
@@ -306,7 +568,7 @@
 			Failed to load counselor. Try refreshing the page.
 		</div>
 	{:else}
-		<Tabs.Root value="certifications">
+		<Tabs.Root value={activeTab} onValueChange={handleTabChange}>
 			<Tabs.List>
 				<Tabs.Trigger value="certifications">Certifications</Tabs.Trigger>
 				<Tabs.Trigger value="history">Session History</Tabs.Trigger>
@@ -380,7 +642,10 @@
 								<Select.Root
 									type="single"
 									value={historyFilterSeasonId}
-									onValueChange={(v) => (historyFilterSeasonId = v ?? "")}
+									onValueChange={(v) => {
+									historyFilterSeasonId = v ?? "";
+									updateUrl();
+								}}
 								>
 									<Select.Trigger class="w-48">
 										{historyFilterSeasonId
@@ -458,10 +723,263 @@
 				</div>
 			</Tabs.Content>
 
-			<!-- Preferences Tab (placeholder for next commit) -->
+			<!-- Preferences Tab -->
 			<Tabs.Content value="preferences">
-				<div class="text-muted-foreground py-8 text-center text-sm">
-					Preferences management coming soon. Select a session to manage age group, co-counselor, and activity preferences.
+				<div class="grid gap-6 pt-4">
+					<!-- Session selector -->
+					<div class="flex items-center gap-4">
+						<p class="text-muted-foreground text-sm">Manage ranked preferences for a session.</p>
+						{#if sessions.length > 0}
+							<Select.Root
+								type="single"
+								value={prefSessionId}
+								onValueChange={handlePrefSessionChange}
+							>
+								<Select.Trigger class="w-64">
+									{prefSessionId
+										? getSessionLabel(sessions.find((s) => s.id === prefSessionId)!)
+										: "Select session"}
+								</Select.Trigger>
+								<Select.Content>
+									{#each sessions as session (session.id)}
+										<Select.Item value={session.id}>{getSessionLabel(session)}</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+						{:else if !loading}
+							<p class="text-muted-foreground text-sm">
+								No sessions found. <a href="/app/sessions" class="text-foreground underline">Create a session</a> to manage preferences.
+							</p>
+						{/if}
+					</div>
+
+					{#if !prefSessionId}
+						<div class="text-muted-foreground py-8 text-center text-sm">
+							Select a session to manage preferences.
+						</div>
+					{:else if prefLoading}
+						<div class="text-muted-foreground py-8 text-center text-sm">Loading preferences...</div>
+					{:else}
+						<!-- Age Group Preferences -->
+						<div class="grid gap-3">
+							<h3 class="text-sm font-medium">Age Group Preferences</h3>
+							{#if ageGroupPrefs.length === 0}
+								<div class="text-muted-foreground py-4 text-center text-sm">No age group preferences.</div>
+							{:else}
+								<Table.Table>
+									<Table.TableHeader>
+										<Table.TableRow>
+											<Table.TableHead class="w-12">#</Table.TableHead>
+											<Table.TableHead>Age Group</Table.TableHead>
+											<Table.TableHead class="w-28">
+												<span class="sr-only">Actions</span>
+											</Table.TableHead>
+										</Table.TableRow>
+									</Table.TableHeader>
+									<Table.TableBody>
+										{#each ageGroupPrefs as pref, i (pref.id)}
+											<Table.TableRow>
+												<Table.TableCell class="text-muted-foreground">{pref.rank}</Table.TableCell>
+												<Table.TableCell>{getAgeGroupName(pref.age_group_id)}</Table.TableCell>
+												<Table.TableCell>
+													<div class="flex justify-end gap-1">
+														<Button variant="ghost" size="icon-sm" title="Move up" disabled={disabled || i === 0} onclick={() => moveAgeGroupPref(i, -1)}>
+															<ArrowUpIcon class="size-4" />
+															<span class="sr-only">Move up</span>
+														</Button>
+														<Button variant="ghost" size="icon-sm" title="Move down" disabled={disabled || i === ageGroupPrefs.length - 1} onclick={() => moveAgeGroupPref(i, 1)}>
+															<ArrowDownIcon class="size-4" />
+															<span class="sr-only">Move down</span>
+														</Button>
+														<Button variant="ghost" size="icon-sm" title="Remove" disabled={disabled} onclick={() => removeAgeGroupPref(i)}>
+															<TrashIcon class="size-4" />
+															<span class="sr-only">Remove</span>
+														</Button>
+													</div>
+												</Table.TableCell>
+											</Table.TableRow>
+										{/each}
+									</Table.TableBody>
+								</Table.Table>
+							{/if}
+							{#if availableAgeGroupsForPref.length > 0}
+								<div class="flex items-center gap-2">
+									<Select.Root
+										type="single"
+										value={addAgeGroupId}
+										onValueChange={(v) => (addAgeGroupId = v ?? "")}
+									>
+										<Select.Trigger class="w-48">
+											{addAgeGroupId
+												? availableAgeGroupsForPref.find((ag) => ag.id === addAgeGroupId)?.name ?? "Select age group"
+												: "Select age group"}
+										</Select.Trigger>
+										<Select.Content>
+											{#each availableAgeGroupsForPref as ag (ag.id)}
+												<Select.Item value={ag.id}>{ag.name}</Select.Item>
+											{/each}
+										</Select.Content>
+									</Select.Root>
+									<Button size="sm" disabled={disabled || !addAgeGroupId} onclick={addAgeGroupPref}>
+										<PlusIcon class="mr-1 size-4" />
+										Add
+									</Button>
+								</div>
+							{:else if ageGroups.length === 0}
+								<p class="text-muted-foreground text-sm">
+									No age groups found. <a href="/app/age-groups" class="text-foreground underline">Create age groups</a> to add preferences.
+								</p>
+							{/if}
+						</div>
+
+						<Separator />
+
+						<!-- Co-Counselor Preferences -->
+						<div class="grid gap-3">
+							<h3 class="text-sm font-medium">Co-Counselor Preferences</h3>
+							{#if cocounselorPrefs.length === 0}
+								<div class="text-muted-foreground py-4 text-center text-sm">No co-counselor preferences.</div>
+							{:else}
+								<Table.Table>
+									<Table.TableHeader>
+										<Table.TableRow>
+											<Table.TableHead class="w-12">#</Table.TableHead>
+											<Table.TableHead>Counselor</Table.TableHead>
+											<Table.TableHead class="w-28">
+												<span class="sr-only">Actions</span>
+											</Table.TableHead>
+										</Table.TableRow>
+									</Table.TableHeader>
+									<Table.TableBody>
+										{#each cocounselorPrefs as pref, i (pref.id)}
+											<Table.TableRow>
+												<Table.TableCell class="text-muted-foreground">{pref.rank}</Table.TableCell>
+												<Table.TableCell>{getCounselorName(pref.preferred_counselor_id)}</Table.TableCell>
+												<Table.TableCell>
+													<div class="flex justify-end gap-1">
+														<Button variant="ghost" size="icon-sm" title="Move up" disabled={disabled || i === 0} onclick={() => moveCocounselorPref(i, -1)}>
+															<ArrowUpIcon class="size-4" />
+															<span class="sr-only">Move up</span>
+														</Button>
+														<Button variant="ghost" size="icon-sm" title="Move down" disabled={disabled || i === cocounselorPrefs.length - 1} onclick={() => moveCocounselorPref(i, 1)}>
+															<ArrowDownIcon class="size-4" />
+															<span class="sr-only">Move down</span>
+														</Button>
+														<Button variant="ghost" size="icon-sm" title="Remove" disabled={disabled} onclick={() => removeCocounselorPref(i)}>
+															<TrashIcon class="size-4" />
+															<span class="sr-only">Remove</span>
+														</Button>
+													</div>
+												</Table.TableCell>
+											</Table.TableRow>
+										{/each}
+									</Table.TableBody>
+								</Table.Table>
+							{/if}
+							{#if availableCounselorsForPref.length > 0}
+								<div class="flex items-center gap-2">
+									<Select.Root
+										type="single"
+										value={addCocounselorId}
+										onValueChange={(v) => (addCocounselorId = v ?? "")}
+									>
+										<Select.Trigger class="w-48">
+											{addCocounselorId
+												? availableCounselorsForPref.find((c) => c.id === addCocounselorId)?.name ?? "Select counselor"
+												: "Select counselor"}
+										</Select.Trigger>
+										<Select.Content>
+											{#each availableCounselorsForPref as c (c.id)}
+												<Select.Item value={c.id}>{c.name}</Select.Item>
+											{/each}
+										</Select.Content>
+									</Select.Root>
+									<Button size="sm" disabled={disabled || !addCocounselorId} onclick={addCocounselorPref}>
+										<PlusIcon class="mr-1 size-4" />
+										Add
+									</Button>
+								</div>
+							{:else if allCounselors.length <= 1}
+								<p class="text-muted-foreground text-sm">
+									No other counselors found. <a href="/app/counselors" class="text-foreground underline">Create counselors</a> to add co-counselor preferences.
+								</p>
+							{/if}
+						</div>
+
+						<Separator />
+
+						<!-- Activity Preferences -->
+						<div class="grid gap-3">
+							<h3 class="text-sm font-medium">Activity Preferences</h3>
+							{#if activityPrefs.length === 0}
+								<div class="text-muted-foreground py-4 text-center text-sm">No activity preferences.</div>
+							{:else}
+								<Table.Table>
+									<Table.TableHeader>
+										<Table.TableRow>
+											<Table.TableHead class="w-12">#</Table.TableHead>
+											<Table.TableHead>Activity</Table.TableHead>
+											<Table.TableHead class="w-28">
+												<span class="sr-only">Actions</span>
+											</Table.TableHead>
+										</Table.TableRow>
+									</Table.TableHeader>
+									<Table.TableBody>
+										{#each activityPrefs as pref, i (pref.id)}
+											<Table.TableRow>
+												<Table.TableCell class="text-muted-foreground">{pref.rank}</Table.TableCell>
+												<Table.TableCell>{getActivityName(pref.activity_id)}</Table.TableCell>
+												<Table.TableCell>
+													<div class="flex justify-end gap-1">
+														<Button variant="ghost" size="icon-sm" title="Move up" disabled={disabled || i === 0} onclick={() => moveActivityPref(i, -1)}>
+															<ArrowUpIcon class="size-4" />
+															<span class="sr-only">Move up</span>
+														</Button>
+														<Button variant="ghost" size="icon-sm" title="Move down" disabled={disabled || i === activityPrefs.length - 1} onclick={() => moveActivityPref(i, 1)}>
+															<ArrowDownIcon class="size-4" />
+															<span class="sr-only">Move down</span>
+														</Button>
+														<Button variant="ghost" size="icon-sm" title="Remove" disabled={disabled} onclick={() => removeActivityPref(i)}>
+															<TrashIcon class="size-4" />
+															<span class="sr-only">Remove</span>
+														</Button>
+													</div>
+												</Table.TableCell>
+											</Table.TableRow>
+										{/each}
+									</Table.TableBody>
+								</Table.Table>
+							{/if}
+							{#if availableActivitiesForPref.length > 0}
+								<div class="flex items-center gap-2">
+									<Select.Root
+										type="single"
+										value={addActivityId}
+										onValueChange={(v) => (addActivityId = v ?? "")}
+									>
+										<Select.Trigger class="w-48">
+											{addActivityId
+												? availableActivitiesForPref.find((a) => a.id === addActivityId)?.name ?? "Select activity"
+												: "Select activity"}
+										</Select.Trigger>
+										<Select.Content>
+											{#each availableActivitiesForPref as a (a.id)}
+												<Select.Item value={a.id}>{a.name}</Select.Item>
+											{/each}
+										</Select.Content>
+									</Select.Root>
+									<Button size="sm" disabled={disabled || !addActivityId} onclick={addActivityPref}>
+										<PlusIcon class="mr-1 size-4" />
+										Add
+									</Button>
+								</div>
+							{:else if allActivities.length === 0}
+								<p class="text-muted-foreground text-sm">
+									No activities found. <a href="/app/activities" class="text-foreground underline">Create activities</a> to add preferences.
+								</p>
+							{/if}
+						</div>
+					{/if}
 				</div>
 			</Tabs.Content>
 		</Tabs.Root>

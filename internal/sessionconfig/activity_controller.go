@@ -28,6 +28,9 @@ func (ctrl *ActivityController) RegisterRoutes(rg *gin.RouterGroup) {
 	timeSlots.DELETE("/:timeSlotId", ctrl.DeleteTimeSlot)
 	timeSlots.PUT("/reorder", ctrl.ReorderTimeSlots)
 
+	sessionActivities := rg.Group("/sessions/:sessionId/activities")
+	sessionActivities.GET("", ctrl.ListAllActivities)
+
 	activities := timeSlots.Group("/:timeSlotId/activities")
 	activities.GET("", ctrl.ListActivities)
 	activities.GET("/:activityId", ctrl.GetActivity)
@@ -266,6 +269,28 @@ func (ctrl *ActivityController) ListActivities(c *gin.Context) {
 			With("time_slot_id", timeSlotID).
 			With("error", err).
 			Error("error listing session activities")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, activities)
+}
+
+func (ctrl *ActivityController) ListAllActivities(c *gin.Context) {
+	log := auth.Logger(c)
+	campID := auth.GetCampID(c)
+	sessionID := c.Param("sessionId")
+
+	activities, err := ctrl.svc.ListAllActivities(c.Request.Context(), campID, sessionID)
+	if err != nil {
+		if api.IsBadInput(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		log.
+			With("session_id", sessionID).
+			With("error", err).
+			Error("error listing all session activities")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}

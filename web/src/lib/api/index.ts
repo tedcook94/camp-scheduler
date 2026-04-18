@@ -192,6 +192,8 @@ export const sessionTimeSlotApi = {
 };
 
 export const sessionActivityApi = {
+	listAll: (sessionId: string) =>
+		api.get<SessionActivity[]>(`/api/v1/sessions/${sessionId}/activities`),
 	list: (sessionId: string, timeSlotId: string) =>
 		api.get<SessionActivity[]>(`/api/v1/sessions/${sessionId}/time-slots/${timeSlotId}/activities`),
 	get: (sessionId: string, timeSlotId: string, id: string) =>

@@ -286,6 +286,33 @@ func (svc *ActivityService) ListActivities(ctx context.Context, campID, sessionI
 	return result, nil
 }
 
+// ListAllActivities returns all session activities across all time slots for a session.
+func (svc *ActivityService) ListAllActivities(ctx context.Context, campID, sessionID string) ([]SessionActivityResponse, error) {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return nil, err
+	}
+
+	sessionUUID, err := api.ParseUUID(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := svc.queries.ListSessionActivities(ctx, db.ListSessionActivitiesParams{
+		SessionID: sessionUUID,
+		CampID:    campUUID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error listing all session activities: %w", err)
+	}
+
+	result := make([]SessionActivityResponse, len(rows))
+	for i, r := range rows {
+		result[i] = toSessionActivityResponse(r)
+	}
+	return result, nil
+}
+
 func (svc *ActivityService) GetActivity(ctx context.Context, campID, sessionID, id string) (SessionActivityResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {

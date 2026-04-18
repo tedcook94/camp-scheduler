@@ -213,25 +213,29 @@
 
 	onMount(async () => {
 		try {
-			const [s, stSlots, ts, acts] = await Promise.all([
+			const [s, stSlots, ts, acts, allSessionActs] = await Promise.all([
 				sessionApi.get(sessionId),
 				sessionTimeSlotApi.list(sessionId),
 				timeSlotApi.list(),
 				activityApi.list(),
+				sessionActivityApi.listAll(sessionId),
 			]);
 			session = s;
 			sessionTimeSlots = stSlots;
 			allTimeSlots = ts;
 			allActivities = acts;
 
-			// Load activities for each session time slot
+			// Group activities by session time slot
 			const activitiesByTimeSlotMap = new Map<string, SessionActivity[]>();
-			await Promise.all(
-				stSlots.map(async (st) => {
-					const acts = await sessionActivityApi.list(sessionId, st.id);
-					activitiesByTimeSlotMap.set(st.id, acts);
-				})
-			);
+			for (const st of stSlots) {
+				activitiesByTimeSlotMap.set(st.id, []);
+			}
+			for (const sa of allSessionActs) {
+				const list = activitiesByTimeSlotMap.get(sa.session_time_slot_id);
+				if (list) {
+					list.push(sa);
+				}
+			}
 			activitiesByTimeSlot = activitiesByTimeSlotMap;
 		} catch (err) {
 			const message =

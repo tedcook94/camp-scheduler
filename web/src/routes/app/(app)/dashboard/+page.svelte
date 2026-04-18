@@ -5,6 +5,7 @@
 	import CalendarIcon from "@lucide/svelte/icons/calendar";
 	import TentTreeIcon from "@lucide/svelte/icons/tent-tree";
 	import ClipboardListIcon from "@lucide/svelte/icons/clipboard-list";
+	import DumbbellIcon from "@lucide/svelte/icons/dumbbell";
 	import PlayIcon from "@lucide/svelte/icons/play";
 
 	const sections = [
@@ -34,6 +35,13 @@
 			label: "Campers",
 			description: "Track camper registrations and session enrollments",
 			icon: ClipboardListIcon,
+			enabled: true,
+		},
+		{
+			href: "/app/activities",
+			label: "Activities",
+			description: "Manage activities, time slots, and certification requirements",
+			icon: DumbbellIcon,
 			enabled: true,
 		},
 		{

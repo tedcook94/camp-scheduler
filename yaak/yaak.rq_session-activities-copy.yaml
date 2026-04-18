@@ -1,0 +1,22 @@
+type: http_request
+model: http_request
+id: rq_session-activities-copy
+createdAt: "2026-04-18T00:00:00.000000"
+updatedAt: "2026-04-18T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_session-activities
+name: Copy Activities
+description: "Copy all activity assignments from one session time slot to another"
+url: "${[ base_url ]}/sessions/${[ test-session-id ]}/time-slots/:sessionTimeSlotId/copy-activities"
+urlParameters:
+  - enabled: true
+    name: ":sessionTimeSlotId"
+    value: ""
+method: POST
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"source_session_time_slot_id": ""}'
+bodyType: application/json
+sortPriority: 1.0

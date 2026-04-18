@@ -110,7 +110,7 @@
 		{
 			label: "Campers",
 			icon: ClipboardListIcon,
-			children: [],
+			href: "/app/campers",
 		},
 		{
 			label: "Assignment Runs",

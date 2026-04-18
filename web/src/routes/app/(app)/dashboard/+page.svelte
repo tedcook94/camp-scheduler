@@ -30,10 +30,11 @@
 			enabled: true,
 		},
 		{
+			href: "/app/campers",
 			label: "Campers",
 			description: "Track camper registrations and session enrollments",
 			icon: ClipboardListIcon,
-			enabled: false,
+			enabled: true,
 		},
 		{
 			label: "Assignment Runs",

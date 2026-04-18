@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { getContext, onMount } from "svelte";
 	import { goto } from "$app/navigation";
+	import { getContext, onMount } from "svelte";
+
 	import { ApiClientError } from "$lib/api/client";
 	import { counselorApi } from "$lib/api";
 	import { toast } from "svelte-sonner";
@@ -207,18 +208,7 @@
 			</Table.TableHeader>
 			<Table.TableBody>
 				{#each sortedCounselors as counselor (counselor.id)}
-					<Table.TableRow
-						class="cursor-pointer hover:bg-muted/50"
-						tabindex={0}
-						role="button"
-						onclick={() => goto(`/app/counselors/${counselor.id}`)}
-						onkeydown={(e: KeyboardEvent) => {
-							if (e.key === "Enter" || e.key === " ") {
-								e.preventDefault();
-								goto(`/app/counselors/${counselor.id}`);
-							}
-						}}
-					>
+					<Table.TableRow class="cursor-pointer hover:bg-muted/50" onclick={() => goto(`/app/counselors/${counselor.id}`)}>
 						<Table.TableCell>{counselor.name}</Table.TableCell>
 						<Table.TableCell>
 							<Badge variant={counselor.junior_counselor ? "secondary" : "default"}>
@@ -252,7 +242,14 @@
 									<TrashIcon class="size-4" />
 									<span class="sr-only">Delete</span>
 								</Button>
-								<ChevronRightIcon class="ml-1 size-4 text-muted-foreground" />
+								<a
+									href={`/app/counselors/${counselor.id}`}
+									class="ml-1 inline-flex items-center text-muted-foreground hover:text-foreground"
+									onclick={(e: MouseEvent) => e.stopPropagation()}
+								>
+									<ChevronRightIcon class="size-4" />
+									<span class="sr-only">View details</span>
+								</a>
 							</div>
 						</Table.TableCell>
 					</Table.TableRow>

@@ -297,7 +297,7 @@
 
 <!-- Create / Edit User Dialog -->
 <Dialog.Dialog bind:open={dialogOpen}>
-	<Dialog.DialogContent class="max-w-md">
+	<Dialog.DialogContent class="max-w-md" onInteractOutside={(e) => e.preventDefault()}>
 		<Dialog.DialogHeader>
 			<Dialog.DialogTitle>
 				{dialogMode === "create" ? "Create User" : "Edit User"}
@@ -414,7 +414,7 @@
 
 <!-- Change Password Dialog -->
 <Dialog.Dialog bind:open={passwordDialogOpen}>
-	<Dialog.DialogContent class="max-w-sm">
+	<Dialog.DialogContent class="max-w-sm" onInteractOutside={(e) => e.preventDefault()}>
 		<Dialog.DialogHeader>
 			<Dialog.DialogTitle>Change Password</Dialog.DialogTitle>
 			<Dialog.DialogDescription>

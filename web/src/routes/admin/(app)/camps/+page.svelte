@@ -194,7 +194,7 @@
 
 <!-- Create / Edit Dialog -->
 <Dialog.Dialog bind:open={dialogOpen}>
-	<Dialog.DialogContent>
+	<Dialog.DialogContent onInteractOutside={(e) => e.preventDefault()}>
 		<Dialog.DialogHeader>
 			<Dialog.DialogTitle>
 				{dialogMode === "create" ? "Create Camp" : "Edit Camp"}

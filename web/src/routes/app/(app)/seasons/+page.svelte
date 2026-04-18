@@ -225,6 +225,7 @@
 									variant="ghost"
 									size="icon-sm"
 									disabled={disabled}
+									title="Edit"
 									onclick={() => openEdit(season)}
 								>
 									<PencilIcon class="size-4" />
@@ -234,6 +235,7 @@
 									variant="ghost"
 									size="icon-sm"
 									disabled={disabled}
+									title="Delete"
 									onclick={() => confirmDelete(season)}
 								>
 									<TrashIcon class="size-4" />

@@ -222,6 +222,7 @@
 									variant="ghost"
 									size="icon-sm"
 									disabled={disabled}
+									title="Edit"
 									onclick={() => openEdit(cabin)}
 								>
 									<PencilIcon class="size-4" />
@@ -231,6 +232,7 @@
 									variant="ghost"
 									size="icon-sm"
 									disabled={disabled}
+									title="Delete"
 									onclick={() => confirmDelete(cabin)}
 								>
 									<TrashIcon class="size-4" />

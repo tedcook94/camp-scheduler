@@ -216,6 +216,7 @@
 										type="submit"
 										variant="ghost"
 										size="icon-sm"
+										title="Save"
 										disabled={saving || !editingName.trim()}
 									>
 										{#if saving}
@@ -228,6 +229,7 @@
 										type="button"
 										variant="ghost"
 										size="icon-sm"
+										title="Cancel"
 										disabled={saving}
 										onclick={cancelEdit}
 									>
@@ -244,6 +246,7 @@
 									<Button
 										variant="ghost"
 										size="icon-sm"
+										title="Edit"
 										disabled={disabled || editingId !== null}
 										onclick={() => startEdit(item)}
 									>
@@ -253,6 +256,7 @@
 									<Button
 										variant="ghost"
 										size="icon-sm"
+										title="Delete"
 										disabled={disabled || editingId !== null}
 										onclick={() => confirmDelete(item)}
 									>

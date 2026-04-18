@@ -24,3 +24,8 @@ RETURNING id, camp_id, session_id, time_slot_id, sort_order;
 -- name: DeleteSessionTimeSlot :execrows
 DELETE FROM session_time_slots
 WHERE id = $1 AND camp_id = $2 AND session_id = $3;
+
+-- name: UpdateSessionTimeSlotSortOrder :exec
+UPDATE session_time_slots
+SET sort_order = $4
+WHERE id = $1 AND camp_id = $2 AND session_id = $3;

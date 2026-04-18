@@ -26,6 +26,7 @@ func (ctrl *ActivityController) RegisterRoutes(rg *gin.RouterGroup) {
 	timeSlots.POST("", ctrl.CreateTimeSlot)
 	timeSlots.PUT("/:timeSlotId", ctrl.UpdateTimeSlot)
 	timeSlots.DELETE("/:timeSlotId", ctrl.DeleteTimeSlot)
+	timeSlots.PUT("/reorder", ctrl.ReorderTimeSlots)
 
 	activities := timeSlots.Group("/:timeSlotId/activities")
 	activities.GET("", ctrl.ListActivities)
@@ -40,10 +41,6 @@ func (ctrl *ActivityController) RegisterRoutes(rg *gin.RouterGroup) {
 type CreateSessionTimeSlotRequest struct {
 	TimeSlotID string `json:"time_slot_id" binding:"required"`
 	SortOrder  int32  `json:"sort_order"`
-}
-
-type CopyActivitiesRequest struct {
-	SourceSessionTimeSlotID string `json:"source_session_time_slot_id" binding:"required"`
 }
 
 type UpdateSessionTimeSlotRequest struct {
@@ -78,6 +75,14 @@ type SessionActivityResponse struct {
 	ActivityID         string `json:"activity_id"`
 	Capacity           int32  `json:"capacity"`
 	RequiredCounselors int32  `json:"required_counselors"`
+}
+
+type CopyActivitiesRequest struct {
+	SourceSessionTimeSlotID string `json:"source_session_time_slot_id" binding:"required"`
+}
+
+type ReorderTimeSlotsRequest struct {
+	OrderedIDs []string `json:"ordered_ids" binding:"required,min=1"`
 }
 
 func (ctrl *ActivityController) ListTimeSlots(c *gin.Context) {
@@ -413,6 +418,34 @@ func (ctrl *ActivityController) DeleteActivity(c *gin.Context) {
 			With("id", id).
 			With("error", err).
 			Error("error deleting session activity")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.Status(http.StatusOK)
+}
+
+func (ctrl *ActivityController) ReorderTimeSlots(c *gin.Context) {
+	log := auth.Logger(c)
+	campID := auth.GetCampID(c)
+	sessionID := c.Param("sessionId")
+
+	var req ReorderTimeSlotsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := ctrl.svc.ReorderTimeSlots(c.Request.Context(), campID, sessionID, req.OrderedIDs)
+	if err != nil {
+		if api.IsBadInput(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		log.
+			With("session_id", sessionID).
+			With("error", err).
+			Error("error reordering session time slots")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}

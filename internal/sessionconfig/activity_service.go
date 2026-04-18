@@ -175,6 +175,76 @@ func (svc *ActivityService) DeleteTimeSlot(ctx context.Context, campID, sessionI
 	return nil
 }
 
+func (svc *ActivityService) ReorderTimeSlots(ctx context.Context, campID, sessionID string, orderedIDs []string) error {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return err
+	}
+
+	sessionUUID, err := api.ParseUUID(sessionID)
+	if err != nil {
+		return err
+	}
+
+	if len(orderedIDs) == 0 {
+		return api.BadInput("ordered_ids must not be empty")
+	}
+
+	existing, err := svc.queries.ListSessionTimeSlots(ctx, db.ListSessionTimeSlotsParams{
+		CampID:    campUUID,
+		SessionID: sessionUUID,
+	})
+	if err != nil {
+		return fmt.Errorf("error listing session time slots: %w", err)
+	}
+
+	existingIDs := make(map[string]struct{}, len(existing))
+	for _, st := range existing {
+		existingIDs[st.ID.String()] = struct{}{}
+	}
+
+	if len(orderedIDs) != len(existing) {
+		return api.BadInput("ordered_ids must contain exactly all time slots for the session")
+	}
+
+	seen := make(map[string]struct{}, len(orderedIDs))
+	for _, id := range orderedIDs {
+		if _, dup := seen[id]; dup {
+			return api.BadInput("ordered_ids contains duplicate: " + id)
+		}
+		seen[id] = struct{}{}
+		if _, ok := existingIDs[id]; !ok {
+			return api.BadInput("ordered_ids contains invalid time slot: " + id)
+		}
+	}
+
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error starting transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := svc.queries.WithTx(tx)
+
+	for i, id := range orderedIDs {
+		uid, err := api.ParseUUID(id)
+		if err != nil {
+			return err
+		}
+		err = qtx.UpdateSessionTimeSlotSortOrder(ctx, db.UpdateSessionTimeSlotSortOrderParams{
+			ID:        uid,
+			CampID:    campUUID,
+			SessionID: sessionUUID,
+			SortOrder: int32(i + 1),
+		})
+		if err != nil {
+			return fmt.Errorf("error updating sort order for %s: %w", id, err)
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
 func (svc *ActivityService) ListActivities(ctx context.Context, campID, sessionID, timeSlotID string) ([]SessionActivityResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {

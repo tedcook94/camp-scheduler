@@ -15,7 +15,7 @@ The **Base Environment** (committed to git) contains:
 
 - `base_url` — the API base URL (default: `http://10.0.4.14:9100/api/v1`)
 - `access-token` — auto-populated via request chaining from the Login response
-- 18 test ID variables for referencing created resources in requests
+- 21 test ID variables for referencing created resources in requests
 
 To override `base_url` or any other variable for your local setup, create a
 private (non-sharable) sub-environment in Yaak. Private environments are not

@@ -22,7 +22,7 @@ solutions that respect hard constraints and optimize soft preferences.
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  Admin UI   │────>│  REST API   │────>│ PostgreSQL  │
+│   Web UI    │────>│  REST API   │────>│ PostgreSQL  │
 │ (SvelteKit) │     │  (Go/Gin)   │     │             │
 └─────────────┘     └──────┬──────┘     └──────┬──────┘
                            │                    │
@@ -83,11 +83,11 @@ internal/            → All application code
   db/                → sqlc-generated database code
   api/               → Shared API helpers
   assignment/        → Assignment run orchestration
-  <domain>/          → Domain packages (camp, cabin, counselor, camper, etc.)
-web/                 → Super-admin frontend (SvelteKit SPA)
+  <domain>/          → Domain packages (camp, cabin, counselor, camper, activity, timeslot, sessionconfig, etc.)
+web/                 → Frontend (SvelteKit SPA)
   src/lib/api/       → API client layer (typed fetch wrapper)
   src/lib/components/→ UI components (shadcn-svelte)
-  src/routes/        → SvelteKit routes (login, camps, users)
+  src/routes/        → SvelteKit routes (login, admin, app dashboard + domain CRUD)
 database/
   migrations/        → SQL migration files (golang-migrate)
   queries/           → SQL query files (sqlc)

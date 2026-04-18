@@ -27,7 +27,7 @@ integration) is in progress.
 ### Schema
 
 Tables are organized by domain. See `database/migrations/` for the complete
-schema (21 migrations). Key groups:
+schema (24 migrations). Key groups:
 
 - **Core:** camps, age_groups, cabins, seasons, sessions, counselors
 - **Preferences:** counselor_age_group_preferences, counselor_cocounselor_preferences, counselor_activity_preferences, camper_friend_preferences
@@ -142,7 +142,7 @@ viable configurations and understand trade-offs.
   - [x] Seasons & sessions: CRUD for seasons; manage sessions within a season
   - [x] Counselors: list, create, edit, delete; manage preferences (age group, co-counselor, activity); certifications; session history
   - [x] Campers: list, create, edit, delete; friend preferences; session enrollments
-  - [x] Activities & time slots: CRUD for both; certification requirements; assign to sessions
+  - [x] Activities & time slots: CRUD for both; certification requirements; assign time slots and activities to sessions; copy activities between time slots; drag-and-drop reorder
   - [ ] Session configuration: assign age groups, cabins, activities, and time slots to a session
   - [ ] Assignment runs: trigger solver, view run history, compare ranked solutions, select a solution
 - [ ] Filter counselor preference options to session-configured age groups and activities

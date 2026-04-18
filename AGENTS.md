@@ -103,3 +103,5 @@ a constraint satisfaction solver. See `README.md` for a high-level overview and
   workflows.
 - Keep `yaak/` API definitions in sync with endpoint changes.
 - Keep `docs/roadmap.md` up to date when completing or adding development phases.
+- When making changes, review all project documentation for necessary updates as
+  part of each logical change — don't defer doc updates to the end.

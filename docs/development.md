@@ -20,11 +20,11 @@ mise run dev       # Start Postgres + Go server + Vite frontend with hot-reload
 2. Runs all pending migrations on both dev and test databases
 3. Starts the Go server via air — watches for file changes and rebuilds
    automatically
-4. Starts the Vite dev server for the admin panel — hot-module replacement on
+4. Starts the Vite dev server for the frontend — hot-module replacement on
    port 5173
 
-The admin panel is accessible at `http://localhost:5173/admin` during development
-and at `http://localhost:9100/admin` in production builds. The Vite dev server
+The frontend is accessible at `http://localhost:5173` during development
+and at `http://localhost:9100` in production builds. The Vite dev server
 proxies API requests to the Go server on port 9100.
 
 To run just one side independently:
@@ -69,6 +69,7 @@ Override any value locally with `mise.local.toml` (gitignored).
 | `mise run migrate:all`  | Run migrations on both dev and test databases    |
 | `mise run migration <name>` | Create a new migration file                  |
 | `mise run db:reset` | Destroy local databases and volumes                  |
+| `mise run seed:super-admin` | Create a super-admin user (interactive)        |
 | `mise run web`      | Start Vite dev server with HMR (port 5173)           |
 | `mise run web:build`| Build frontend static files                          |
 | `mise run web:check`| Run svelte-check type checking                       |

@@ -141,16 +141,18 @@ viable configurations and understand trade-offs.
   - [x] Cabins: list, create, edit, delete (with age group assignment)
   - [x] Seasons & sessions: CRUD for seasons; manage sessions within a season
   - [x] Counselors: list, create, edit, delete; manage preferences (age group, co-counselor, activity); certifications; session history
-  - [ ] Campers: list, create, edit, delete; friend preferences; session enrollments
+  - [x] Campers: list, create, edit, delete; friend preferences; session enrollments
   - [ ] Activities & time slots: CRUD for both; certification requirements; assign to sessions
   - [ ] Session configuration: assign age groups, cabins, activities, and time slots to a session
   - [ ] Assignment runs: trigger solver, view run history, compare ranked solutions, select a solution
 - [ ] Filter counselor preference options to session-configured age groups and activities
+- [ ] Filter camper preference options to session-enrolled campers
+- [ ] Add dedicated camper enrollments endpoint to eliminate N+1 loading on camper detail page
 - [ ] Archive (soft delete) objects
 - [ ] Demo camp seeding tool
 - [ ] Overrides (locking assignments before solver runs)
 - [ ] Data import (CSV/spreadsheet)
 - [ ] Auditing
-- [ ] MFA
+- [ ] Migrate auth to BetterAuth (enable MFA)
 - [ ] External system integration (Campminder, etc.)
 - [ ] LLM conversational layer (MCP) for "why was X assigned to Y?" queries

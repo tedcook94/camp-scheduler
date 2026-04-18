@@ -145,6 +145,7 @@ viable configurations and understand trade-offs.
   - [ ] Activities & time slots: CRUD for both; certification requirements; assign to sessions
   - [ ] Session configuration: assign age groups, cabins, activities, and time slots to a session
   - [ ] Assignment runs: trigger solver, view run history, compare ranked solutions, select a solution
+- [ ] Archive (soft delete) objects
 - [ ] Demo camp seeding tool
 - [ ] Overrides (locking assignments before solver runs)
 - [ ] Data import (CSV/spreadsheet)

@@ -1,0 +1,19 @@
+type: http_request
+model: http_request
+id: rq_camper-friend-prefs-replace
+createdAt: "2026-04-17T00:00:00.000000"
+updatedAt: "2026-04-17T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_camper-friend-prefs
+name: Replace All
+description: ""
+url: "${[ base_url ]}/sessions/${[ test-session-for-prefs-id ]}/campers/${[ test-camper-id ]}/friend-preferences"
+urlParameters: []
+method: PUT
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '[{"preferred_camper_id": "${[ test-camper-id ]}", "rank": 1}]'
+bodyType: application/json
+sortPriority: 1.0

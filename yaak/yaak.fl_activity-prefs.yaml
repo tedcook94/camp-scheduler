@@ -1,0 +1,13 @@
+type: folder
+model: folder
+id: fl_activity-prefs
+createdAt: "2026-04-17T00:00:00.000000"
+updatedAt: "2026-04-17T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: null
+name: activity-preferences
+description: ""
+authentication: {}
+authenticationType: null
+headers: []
+sortPriority: 8.0

@@ -2,21 +2,21 @@ package preferences
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
-)
 
-var ErrActivityPreferenceNotFound = errors.New("activity preference not found")
+	"github.com/jackc/pgx/v5/pgxpool"
+)
 
 type ActivityPreferenceService struct {
 	queries *db.Queries
+	pool    *pgxpool.Pool
 }
 
-func NewActivityPreferenceService(queries *db.Queries) *ActivityPreferenceService {
-	return &ActivityPreferenceService{queries: queries}
+func NewActivityPreferenceService(queries *db.Queries, pool *pgxpool.Pool) *ActivityPreferenceService {
+	return &ActivityPreferenceService{queries: queries, pool: pool}
 }
 
 func (svc *ActivityPreferenceService) List(ctx context.Context, campID, sessionID, counselorID string) ([]ActivityPreferenceResponse, error) {
@@ -51,151 +51,77 @@ func (svc *ActivityPreferenceService) List(ctx context.Context, campID, sessionI
 	return result, nil
 }
 
-func (svc *ActivityPreferenceService) GetByID(ctx context.Context, campID, sessionID, counselorID, id string) (ActivityPreferenceResponse, error) {
+func (svc *ActivityPreferenceService) ReplaceAll(ctx context.Context, campID, sessionID, counselorID string, items []ActivityPreferenceItem) ([]ActivityPreferenceResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {
-		return ActivityPreferenceResponse{}, err
+		return nil, err
 	}
 
 	sessionUUID, err := api.ParseUUID(sessionID)
 	if err != nil {
-		return ActivityPreferenceResponse{}, err
+		return nil, err
 	}
 
 	counselorUUID, err := api.ParseUUID(counselorID)
 	if err != nil {
-		return ActivityPreferenceResponse{}, err
+		return nil, err
 	}
 
-	uid, err := api.ParseUUID(id)
+	if err := validateRanks(len(items), func(i int) int32 { return items[i].Rank }); err != nil {
+		return nil, err
+	}
+
+	seen := make(map[string]bool, len(items))
+	for _, item := range items {
+		if seen[item.ActivityID] {
+			return nil, api.BadInput(fmt.Sprintf("duplicate activity_id: %s", item.ActivityID))
+		}
+		seen[item.ActivityID] = true
+	}
+
+	tx, err := svc.pool.Begin(ctx)
 	if err != nil {
-		return ActivityPreferenceResponse{}, err
+		return nil, fmt.Errorf("error starting transaction: %w", err)
 	}
+	defer tx.Rollback(ctx)
 
-	pref, err := svc.queries.GetCounselorActivityPreference(ctx, db.GetCounselorActivityPreferenceParams{
-		ID:          uid,
-		CampID:      campUUID,
-		SessionID:   sessionUUID,
-		CounselorID: counselorUUID,
-	})
-	if err != nil {
-		return ActivityPreferenceResponse{}, fmt.Errorf("error getting activity preference %s: %w", id, err)
-	}
+	qtx := svc.queries.WithTx(tx)
 
-	return toActivityPreferenceResponse(pref), nil
-}
-
-func (svc *ActivityPreferenceService) Create(ctx context.Context, campID, sessionID, counselorID string, req CreateActivityPreferenceRequest) (ActivityPreferenceResponse, error) {
-	campUUID, err := api.ParseUUID(campID)
-	if err != nil {
-		return ActivityPreferenceResponse{}, err
-	}
-
-	sessionUUID, err := api.ParseUUID(sessionID)
-	if err != nil {
-		return ActivityPreferenceResponse{}, err
-	}
-
-	counselorUUID, err := api.ParseUUID(counselorID)
-	if err != nil {
-		return ActivityPreferenceResponse{}, err
-	}
-
-	activityUUID, err := api.ParseUUID(req.ActivityID)
-	if err != nil {
-		return ActivityPreferenceResponse{}, err
-	}
-
-	pref, err := svc.queries.CreateCounselorActivityPreference(ctx, db.CreateCounselorActivityPreferenceParams{
-		CampID:      campUUID,
+	err = qtx.DeleteAllCounselorActivityPreferences(ctx, db.DeleteAllCounselorActivityPreferencesParams{
 		CounselorID: counselorUUID,
 		SessionID:   sessionUUID,
-		ActivityID:  activityUUID,
-		Rank:        req.Rank,
-	})
-	if err != nil {
-		return ActivityPreferenceResponse{}, fmt.Errorf("error creating activity preference: %w", err)
-	}
-
-	return toActivityPreferenceResponse(pref), nil
-}
-
-func (svc *ActivityPreferenceService) Update(ctx context.Context, campID, sessionID, counselorID, id string, req UpdateActivityPreferenceRequest) (ActivityPreferenceResponse, error) {
-	campUUID, err := api.ParseUUID(campID)
-	if err != nil {
-		return ActivityPreferenceResponse{}, err
-	}
-
-	sessionUUID, err := api.ParseUUID(sessionID)
-	if err != nil {
-		return ActivityPreferenceResponse{}, err
-	}
-
-	counselorUUID, err := api.ParseUUID(counselorID)
-	if err != nil {
-		return ActivityPreferenceResponse{}, err
-	}
-
-	uid, err := api.ParseUUID(id)
-	if err != nil {
-		return ActivityPreferenceResponse{}, err
-	}
-
-	activityUUID, err := api.ParseUUID(req.ActivityID)
-	if err != nil {
-		return ActivityPreferenceResponse{}, err
-	}
-
-	pref, err := svc.queries.UpdateCounselorActivityPreference(ctx, db.UpdateCounselorActivityPreferenceParams{
-		ID:          uid,
 		CampID:      campUUID,
-		SessionID:   sessionUUID,
-		CounselorID: counselorUUID,
-		ActivityID:  activityUUID,
-		Rank:        req.Rank,
 	})
 	if err != nil {
-		return ActivityPreferenceResponse{}, fmt.Errorf("error updating activity preference %s: %w", id, err)
+		return nil, fmt.Errorf("error deleting activity preferences: %w", err)
 	}
 
-	return toActivityPreferenceResponse(pref), nil
-}
+	result := make([]ActivityPreferenceResponse, len(items))
+	for i, item := range items {
+		activityUUID, err := api.ParseUUID(item.ActivityID)
+		if err != nil {
+			return nil, err
+		}
 
-func (svc *ActivityPreferenceService) Delete(ctx context.Context, campID, sessionID, counselorID, id string) error {
-	campUUID, err := api.ParseUUID(campID)
-	if err != nil {
-		return err
+		pref, err := qtx.CreateCounselorActivityPreference(ctx, db.CreateCounselorActivityPreferenceParams{
+			CampID:      campUUID,
+			CounselorID: counselorUUID,
+			SessionID:   sessionUUID,
+			ActivityID:  activityUUID,
+			Rank:        item.Rank,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error creating activity preference: %w", err)
+		}
+
+		result[i] = toActivityPreferenceResponse(pref)
 	}
 
-	sessionUUID, err := api.ParseUUID(sessionID)
-	if err != nil {
-		return err
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("error committing transaction: %w", err)
 	}
 
-	counselorUUID, err := api.ParseUUID(counselorID)
-	if err != nil {
-		return err
-	}
-
-	uid, err := api.ParseUUID(id)
-	if err != nil {
-		return err
-	}
-
-	rows, err := svc.queries.DeleteCounselorActivityPreference(ctx, db.DeleteCounselorActivityPreferenceParams{
-		ID:          uid,
-		CampID:      campUUID,
-		SessionID:   sessionUUID,
-		CounselorID: counselorUUID,
-	})
-	if err != nil {
-		return fmt.Errorf("error deleting activity preference %s: %w", id, err)
-	}
-	if rows == 0 {
-		return ErrActivityPreferenceNotFound
-	}
-
-	return nil
+	return result, nil
 }
 
 func toActivityPreferenceResponse(p db.CounselorActivityPreference) ActivityPreferenceResponse {

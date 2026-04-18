@@ -1,14 +1,12 @@
 package preferences
 
 import (
-	"errors"
 	"net/http"
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/auth"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5"
 )
 
 type CocounselorController struct {
@@ -22,20 +20,7 @@ func NewCocounselorController(svc *CocounselorService) *CocounselorController {
 func (ctrl *CocounselorController) RegisterRoutes(rg *gin.RouterGroup) {
 	prefs := rg.Group("/sessions/:sessionId/counselors/:counselorId/cocounselor-preferences")
 	prefs.GET("", ctrl.List)
-	prefs.GET("/:id", ctrl.Get)
-	prefs.POST("", ctrl.Create)
-	prefs.PUT("/:id", ctrl.Update)
-	prefs.DELETE("/:id", ctrl.Delete)
-}
-
-type CreateCocounselorPreferenceRequest struct {
-	PreferredCounselorID string `json:"preferred_counselor_id" binding:"required"`
-	Rank                 int32  `json:"rank" binding:"required,gt=0"`
-}
-
-type UpdateCocounselorPreferenceRequest struct {
-	PreferredCounselorID string `json:"preferred_counselor_id" binding:"required"`
-	Rank                 int32  `json:"rank" binding:"required,gt=0"`
+	prefs.PUT("", ctrl.ReplaceAll)
 }
 
 type CocounselorPreferenceResponse struct {
@@ -71,49 +56,19 @@ func (ctrl *CocounselorController) List(c *gin.Context) {
 	c.JSON(http.StatusOK, prefs)
 }
 
-func (ctrl *CocounselorController) Get(c *gin.Context) {
-	log := auth.Logger(c)
-	campID := auth.GetCampID(c)
-	sessionID := c.Param("sessionId")
-	counselorID := c.Param("counselorId")
-	id := c.Param("id")
-
-	pref, err := ctrl.svc.GetByID(c.Request.Context(), campID, sessionID, counselorID, id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "co-counselor preference not found"})
-			return
-		}
-		if api.IsBadInput(err) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		log.
-			With("session_id", sessionID).
-			With("counselor_id", counselorID).
-			With("id", id).
-			With("error", err).
-			Error("error getting co-counselor preference")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
-		return
-	}
-
-	c.JSON(http.StatusOK, pref)
-}
-
-func (ctrl *CocounselorController) Create(c *gin.Context) {
+func (ctrl *CocounselorController) ReplaceAll(c *gin.Context) {
 	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	sessionID := c.Param("sessionId")
 	counselorID := c.Param("counselorId")
 
-	var req CreateCocounselorPreferenceRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	var items []CocounselorPreferenceItem
+	if err := c.ShouldBindJSON(&items); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	pref, err := ctrl.svc.Create(c.Request.Context(), campID, sessionID, counselorID, req)
+	prefs, err := ctrl.svc.ReplaceAll(c.Request.Context(), campID, sessionID, counselorID, items)
 	if err != nil {
 		if api.IsBadInput(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -123,84 +78,18 @@ func (ctrl *CocounselorController) Create(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
 			return
 		}
-		log.
-			With("session_id", sessionID).
-			With("counselor_id", counselorID).
-			With("error", err).
-			Error("error creating co-counselor preference")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
-		return
-	}
-
-	c.JSON(http.StatusCreated, pref)
-}
-
-func (ctrl *CocounselorController) Update(c *gin.Context) {
-	log := auth.Logger(c)
-	campID := auth.GetCampID(c)
-	sessionID := c.Param("sessionId")
-	counselorID := c.Param("counselorId")
-	id := c.Param("id")
-
-	var req UpdateCocounselorPreferenceRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	pref, err := ctrl.svc.Update(c.Request.Context(), campID, sessionID, counselorID, id, req)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "co-counselor preference not found"})
-			return
-		}
-		if api.IsBadInput(err) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		if api.IsFKViolation(err) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "referenced entity not found"})
+		if api.IsCheckViolation(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "a counselor cannot prefer themselves"})
 			return
 		}
 		log.
 			With("session_id", sessionID).
 			With("counselor_id", counselorID).
-			With("id", id).
 			With("error", err).
-			Error("error updating co-counselor preference")
+			Error("error replacing co-counselor preferences")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	c.JSON(http.StatusOK, pref)
-}
-
-func (ctrl *CocounselorController) Delete(c *gin.Context) {
-	log := auth.Logger(c)
-	campID := auth.GetCampID(c)
-	sessionID := c.Param("sessionId")
-	counselorID := c.Param("counselorId")
-	id := c.Param("id")
-
-	err := ctrl.svc.Delete(c.Request.Context(), campID, sessionID, counselorID, id)
-	if err != nil {
-		if errors.Is(err, ErrCocounselorPreferenceNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "co-counselor preference not found"})
-			return
-		}
-		if api.IsBadInput(err) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		log.
-			With("session_id", sessionID).
-			With("counselor_id", counselorID).
-			With("id", id).
-			With("error", err).
-			Error("error deleting co-counselor preference")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
-		return
-	}
-
-	c.Status(http.StatusOK)
+	c.JSON(http.StatusOK, prefs)
 }

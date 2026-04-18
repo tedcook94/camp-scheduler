@@ -2,21 +2,21 @@ package preferences
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
-)
 
-var ErrCamperFriendPreferenceNotFound = errors.New("camper friend preference not found")
+	"github.com/jackc/pgx/v5/pgxpool"
+)
 
 type CamperFriendService struct {
 	queries *db.Queries
+	pool    *pgxpool.Pool
 }
 
-func NewCamperFriendService(queries *db.Queries) *CamperFriendService {
-	return &CamperFriendService{queries: queries}
+func NewCamperFriendService(queries *db.Queries, pool *pgxpool.Pool) *CamperFriendService {
+	return &CamperFriendService{queries: queries, pool: pool}
 }
 
 func (svc *CamperFriendService) List(ctx context.Context, campID, sessionID, camperID string) ([]CamperFriendPreferenceResponse, error) {
@@ -51,151 +51,77 @@ func (svc *CamperFriendService) List(ctx context.Context, campID, sessionID, cam
 	return result, nil
 }
 
-func (svc *CamperFriendService) GetByID(ctx context.Context, campID, sessionID, camperID, id string) (CamperFriendPreferenceResponse, error) {
+func (svc *CamperFriendService) ReplaceAll(ctx context.Context, campID, sessionID, camperID string, items []CamperFriendPreferenceItem) ([]CamperFriendPreferenceResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {
-		return CamperFriendPreferenceResponse{}, err
+		return nil, err
 	}
 
 	sessionUUID, err := api.ParseUUID(sessionID)
 	if err != nil {
-		return CamperFriendPreferenceResponse{}, err
+		return nil, err
 	}
 
 	camperUUID, err := api.ParseUUID(camperID)
 	if err != nil {
-		return CamperFriendPreferenceResponse{}, err
+		return nil, err
 	}
 
-	uid, err := api.ParseUUID(id)
+	if err := validateRanks(len(items), func(i int) int32 { return items[i].Rank }); err != nil {
+		return nil, err
+	}
+
+	seen := make(map[string]bool, len(items))
+	for _, item := range items {
+		if seen[item.PreferredCamperID] {
+			return nil, api.BadInput(fmt.Sprintf("duplicate preferred_camper_id: %s", item.PreferredCamperID))
+		}
+		seen[item.PreferredCamperID] = true
+	}
+
+	tx, err := svc.pool.Begin(ctx)
 	if err != nil {
-		return CamperFriendPreferenceResponse{}, err
+		return nil, fmt.Errorf("error starting transaction: %w", err)
 	}
+	defer tx.Rollback(ctx)
 
-	pref, err := svc.queries.GetCamperFriendPreference(ctx, db.GetCamperFriendPreferenceParams{
-		ID:        uid,
-		CampID:    campUUID,
-		SessionID: sessionUUID,
+	qtx := svc.queries.WithTx(tx)
+
+	err = qtx.DeleteAllCamperFriendPreferences(ctx, db.DeleteAllCamperFriendPreferencesParams{
 		CamperID:  camperUUID,
-	})
-	if err != nil {
-		return CamperFriendPreferenceResponse{}, fmt.Errorf("error getting camper friend preference %s: %w", id, err)
-	}
-
-	return toCamperFriendPreferenceResponse(pref), nil
-}
-
-func (svc *CamperFriendService) Create(ctx context.Context, campID, sessionID, camperID string, req CreateCamperFriendPreferenceRequest) (CamperFriendPreferenceResponse, error) {
-	campUUID, err := api.ParseUUID(campID)
-	if err != nil {
-		return CamperFriendPreferenceResponse{}, err
-	}
-
-	sessionUUID, err := api.ParseUUID(sessionID)
-	if err != nil {
-		return CamperFriendPreferenceResponse{}, err
-	}
-
-	camperUUID, err := api.ParseUUID(camperID)
-	if err != nil {
-		return CamperFriendPreferenceResponse{}, err
-	}
-
-	preferredUUID, err := api.ParseUUID(req.PreferredCamperID)
-	if err != nil {
-		return CamperFriendPreferenceResponse{}, err
-	}
-
-	pref, err := svc.queries.CreateCamperFriendPreference(ctx, db.CreateCamperFriendPreferenceParams{
-		CampID:            campUUID,
-		CamperID:          camperUUID,
-		SessionID:         sessionUUID,
-		PreferredCamperID: preferredUUID,
-		Rank:              req.Rank,
-	})
-	if err != nil {
-		return CamperFriendPreferenceResponse{}, fmt.Errorf("error creating camper friend preference: %w", err)
-	}
-
-	return toCamperFriendPreferenceResponse(pref), nil
-}
-
-func (svc *CamperFriendService) Update(ctx context.Context, campID, sessionID, camperID, id string, req UpdateCamperFriendPreferenceRequest) (CamperFriendPreferenceResponse, error) {
-	campUUID, err := api.ParseUUID(campID)
-	if err != nil {
-		return CamperFriendPreferenceResponse{}, err
-	}
-
-	sessionUUID, err := api.ParseUUID(sessionID)
-	if err != nil {
-		return CamperFriendPreferenceResponse{}, err
-	}
-
-	camperUUID, err := api.ParseUUID(camperID)
-	if err != nil {
-		return CamperFriendPreferenceResponse{}, err
-	}
-
-	uid, err := api.ParseUUID(id)
-	if err != nil {
-		return CamperFriendPreferenceResponse{}, err
-	}
-
-	preferredUUID, err := api.ParseUUID(req.PreferredCamperID)
-	if err != nil {
-		return CamperFriendPreferenceResponse{}, err
-	}
-
-	pref, err := svc.queries.UpdateCamperFriendPreference(ctx, db.UpdateCamperFriendPreferenceParams{
-		ID:                uid,
-		CampID:            campUUID,
-		SessionID:         sessionUUID,
-		CamperID:          camperUUID,
-		PreferredCamperID: preferredUUID,
-		Rank:              req.Rank,
-	})
-	if err != nil {
-		return CamperFriendPreferenceResponse{}, fmt.Errorf("error updating camper friend preference %s: %w", id, err)
-	}
-
-	return toCamperFriendPreferenceResponse(pref), nil
-}
-
-func (svc *CamperFriendService) Delete(ctx context.Context, campID, sessionID, camperID, id string) error {
-	campUUID, err := api.ParseUUID(campID)
-	if err != nil {
-		return err
-	}
-
-	sessionUUID, err := api.ParseUUID(sessionID)
-	if err != nil {
-		return err
-	}
-
-	camperUUID, err := api.ParseUUID(camperID)
-	if err != nil {
-		return err
-	}
-
-	uid, err := api.ParseUUID(id)
-	if err != nil {
-		return err
-	}
-
-	rows, err := svc.queries.DeleteCamperFriendPreference(ctx, db.DeleteCamperFriendPreferenceParams{
-		ID:        uid,
-		CampID:    campUUID,
 		SessionID: sessionUUID,
-		CamperID:  camperUUID,
+		CampID:    campUUID,
 	})
 	if err != nil {
-		return fmt.Errorf("error deleting camper friend preference %s: %w", id, err)
-	}
-	if rows == 0 {
-		return ErrCamperFriendPreferenceNotFound
+		return nil, fmt.Errorf("error deleting camper friend preferences: %w", err)
 	}
 
-	return nil
+	result := make([]CamperFriendPreferenceResponse, len(items))
+	for i, item := range items {
+		preferredUUID, err := api.ParseUUID(item.PreferredCamperID)
+		if err != nil {
+			return nil, err
+		}
+
+		pref, err := qtx.CreateCamperFriendPreference(ctx, db.CreateCamperFriendPreferenceParams{
+			CampID:            campUUID,
+			CamperID:          camperUUID,
+			SessionID:         sessionUUID,
+			PreferredCamperID: preferredUUID,
+			Rank:              item.Rank,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error creating camper friend preference: %w", err)
+		}
+
+		result[i] = toCamperFriendPreferenceResponse(pref)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("error committing transaction: %w", err)
+	}
+
+	return result, nil
 }
 
 func toCamperFriendPreferenceResponse(p db.CamperFriendPreference) CamperFriendPreferenceResponse {

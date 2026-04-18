@@ -45,61 +45,20 @@ func (q *Queries) CreateCounselorCocounselorPreference(ctx context.Context, arg 
 	return i, err
 }
 
-const deleteCounselorCocounselorPreference = `-- name: DeleteCounselorCocounselorPreference :execrows
+const deleteAllCounselorCocounselorPreferences = `-- name: DeleteAllCounselorCocounselorPreferences :exec
 DELETE FROM counselor_cocounselor_preferences
-WHERE id = $1 AND camp_id = $2 AND session_id = $3 AND counselor_id = $4
+WHERE counselor_id = $1 AND session_id = $2 AND camp_id = $3
 `
 
-type DeleteCounselorCocounselorPreferenceParams struct {
-	ID          pgtype.UUID
-	CampID      pgtype.UUID
-	SessionID   pgtype.UUID
+type DeleteAllCounselorCocounselorPreferencesParams struct {
 	CounselorID pgtype.UUID
-}
-
-func (q *Queries) DeleteCounselorCocounselorPreference(ctx context.Context, arg DeleteCounselorCocounselorPreferenceParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteCounselorCocounselorPreference,
-		arg.ID,
-		arg.CampID,
-		arg.SessionID,
-		arg.CounselorID,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const getCounselorCocounselorPreference = `-- name: GetCounselorCocounselorPreference :one
-SELECT id, camp_id, counselor_id, session_id, preferred_counselor_id, rank
-FROM counselor_cocounselor_preferences
-WHERE id = $1 AND camp_id = $2 AND session_id = $3 AND counselor_id = $4
-`
-
-type GetCounselorCocounselorPreferenceParams struct {
-	ID          pgtype.UUID
-	CampID      pgtype.UUID
 	SessionID   pgtype.UUID
-	CounselorID pgtype.UUID
+	CampID      pgtype.UUID
 }
 
-func (q *Queries) GetCounselorCocounselorPreference(ctx context.Context, arg GetCounselorCocounselorPreferenceParams) (CounselorCocounselorPreference, error) {
-	row := q.db.QueryRow(ctx, getCounselorCocounselorPreference,
-		arg.ID,
-		arg.CampID,
-		arg.SessionID,
-		arg.CounselorID,
-	)
-	var i CounselorCocounselorPreference
-	err := row.Scan(
-		&i.ID,
-		&i.CampID,
-		&i.CounselorID,
-		&i.SessionID,
-		&i.PreferredCounselorID,
-		&i.Rank,
-	)
-	return i, err
+func (q *Queries) DeleteAllCounselorCocounselorPreferences(ctx context.Context, arg DeleteAllCounselorCocounselorPreferencesParams) error {
+	_, err := q.db.Exec(ctx, deleteAllCounselorCocounselorPreferences, arg.CounselorID, arg.SessionID, arg.CampID)
+	return err
 }
 
 const listCounselorCocounselorPreferences = `-- name: ListCounselorCocounselorPreferences :many
@@ -178,42 +137,4 @@ func (q *Queries) ListSessionCocounselorPreferences(ctx context.Context, arg Lis
 		return nil, err
 	}
 	return items, nil
-}
-
-const updateCounselorCocounselorPreference = `-- name: UpdateCounselorCocounselorPreference :one
-UPDATE counselor_cocounselor_preferences
-SET preferred_counselor_id = $5,
-    rank = $6
-WHERE id = $1 AND camp_id = $2 AND session_id = $3 AND counselor_id = $4
-RETURNING id, camp_id, counselor_id, session_id, preferred_counselor_id, rank
-`
-
-type UpdateCounselorCocounselorPreferenceParams struct {
-	ID                   pgtype.UUID
-	CampID               pgtype.UUID
-	SessionID            pgtype.UUID
-	CounselorID          pgtype.UUID
-	PreferredCounselorID pgtype.UUID
-	Rank                 int32
-}
-
-func (q *Queries) UpdateCounselorCocounselorPreference(ctx context.Context, arg UpdateCounselorCocounselorPreferenceParams) (CounselorCocounselorPreference, error) {
-	row := q.db.QueryRow(ctx, updateCounselorCocounselorPreference,
-		arg.ID,
-		arg.CampID,
-		arg.SessionID,
-		arg.CounselorID,
-		arg.PreferredCounselorID,
-		arg.Rank,
-	)
-	var i CounselorCocounselorPreference
-	err := row.Scan(
-		&i.ID,
-		&i.CampID,
-		&i.CounselorID,
-		&i.SessionID,
-		&i.PreferredCounselorID,
-		&i.Rank,
-	)
-	return i, err
 }

@@ -91,6 +91,10 @@ variables:
   value: ''
   id: bYiwYYQqUi
 - enabled: true
+  name: test-activity-id
+  value: ''
+  id: kR7vNpXw2M
+- enabled: true
   name: test-admin-camp-id
   value: ''
   id: aKm7XqPwN3

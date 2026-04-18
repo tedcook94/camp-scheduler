@@ -45,61 +45,20 @@ func (q *Queries) CreateCamperFriendPreference(ctx context.Context, arg CreateCa
 	return i, err
 }
 
-const deleteCamperFriendPreference = `-- name: DeleteCamperFriendPreference :execrows
+const deleteAllCamperFriendPreferences = `-- name: DeleteAllCamperFriendPreferences :exec
 DELETE FROM camper_friend_preferences
-WHERE id = $1 AND camp_id = $2 AND session_id = $3 AND camper_id = $4
+WHERE camper_id = $1 AND session_id = $2 AND camp_id = $3
 `
 
-type DeleteCamperFriendPreferenceParams struct {
-	ID        pgtype.UUID
-	CampID    pgtype.UUID
-	SessionID pgtype.UUID
+type DeleteAllCamperFriendPreferencesParams struct {
 	CamperID  pgtype.UUID
-}
-
-func (q *Queries) DeleteCamperFriendPreference(ctx context.Context, arg DeleteCamperFriendPreferenceParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteCamperFriendPreference,
-		arg.ID,
-		arg.CampID,
-		arg.SessionID,
-		arg.CamperID,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const getCamperFriendPreference = `-- name: GetCamperFriendPreference :one
-SELECT id, camp_id, camper_id, session_id, preferred_camper_id, rank
-FROM camper_friend_preferences
-WHERE id = $1 AND camp_id = $2 AND session_id = $3 AND camper_id = $4
-`
-
-type GetCamperFriendPreferenceParams struct {
-	ID        pgtype.UUID
-	CampID    pgtype.UUID
 	SessionID pgtype.UUID
-	CamperID  pgtype.UUID
+	CampID    pgtype.UUID
 }
 
-func (q *Queries) GetCamperFriendPreference(ctx context.Context, arg GetCamperFriendPreferenceParams) (CamperFriendPreference, error) {
-	row := q.db.QueryRow(ctx, getCamperFriendPreference,
-		arg.ID,
-		arg.CampID,
-		arg.SessionID,
-		arg.CamperID,
-	)
-	var i CamperFriendPreference
-	err := row.Scan(
-		&i.ID,
-		&i.CampID,
-		&i.CamperID,
-		&i.SessionID,
-		&i.PreferredCamperID,
-		&i.Rank,
-	)
-	return i, err
+func (q *Queries) DeleteAllCamperFriendPreferences(ctx context.Context, arg DeleteAllCamperFriendPreferencesParams) error {
+	_, err := q.db.Exec(ctx, deleteAllCamperFriendPreferences, arg.CamperID, arg.SessionID, arg.CampID)
+	return err
 }
 
 const listCamperFriendPreferences = `-- name: ListCamperFriendPreferences :many
@@ -178,42 +137,4 @@ func (q *Queries) ListSessionCamperFriendPreferences(ctx context.Context, arg Li
 		return nil, err
 	}
 	return items, nil
-}
-
-const updateCamperFriendPreference = `-- name: UpdateCamperFriendPreference :one
-UPDATE camper_friend_preferences
-SET preferred_camper_id = $5,
-    rank = $6
-WHERE id = $1 AND camp_id = $2 AND session_id = $3 AND camper_id = $4
-RETURNING id, camp_id, camper_id, session_id, preferred_camper_id, rank
-`
-
-type UpdateCamperFriendPreferenceParams struct {
-	ID                pgtype.UUID
-	CampID            pgtype.UUID
-	SessionID         pgtype.UUID
-	CamperID          pgtype.UUID
-	PreferredCamperID pgtype.UUID
-	Rank              int32
-}
-
-func (q *Queries) UpdateCamperFriendPreference(ctx context.Context, arg UpdateCamperFriendPreferenceParams) (CamperFriendPreference, error) {
-	row := q.db.QueryRow(ctx, updateCamperFriendPreference,
-		arg.ID,
-		arg.CampID,
-		arg.SessionID,
-		arg.CamperID,
-		arg.PreferredCamperID,
-		arg.Rank,
-	)
-	var i CamperFriendPreference
-	err := row.Scan(
-		&i.ID,
-		&i.CampID,
-		&i.CamperID,
-		&i.SessionID,
-		&i.PreferredCamperID,
-		&i.Rank,
-	)
-	return i, err
 }

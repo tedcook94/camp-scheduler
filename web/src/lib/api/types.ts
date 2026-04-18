@@ -136,6 +136,59 @@ export interface Activity {
 	name: string;
 }
 
+export interface ActivityCertification {
+	id: string;
+	camp_id: string;
+	activity_id: string;
+	certification_id: string;
+	certification_name?: string;
+}
+
+export interface TimeSlot {
+	id: string;
+	camp_id: string;
+	name: string;
+}
+
+export interface SessionTimeSlot {
+	id: string;
+	camp_id: string;
+	session_id: string;
+	time_slot_id: string;
+	sort_order: number;
+}
+
+export interface CreateSessionTimeSlotRequest {
+	time_slot_id: string;
+	sort_order: number;
+}
+
+export interface UpdateSessionTimeSlotRequest {
+	time_slot_id: string;
+	sort_order: number;
+}
+
+export interface SessionActivity {
+	id: string;
+	camp_id: string;
+	session_time_slot_id: string;
+	activity_id: string;
+	capacity: number;
+	required_counselors: number;
+}
+
+export interface CreateSessionActivityRequest {
+	activity_id: string;
+	capacity: number;
+	required_counselors: number;
+}
+
+export interface UpdateSessionActivityRequest {
+	activity_id: string;
+	capacity: number;
+	required_counselors: number;
+}
+
 export interface Counselor {
 	id: string;
 	camp_id: string;

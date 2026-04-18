@@ -1,6 +1,7 @@
 import { api } from "./client";
 import type {
 	Activity,
+	ActivityCertification,
 	ActivityPreference,
 	ActivityPreferenceItem,
 	AgeGroup,
@@ -18,21 +19,28 @@ import type {
 	CreateCampRequest,
 	CreateCounselorRequest,
 	CreateSeasonRequest,
+	CreateSessionActivityRequest,
 	CreateSessionHistoryRequest,
 	CreateSessionRequest,
+	CreateSessionTimeSlotRequest,
 	CreateUserRequest,
 	HistorySummary,
 	Season,
 	Session,
+	SessionActivity,
 	SessionHistory,
+	SessionTimeSlot,
+	TimeSlot,
 	TokenResponse,
 	UpdateCabinRequest,
 	UpdateCampRequest,
 	UpdateCounselorRequest,
 	UpdatePasswordRequest,
 	UpdateSeasonRequest,
+	UpdateSessionActivityRequest,
 	UpdateSessionHistoryRequest,
 	UpdateSessionRequest,
+	UpdateSessionTimeSlotRequest,
 	UpdateUserRequest,
 	User,
 } from "./types";
@@ -148,6 +156,56 @@ export const activityApi = {
 	update: (id: string, name: string) =>
 		api.put<Activity>(`/api/v1/activities/${id}`, { name }),
 	delete: (id: string) => api.delete<void>(`/api/v1/activities/${id}`),
+};
+
+export const activityCertificationApi = {
+	list: (activityId: string) =>
+		api.get<ActivityCertification[]>(`/api/v1/activities/${activityId}/certifications`),
+	add: (activityId: string, certificationId: string) =>
+		api.post<ActivityCertification>(`/api/v1/activities/${activityId}/certifications`, { certification_id: certificationId }),
+	remove: (activityId: string, id: string) =>
+		api.delete<void>(`/api/v1/activities/${activityId}/certifications/${id}`),
+};
+
+export const timeSlotApi = {
+	list: () => api.get<TimeSlot[]>("/api/v1/time-slots"),
+	get: (id: string) => api.get<TimeSlot>(`/api/v1/time-slots/${id}`),
+	create: (name: string) => api.post<TimeSlot>("/api/v1/time-slots", { name }),
+	update: (id: string, name: string) =>
+		api.put<TimeSlot>(`/api/v1/time-slots/${id}`, { name }),
+	delete: (id: string) => api.delete<void>(`/api/v1/time-slots/${id}`),
+};
+
+export const sessionTimeSlotApi = {
+	list: (sessionId: string) =>
+		api.get<SessionTimeSlot[]>(`/api/v1/sessions/${sessionId}/time-slots`),
+	get: (sessionId: string, id: string) =>
+		api.get<SessionTimeSlot>(`/api/v1/sessions/${sessionId}/time-slots/${id}`),
+	create: (sessionId: string, data: CreateSessionTimeSlotRequest) =>
+		api.post<SessionTimeSlot>(`/api/v1/sessions/${sessionId}/time-slots`, data),
+	update: (sessionId: string, id: string, data: UpdateSessionTimeSlotRequest) =>
+		api.put<SessionTimeSlot>(`/api/v1/sessions/${sessionId}/time-slots/${id}`, data),
+	delete: (sessionId: string, id: string) =>
+		api.delete<void>(`/api/v1/sessions/${sessionId}/time-slots/${id}`),
+	reorder: (sessionId: string, orderedIds: string[]) =>
+		api.put<void>(`/api/v1/sessions/${sessionId}/time-slots/reorder`, { ordered_ids: orderedIds }),
+};
+
+export const sessionActivityApi = {
+	list: (sessionId: string, timeSlotId: string) =>
+		api.get<SessionActivity[]>(`/api/v1/sessions/${sessionId}/time-slots/${timeSlotId}/activities`),
+	get: (sessionId: string, timeSlotId: string, id: string) =>
+		api.get<SessionActivity>(`/api/v1/sessions/${sessionId}/time-slots/${timeSlotId}/activities/${id}`),
+	create: (sessionId: string, timeSlotId: string, data: CreateSessionActivityRequest) =>
+		api.post<SessionActivity>(`/api/v1/sessions/${sessionId}/time-slots/${timeSlotId}/activities`, data),
+	update: (sessionId: string, timeSlotId: string, id: string, data: UpdateSessionActivityRequest) =>
+		api.put<SessionActivity>(`/api/v1/sessions/${sessionId}/time-slots/${timeSlotId}/activities/${id}`, data),
+	delete: (sessionId: string, timeSlotId: string, id: string) =>
+		api.delete<void>(`/api/v1/sessions/${sessionId}/time-slots/${timeSlotId}/activities/${id}`),
+	copyFromTimeSlot: (sessionId: string, targetTimeSlotId: string, sourceTimeSlotId: string) =>
+		api.post<SessionActivity[]>(`/api/v1/sessions/${sessionId}/time-slots/${targetTimeSlotId}/copy-activities`, {
+			source_session_time_slot_id: sourceTimeSlotId,
+		}),
 };
 
 export const counselorApi = {

@@ -142,12 +142,13 @@ viable configurations and understand trade-offs.
   - [x] Seasons & sessions: CRUD for seasons; manage sessions within a season
   - [x] Counselors: list, create, edit, delete; manage preferences (age group, co-counselor, activity); certifications; session history
   - [x] Campers: list, create, edit, delete; friend preferences; session enrollments
-  - [ ] Activities & time slots: CRUD for both; certification requirements; assign to sessions
+  - [x] Activities & time slots: CRUD for both; certification requirements; assign to sessions
   - [ ] Session configuration: assign age groups, cabins, activities, and time slots to a session
   - [ ] Assignment runs: trigger solver, view run history, compare ranked solutions, select a solution
 - [ ] Filter counselor preference options to session-configured age groups and activities
 - [ ] Filter camper preference options to session-enrolled campers
 - [ ] Add dedicated camper enrollments endpoint to eliminate N+1 loading on camper detail page
+- [ ] "Dirty" flag for when changes have been made since assignment run
 - [ ] Archive (soft delete) objects
 - [ ] Demo camp seeding tool
 - [ ] Overrides (locking assignments before solver runs)

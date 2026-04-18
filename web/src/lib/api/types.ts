@@ -129,3 +129,112 @@ export interface UpdateSessionRequest {
 	season_id: string;
 	previous_session_id?: string | null;
 }
+
+export interface Activity {
+	id: string;
+	camp_id: string;
+	name: string;
+}
+
+export interface Counselor {
+	id: string;
+	camp_id: string;
+	name: string;
+	junior_counselor: boolean;
+	enabled: boolean;
+}
+
+export interface CreateCounselorRequest {
+	name: string;
+	junior_counselor: boolean;
+}
+
+export interface UpdateCounselorRequest {
+	name: string;
+	junior_counselor: boolean;
+	enabled: boolean;
+}
+
+export interface CounselorCertification {
+	id: string;
+	camp_id: string;
+	counselor_id: string;
+	certification_id: string;
+	certification_name?: string;
+}
+
+export interface AddCounselorCertificationRequest {
+	certification_id: string;
+}
+
+export interface SessionHistory {
+	id: string;
+	camp_id: string;
+	counselor_id: string;
+	session_id: string;
+	age_group_id: string;
+	cabin_id?: string;
+}
+
+export interface CreateSessionHistoryRequest {
+	session_id: string;
+	age_group_id: string;
+	cabin_id?: string;
+}
+
+export interface UpdateSessionHistoryRequest {
+	session_id: string;
+	age_group_id: string;
+	cabin_id?: string;
+}
+
+export interface HistorySummary {
+	id: string;
+	session_name: string;
+	season_id: string;
+	season_name: string;
+	age_group_name: string;
+	cabin_name?: string;
+}
+
+export interface AgeGroupPreference {
+	id: string;
+	camp_id: string;
+	counselor_id: string;
+	session_id: string;
+	age_group_id: string;
+	rank: number;
+}
+
+export interface AgeGroupPreferenceItem {
+	age_group_id: string;
+	rank: number;
+}
+
+export interface CocounselorPreference {
+	id: string;
+	camp_id: string;
+	counselor_id: string;
+	session_id: string;
+	preferred_counselor_id: string;
+	rank: number;
+}
+
+export interface CocounselorPreferenceItem {
+	preferred_counselor_id: string;
+	rank: number;
+}
+
+export interface ActivityPreference {
+	id: string;
+	camp_id: string;
+	counselor_id: string;
+	session_id: string;
+	activity_id: string;
+	rank: number;
+}
+
+export interface ActivityPreferenceItem {
+	activity_id: string;
+	rank: number;
+}

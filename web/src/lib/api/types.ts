@@ -238,3 +238,54 @@ export interface ActivityPreferenceItem {
 	activity_id: string;
 	rank: number;
 }
+
+export interface Camper {
+	id: string;
+	camp_id: string;
+	name: string;
+}
+
+export interface CreateCamperRequest {
+	name: string;
+}
+
+export interface UpdateCamperRequest {
+	name: string;
+}
+
+export interface SessionAgeGroup {
+	id: string;
+	camp_id: string;
+	session_id: string;
+	age_group_id: string;
+	group_size: number | null;
+}
+
+export interface Enrollment {
+	id: string;
+	camp_id: string;
+	camper_id: string;
+	session_age_group_id: string;
+	camper_name: string;
+	session_id: string;
+	age_group_id: string;
+}
+
+export interface CreateEnrollmentRequest {
+	camper_id: string;
+	session_age_group_id: string;
+}
+
+export interface CamperFriendPreference {
+	id: string;
+	camp_id: string;
+	camper_id: string;
+	session_id: string;
+	preferred_camper_id: string;
+	rank: number;
+}
+
+export interface CamperFriendPreferenceItem {
+	preferred_camper_id: string;
+	rank: number;
+}

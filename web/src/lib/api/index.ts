@@ -37,6 +37,13 @@ import type {
 	User,
 } from "./types";
 
+export {
+	camperApi,
+	enrollmentApi,
+	sessionAgeGroupApi,
+	camperFriendPreferenceApi,
+} from "./campers";
+
 export const authApi = {
 	login: (username: string, password: string) =>
 		api.post<TokenResponse>("/api/v1/auth/login", { username, password }),

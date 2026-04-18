@@ -251,7 +251,7 @@
 
 <!-- Create/Edit dialog -->
 <Dialog.Dialog bind:open={dialogOpen}>
-	<Dialog.DialogContent>
+	<Dialog.DialogContent onInteractOutside={(e) => e.preventDefault()}>
 		<Dialog.DialogHeader>
 			<Dialog.DialogTitle>{dialogTitle}</Dialog.DialogTitle>
 			<Dialog.DialogDescription>{dialogDescription}</Dialog.DialogDescription>

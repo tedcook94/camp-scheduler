@@ -256,7 +256,7 @@
 
 <!-- Create dialog -->
 <Dialog.Dialog bind:open={createOpen}>
-	<Dialog.DialogContent>
+	<Dialog.DialogContent onInteractOutside={(e) => e.preventDefault()}>
 		<Dialog.DialogHeader>
 			<Dialog.DialogTitle>Add {resourceName}</Dialog.DialogTitle>
 			<Dialog.DialogDescription>Enter a name for the new {resourceName.toLowerCase()}.</Dialog.DialogDescription>

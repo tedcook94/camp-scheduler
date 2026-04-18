@@ -20,10 +20,38 @@
 	import TrashIcon from "@lucide/svelte/icons/trash";
 	import KeyIcon from "@lucide/svelte/icons/key-round";
 	import UserCheckIcon from "@lucide/svelte/icons/user-check";
+	import SortableTableHead from "$lib/components/sortable-table-head.svelte";
+	import { sortItems, type SortDirection, type SortAccessor } from "$lib/utils";
 
 	let users = $state<User[]>([]);
 	let camps = $state<Camp[]>([]);
 	let loading = $state(true);
+
+	type UserSortKey = "name" | "username" | "email" | "role" | "camp";
+	let sortKey = $state<UserSortKey>("name");
+	let sortDirection = $state<SortDirection>("asc");
+
+	function userSortAccessor(key: UserSortKey): SortAccessor<User> {
+		switch (key) {
+			case "name":
+				return (u: User) => `${u.first_name} ${u.last_name}`;
+			case "camp":
+				return (u: User) => campNameById(u.camp_id);
+			default:
+				return key;
+		}
+	}
+
+	let sortedUsers = $derived(sortItems(users, userSortAccessor(sortKey), sortDirection));
+
+	function toggleSort(key: UserSortKey) {
+		if (sortKey === key) {
+			sortDirection = sortDirection === "asc" ? "desc" : "asc";
+		} else {
+			sortKey = key;
+			sortDirection = "asc";
+		}
+	}
 
 	// User form dialog
 	let dialogOpen = $state(false);
@@ -242,18 +270,18 @@
 		<Table.Table>
 			<Table.TableHeader>
 				<Table.TableRow>
-					<Table.TableHead>Name</Table.TableHead>
-					<Table.TableHead>Username</Table.TableHead>
-					<Table.TableHead>Email</Table.TableHead>
-					<Table.TableHead>Role</Table.TableHead>
-					<Table.TableHead>Camp</Table.TableHead>
+					<SortableTableHead label="Name" active={sortKey === "name"} direction={sortDirection} onclick={() => toggleSort("name")} />
+					<SortableTableHead label="Username" active={sortKey === "username"} direction={sortDirection} onclick={() => toggleSort("username")} />
+					<SortableTableHead label="Email" active={sortKey === "email"} direction={sortDirection} onclick={() => toggleSort("email")} />
+					<SortableTableHead label="Role" active={sortKey === "role"} direction={sortDirection} onclick={() => toggleSort("role")} />
+					<SortableTableHead label="Camp" active={sortKey === "camp"} direction={sortDirection} onclick={() => toggleSort("camp")} />
 					<Table.TableHead class="w-32">
 						<span class="sr-only">Actions</span>
 					</Table.TableHead>
 				</Table.TableRow>
 			</Table.TableHeader>
 			<Table.TableBody>
-				{#each users as user (user.id)}
+				{#each sortedUsers as user (user.id)}
 					<Table.TableRow>
 						<Table.TableCell class="font-medium">
 							{user.first_name} {user.last_name}

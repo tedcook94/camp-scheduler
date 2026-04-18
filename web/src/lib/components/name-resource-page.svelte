@@ -7,6 +7,8 @@
 	import * as Table from "$lib/components/ui/table";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog";
+	import { sortItems, type SortDirection } from "$lib/utils";
+	import SortableTableHead from "$lib/components/sortable-table-head.svelte";
 	import type { Camp } from "$lib/api/types";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
@@ -41,6 +43,19 @@
 	let items = $state<NameResource[]>([]);
 	let loading = $state(true);
 	let loadError = $state(false);
+
+	let sortKey = $state<keyof NameResource>("name");
+	let sortDirection = $state<SortDirection>("asc");
+	let sortedItems = $derived(sortItems(items, sortKey, sortDirection));
+
+	function toggleSort(key: keyof NameResource) {
+		if (sortKey === key) {
+			sortDirection = sortDirection === "asc" ? "desc" : "asc";
+		} else {
+			sortKey = key;
+			sortDirection = "asc";
+		}
+	}
 
 	// Create dialog
 	let createOpen = $state(false);
@@ -172,14 +187,14 @@
 		<Table.Table>
 			<Table.TableHeader>
 				<Table.TableRow>
-					<Table.TableHead>Name</Table.TableHead>
+					<SortableTableHead label="Name" active={sortKey === "name"} direction={sortDirection} onclick={() => toggleSort("name")} />
 					<Table.TableHead class="w-24">
 						<span class="sr-only">Actions</span>
 					</Table.TableHead>
 				</Table.TableRow>
 			</Table.TableHeader>
 			<Table.TableBody>
-				{#each items as item (item.id)}
+				{#each sortedItems as item (item.id)}
 					<Table.TableRow>
 						<Table.TableCell>
 							{#if editingId === item.id}

@@ -14,6 +14,8 @@
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import TrashIcon from "@lucide/svelte/icons/trash";
 	import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
+	import SortableTableHead from "$lib/components/sortable-table-head.svelte";
+	import { sortItems, type SortDirection } from "$lib/utils";
 
 	const getCampDisabled = getContext<() => boolean>("campDisabled");
 	const getCamp = getContext<() => Camp | null>("camp");
@@ -24,6 +26,19 @@
 	let seasons = $state<Season[]>([]);
 	let loading = $state(true);
 	let loadError = $state(false);
+
+	let sortKey = $state<keyof Season>("name");
+	let sortDirection = $state<SortDirection>("asc");
+	let sortedSeasons = $derived(sortItems(seasons, sortKey, sortDirection));
+
+	function toggleSort(key: keyof Season) {
+		if (sortKey === key) {
+			sortDirection = sortDirection === "asc" ? "desc" : "asc";
+		} else {
+			sortKey = key;
+			sortDirection = "asc";
+		}
+	}
 
 	// Create/edit dialog
 	let dialogOpen = $state(false);
@@ -190,16 +205,16 @@
 		<Table.Table>
 			<Table.TableHeader>
 				<Table.TableRow>
-					<Table.TableHead>Name</Table.TableHead>
-					<Table.TableHead>Start Date</Table.TableHead>
-					<Table.TableHead>End Date</Table.TableHead>
+					<SortableTableHead label="Name" active={sortKey === "name"} direction={sortDirection} onclick={() => toggleSort("name")} />
+					<SortableTableHead label="Start Date" active={sortKey === "start_date"} direction={sortDirection} onclick={() => toggleSort("start_date")} />
+					<SortableTableHead label="End Date" active={sortKey === "end_date"} direction={sortDirection} onclick={() => toggleSort("end_date")} />
 					<Table.TableHead class="w-24">
 						<span class="sr-only">Actions</span>
 					</Table.TableHead>
 				</Table.TableRow>
 			</Table.TableHeader>
 			<Table.TableBody>
-				{#each seasons as season (season.id)}
+				{#each sortedSeasons as season (season.id)}
 					<Table.TableRow>
 						<Table.TableCell>{season.name}</Table.TableCell>
 						<Table.TableCell>{formatDate(season.start_date)}</Table.TableCell>

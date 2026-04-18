@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getContext, onMount } from "svelte";
+	import { getContext, onMount, onDestroy } from "svelte";
 	import { page } from "$app/state";
 	import { goto } from "$app/navigation";
 	import { ApiClientError } from "$lib/api/client";
@@ -7,6 +7,7 @@
 		camperApi,
 		enrollmentApi,
 		sessionAgeGroupApi,
+		camperFriendPreferenceApi,
 		sessionApi,
 		seasonApi,
 		ageGroupApi,
@@ -20,6 +21,7 @@
 	import * as Tabs from "$lib/components/ui/tabs";
 	import type {
 		Camper,
+		CamperFriendPreference,
 		Enrollment,
 		Session,
 		Season,
@@ -27,6 +29,8 @@
 		SessionAgeGroup,
 	} from "$lib/api/types";
 	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+	import ArrowUpIcon from "@lucide/svelte/icons/arrow-up";
+	import ArrowDownIcon from "@lucide/svelte/icons/arrow-down";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import TrashIcon from "@lucide/svelte/icons/trash";
 	import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
@@ -63,6 +67,21 @@
 	let deleteEnrollTarget = $state<Enrollment | null>(null);
 	let deletingEnroll = $state(false);
 
+	// Friend preferences
+	let allCampers = $state<Camper[]>([]);
+	let prefSessionId = $state(page.url.searchParams.get("prefSession") ?? "");
+	let prefLoading = $state(false);
+	let prefAbortController: AbortController | null = null;
+	let friendPrefs = $state<CamperFriendPreference[]>([]);
+	let prefSaving = $state(false);
+	let addFriendId = $state("");
+
+	let availableCampersForPref = $derived(
+		allCampers.filter(
+			(c) => c.id !== camperId && !friendPrefs.some((p) => p.preferred_camper_id === c.id)
+		)
+	);
+
 	// Derived: sessions the camper is NOT already enrolled in
 	let availableSessionsForEnroll = $derived(
 		sessions.filter((s) => !enrollments.some((e) => e.session_id === s.id))
@@ -76,21 +95,34 @@
 		})
 	);
 
+	onDestroy(() => {
+		prefAbortController?.abort();
+		enrollAgeGroupController?.abort();
+		enrollAgeGroupController = undefined;
+	});
+
 	onMount(async () => {
 		try {
-			const [c, sess, seas, ag] = await Promise.all([
+			const [c, sess, seas, ag, campers] = await Promise.all([
 				camperApi.get(camperId),
 				sessionApi.list(),
 				seasonApi.list(),
 				ageGroupApi.list(),
+				camperApi.list(),
 			]);
 			camper = c;
 			sessions = sess;
 			seasons = seas;
 			ageGroups = ag;
+			allCampers = campers;
 
-			// Load enrollments across all sessions
 			await loadAllEnrollments();
+
+			if (prefSessionId && sessions.some((s) => s.id === prefSessionId)) {
+				loadFriendPreferences(prefSessionId);
+			} else {
+				prefSessionId = "";
+			}
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to load camper";
 			toast.error(message);
@@ -129,6 +161,7 @@
 	function updateUrl() {
 		const params = new URLSearchParams();
 		if (activeTab !== "enrollments") params.set("tab", activeTab);
+		if (prefSessionId) params.set("prefSession", prefSessionId);
 		const qs = params.toString();
 		goto(`?${qs}`, { replaceState: true, keepFocus: true, noScroll: true });
 	}
@@ -201,6 +234,102 @@
 		} finally {
 			deletingEnroll = false;
 		}
+	}
+
+	// Friend preference handlers
+	async function loadFriendPreferences(sessionId: string) {
+		prefAbortController?.abort();
+		prefAbortController = null;
+		friendPrefs = [];
+
+		if (!sessionId) {
+			friendPrefs = [];
+			prefLoading = false;
+			return;
+		}
+
+		const controller = new AbortController();
+		prefAbortController = controller;
+		const { signal } = controller;
+		prefLoading = true;
+
+		try {
+			const prefs = await camperFriendPreferenceApi.list(sessionId, camperId, signal);
+			if (signal.aborted) return;
+			friendPrefs = prefs.sort((a, b) => a.rank - b.rank);
+		} catch (err) {
+			if (signal.aborted) return;
+			const message = err instanceof ApiClientError ? err.message : "Failed to load friend preferences";
+			toast.error(message);
+		} finally {
+			if (!signal.aborted) prefLoading = false;
+		}
+	}
+
+	function handlePrefSessionChange(sessionId: string | undefined) {
+		prefSessionId = sessionId ?? "";
+		addFriendId = "";
+		updateUrl();
+		loadFriendPreferences(prefSessionId);
+	}
+
+	async function addFriendPref() {
+		if (!addFriendId || !prefSessionId || prefSaving) return;
+		prefSaving = true;
+		const items = [
+			...friendPrefs.map((p, i) => ({ preferred_camper_id: p.preferred_camper_id, rank: i + 1 })),
+			{ preferred_camper_id: addFriendId, rank: friendPrefs.length + 1 },
+		];
+		try {
+			friendPrefs = await camperFriendPreferenceApi.replaceAll(prefSessionId, camperId, items);
+			friendPrefs = friendPrefs.sort((a, b) => a.rank - b.rank);
+			addFriendId = "";
+			toast.success("Friend preference added");
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to update preferences";
+			toast.error(message);
+		} finally {
+			prefSaving = false;
+		}
+	}
+
+	async function moveFriendPref(index: number, direction: -1 | 1) {
+		if (prefSaving) return;
+		const newIndex = index + direction;
+		const reordered = [...friendPrefs];
+		[reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]];
+		const items = reordered.map((p, i) => ({ preferred_camper_id: p.preferred_camper_id, rank: i + 1 }));
+		prefSaving = true;
+		try {
+			friendPrefs = await camperFriendPreferenceApi.replaceAll(prefSessionId, camperId, items);
+			friendPrefs = friendPrefs.sort((a, b) => a.rank - b.rank);
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to reorder preferences";
+			toast.error(message);
+		} finally {
+			prefSaving = false;
+		}
+	}
+
+	async function removeFriendPref(index: number) {
+		if (prefSaving) return;
+		const remaining = friendPrefs.filter((_, i) => i !== index);
+		const items = remaining.map((p, i) => ({ preferred_camper_id: p.preferred_camper_id, rank: i + 1 }));
+		prefSaving = true;
+		try {
+			friendPrefs = await camperFriendPreferenceApi.replaceAll(prefSessionId, camperId, items);
+			friendPrefs = friendPrefs.sort((a, b) => a.rank - b.rank);
+			toast.success("Friend preference removed");
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to update preferences";
+			toast.error(message);
+		} finally {
+			prefSaving = false;
+		}
+	}
+
+	function getCamperName(id: string): string {
+		return allCampers.find((c) => c.id === id)?.name ?? id;
 	}
 
 	// Display helpers
@@ -377,10 +506,114 @@
 				</div>
 			</Tabs.Content>
 
-			<!-- Friend Preferences Tab (placeholder for next commit) -->
+			<!-- Friend Preferences Tab -->
 			<Tabs.Content value="friends">
-				<div class="text-muted-foreground py-8 text-center text-sm">
-					Friend preferences coming soon.
+				<div class="grid gap-6 pt-4">
+					<!-- Session selector -->
+					<div class="flex items-center gap-4">
+						<p class="text-muted-foreground text-sm">Manage ranked friend preferences for a session.</p>
+						{#if sessions.length > 0}
+							<Select.Root
+								type="single"
+								value={prefSessionId}
+								onValueChange={handlePrefSessionChange}
+								disabled={prefSaving}
+							>
+								<Select.Trigger class="w-64">
+									{prefSessionId
+										? getSessionName(prefSessionId)
+										: "Select session"}
+								</Select.Trigger>
+								<Select.Content>
+									{#each sessions as session (session.id)}
+										<Select.Item value={session.id}>{getSessionLabel(session)}</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+						{:else if !loading}
+							<p class="text-muted-foreground text-sm">
+								No sessions found. <a href="/app/sessions" class="text-foreground underline">Create a session</a> to manage preferences.
+							</p>
+						{/if}
+					</div>
+
+					{#if !prefSessionId}
+						<div class="text-muted-foreground py-8 text-center text-sm">
+							Select a session to manage friend preferences.
+						</div>
+					{:else if prefLoading}
+						<div class="text-muted-foreground py-8 text-center text-sm">Loading preferences...</div>
+					{:else}
+						<div class="grid gap-3">
+							{#if friendPrefs.length === 0}
+								<div class="text-muted-foreground py-4 text-center text-sm">No friend preferences.</div>
+							{:else}
+								<Table.Table>
+									<Table.TableHeader>
+										<Table.TableRow>
+											<Table.TableHead class="w-12">#</Table.TableHead>
+											<Table.TableHead>Friend</Table.TableHead>
+											<Table.TableHead class="w-28">
+												<span class="sr-only">Actions</span>
+											</Table.TableHead>
+										</Table.TableRow>
+									</Table.TableHeader>
+									<Table.TableBody>
+										{#each friendPrefs as pref, i (pref.id)}
+											<Table.TableRow>
+												<Table.TableCell class="text-muted-foreground">{pref.rank}</Table.TableCell>
+												<Table.TableCell>{getCamperName(pref.preferred_camper_id)}</Table.TableCell>
+												<Table.TableCell>
+													<div class="flex justify-end gap-1">
+														<Button variant="ghost" size="icon-sm" title="Move up" disabled={disabled || prefSaving || i === 0} onclick={() => moveFriendPref(i, -1)}>
+															<ArrowUpIcon class="size-4" />
+															<span class="sr-only">Move up</span>
+														</Button>
+														<Button variant="ghost" size="icon-sm" title="Move down" disabled={disabled || prefSaving || i === friendPrefs.length - 1} onclick={() => moveFriendPref(i, 1)}>
+															<ArrowDownIcon class="size-4" />
+															<span class="sr-only">Move down</span>
+														</Button>
+														<Button variant="ghost" size="icon-sm" title="Remove" disabled={disabled || prefSaving} onclick={() => removeFriendPref(i)}>
+															<TrashIcon class="size-4" />
+															<span class="sr-only">Remove</span>
+														</Button>
+													</div>
+												</Table.TableCell>
+											</Table.TableRow>
+										{/each}
+									</Table.TableBody>
+								</Table.Table>
+							{/if}
+							{#if availableCampersForPref.length > 0}
+								<div class="flex items-center gap-2">
+									<Select.Root
+										type="single"
+										value={addFriendId}
+										onValueChange={(v) => (addFriendId = v ?? "")}
+									>
+										<Select.Trigger class="w-48">
+											{addFriendId
+												? availableCampersForPref.find((c) => c.id === addFriendId)?.name ?? "Select camper"
+												: "Select camper"}
+										</Select.Trigger>
+										<Select.Content>
+											{#each availableCampersForPref as c (c.id)}
+												<Select.Item value={c.id}>{c.name}</Select.Item>
+											{/each}
+										</Select.Content>
+									</Select.Root>
+									<Button size="sm" disabled={disabled || prefSaving || !addFriendId} onclick={addFriendPref}>
+										<PlusIcon class="mr-1 size-4" />
+										Add
+									</Button>
+								</div>
+							{:else if allCampers.length <= 1}
+								<p class="text-muted-foreground text-sm">
+									No other campers available. <a href="/app/campers" class="text-foreground underline">Add more campers</a> to set friend preferences.
+								</p>
+							{/if}
+						</div>
+					{/if}
 				</div>
 			</Tabs.Content>
 		</Tabs.Root>

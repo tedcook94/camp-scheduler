@@ -2,21 +2,21 @@ package preferences
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
-)
 
-var ErrCocounselorPreferenceNotFound = errors.New("co-counselor preference not found")
+	"github.com/jackc/pgx/v5/pgxpool"
+)
 
 type CocounselorService struct {
 	queries *db.Queries
+	pool    *pgxpool.Pool
 }
 
-func NewCocounselorService(queries *db.Queries) *CocounselorService {
-	return &CocounselorService{queries: queries}
+func NewCocounselorService(queries *db.Queries, pool *pgxpool.Pool) *CocounselorService {
+	return &CocounselorService{queries: queries, pool: pool}
 }
 
 func (svc *CocounselorService) List(ctx context.Context, campID, sessionID, counselorID string) ([]CocounselorPreferenceResponse, error) {
@@ -51,151 +51,80 @@ func (svc *CocounselorService) List(ctx context.Context, campID, sessionID, coun
 	return result, nil
 }
 
-func (svc *CocounselorService) GetByID(ctx context.Context, campID, sessionID, counselorID, id string) (CocounselorPreferenceResponse, error) {
+func (svc *CocounselorService) ReplaceAll(ctx context.Context, campID, sessionID, counselorID string, items []CocounselorPreferenceItem) ([]CocounselorPreferenceResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {
-		return CocounselorPreferenceResponse{}, err
+		return nil, err
 	}
 
 	sessionUUID, err := api.ParseUUID(sessionID)
 	if err != nil {
-		return CocounselorPreferenceResponse{}, err
+		return nil, err
 	}
 
 	counselorUUID, err := api.ParseUUID(counselorID)
 	if err != nil {
-		return CocounselorPreferenceResponse{}, err
+		return nil, err
 	}
 
-	uid, err := api.ParseUUID(id)
+	if err := validateRanks(len(items), func(i int) int32 { return items[i].Rank }); err != nil {
+		return nil, err
+	}
+
+	seen := make(map[string]bool, len(items))
+	for _, item := range items {
+		if item.PreferredCounselorID == counselorID {
+			return nil, api.BadInput("a counselor cannot prefer themselves")
+		}
+		if seen[item.PreferredCounselorID] {
+			return nil, api.BadInput(fmt.Sprintf("duplicate preferred_counselor_id: %s", item.PreferredCounselorID))
+		}
+		seen[item.PreferredCounselorID] = true
+	}
+
+	tx, err := svc.pool.Begin(ctx)
 	if err != nil {
-		return CocounselorPreferenceResponse{}, err
+		return nil, fmt.Errorf("error starting transaction: %w", err)
 	}
+	defer tx.Rollback(ctx)
 
-	pref, err := svc.queries.GetCounselorCocounselorPreference(ctx, db.GetCounselorCocounselorPreferenceParams{
-		ID:          uid,
-		CampID:      campUUID,
-		SessionID:   sessionUUID,
+	qtx := svc.queries.WithTx(tx)
+
+	err = qtx.DeleteAllCounselorCocounselorPreferences(ctx, db.DeleteAllCounselorCocounselorPreferencesParams{
 		CounselorID: counselorUUID,
-	})
-	if err != nil {
-		return CocounselorPreferenceResponse{}, fmt.Errorf("error getting co-counselor preference %s: %w", id, err)
-	}
-
-	return toCocounselorPreferenceResponse(pref), nil
-}
-
-func (svc *CocounselorService) Create(ctx context.Context, campID, sessionID, counselorID string, req CreateCocounselorPreferenceRequest) (CocounselorPreferenceResponse, error) {
-	campUUID, err := api.ParseUUID(campID)
-	if err != nil {
-		return CocounselorPreferenceResponse{}, err
-	}
-
-	sessionUUID, err := api.ParseUUID(sessionID)
-	if err != nil {
-		return CocounselorPreferenceResponse{}, err
-	}
-
-	counselorUUID, err := api.ParseUUID(counselorID)
-	if err != nil {
-		return CocounselorPreferenceResponse{}, err
-	}
-
-	preferredUUID, err := api.ParseUUID(req.PreferredCounselorID)
-	if err != nil {
-		return CocounselorPreferenceResponse{}, err
-	}
-
-	pref, err := svc.queries.CreateCounselorCocounselorPreference(ctx, db.CreateCounselorCocounselorPreferenceParams{
-		CampID:               campUUID,
-		CounselorID:          counselorUUID,
-		SessionID:            sessionUUID,
-		PreferredCounselorID: preferredUUID,
-		Rank:                 req.Rank,
-	})
-	if err != nil {
-		return CocounselorPreferenceResponse{}, fmt.Errorf("error creating co-counselor preference: %w", err)
-	}
-
-	return toCocounselorPreferenceResponse(pref), nil
-}
-
-func (svc *CocounselorService) Update(ctx context.Context, campID, sessionID, counselorID, id string, req UpdateCocounselorPreferenceRequest) (CocounselorPreferenceResponse, error) {
-	campUUID, err := api.ParseUUID(campID)
-	if err != nil {
-		return CocounselorPreferenceResponse{}, err
-	}
-
-	sessionUUID, err := api.ParseUUID(sessionID)
-	if err != nil {
-		return CocounselorPreferenceResponse{}, err
-	}
-
-	counselorUUID, err := api.ParseUUID(counselorID)
-	if err != nil {
-		return CocounselorPreferenceResponse{}, err
-	}
-
-	uid, err := api.ParseUUID(id)
-	if err != nil {
-		return CocounselorPreferenceResponse{}, err
-	}
-
-	preferredUUID, err := api.ParseUUID(req.PreferredCounselorID)
-	if err != nil {
-		return CocounselorPreferenceResponse{}, err
-	}
-
-	pref, err := svc.queries.UpdateCounselorCocounselorPreference(ctx, db.UpdateCounselorCocounselorPreferenceParams{
-		ID:                   uid,
-		CampID:               campUUID,
-		SessionID:            sessionUUID,
-		CounselorID:          counselorUUID,
-		PreferredCounselorID: preferredUUID,
-		Rank:                 req.Rank,
-	})
-	if err != nil {
-		return CocounselorPreferenceResponse{}, fmt.Errorf("error updating co-counselor preference %s: %w", id, err)
-	}
-
-	return toCocounselorPreferenceResponse(pref), nil
-}
-
-func (svc *CocounselorService) Delete(ctx context.Context, campID, sessionID, counselorID, id string) error {
-	campUUID, err := api.ParseUUID(campID)
-	if err != nil {
-		return err
-	}
-
-	sessionUUID, err := api.ParseUUID(sessionID)
-	if err != nil {
-		return err
-	}
-
-	counselorUUID, err := api.ParseUUID(counselorID)
-	if err != nil {
-		return err
-	}
-
-	uid, err := api.ParseUUID(id)
-	if err != nil {
-		return err
-	}
-
-	rows, err := svc.queries.DeleteCounselorCocounselorPreference(ctx, db.DeleteCounselorCocounselorPreferenceParams{
-		ID:          uid,
-		CampID:      campUUID,
 		SessionID:   sessionUUID,
-		CounselorID: counselorUUID,
+		CampID:      campUUID,
 	})
 	if err != nil {
-		return fmt.Errorf("error deleting co-counselor preference %s: %w", id, err)
-	}
-	if rows == 0 {
-		return ErrCocounselorPreferenceNotFound
+		return nil, fmt.Errorf("error deleting co-counselor preferences: %w", err)
 	}
 
-	return nil
+	result := make([]CocounselorPreferenceResponse, len(items))
+	for i, item := range items {
+		preferredUUID, err := api.ParseUUID(item.PreferredCounselorID)
+		if err != nil {
+			return nil, err
+		}
+
+		pref, err := qtx.CreateCounselorCocounselorPreference(ctx, db.CreateCounselorCocounselorPreferenceParams{
+			CampID:               campUUID,
+			CounselorID:          counselorUUID,
+			SessionID:            sessionUUID,
+			PreferredCounselorID: preferredUUID,
+			Rank:                 item.Rank,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error creating co-counselor preference: %w", err)
+		}
+
+		result[i] = toCocounselorPreferenceResponse(pref)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("error committing transaction: %w", err)
+	}
+
+	return result, nil
 }
 
 func toCocounselorPreferenceResponse(p db.CounselorCocounselorPreference) CocounselorPreferenceResponse {

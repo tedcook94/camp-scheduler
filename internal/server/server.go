@@ -136,11 +136,11 @@ func (s *Server) routes() {
 	counselorController := counselor.NewController(counselorService)
 	counselorController.RegisterRoutes(protected)
 
-	ageGroupPrefService := preferences.NewAgeGroupService(queries)
+	ageGroupPrefService := preferences.NewAgeGroupService(queries, s.pool)
 	ageGroupPrefController := preferences.NewAgeGroupController(ageGroupPrefService)
 	ageGroupPrefController.RegisterRoutes(protected)
 
-	cocounselorPrefService := preferences.NewCocounselorService(queries)
+	cocounselorPrefService := preferences.NewCocounselorService(queries, s.pool)
 	cocounselorPrefController := preferences.NewCocounselorController(cocounselorPrefService)
 	cocounselorPrefController.RegisterRoutes(protected)
 
@@ -148,11 +148,11 @@ func (s *Server) routes() {
 	counselorCertController := preferences.NewCounselorCertificationController(counselorCertService)
 	counselorCertController.RegisterRoutes(protected)
 
-	activityPrefService := preferences.NewActivityPreferenceService(queries)
+	activityPrefService := preferences.NewActivityPreferenceService(queries, s.pool)
 	activityPrefController := preferences.NewActivityPreferenceController(activityPrefService)
 	activityPrefController.RegisterRoutes(protected)
 
-	camperFriendPrefService := preferences.NewCamperFriendService(queries)
+	camperFriendPrefService := preferences.NewCamperFriendService(queries, s.pool)
 	camperFriendPrefController := preferences.NewCamperFriendController(camperFriendPrefService)
 	camperFriendPrefController.RegisterRoutes(protected)
 

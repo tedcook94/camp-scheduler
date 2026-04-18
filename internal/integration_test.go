@@ -99,6 +99,11 @@ func mustGetList(t *testing.T, url string, token string) []any {
 	return result
 }
 
+func mustPut(t *testing.T, url string, body any, token string) {
+	t.Helper()
+	doRawRequest(t, http.MethodPut, url, body, http.StatusOK, token)
+}
+
 func mustDelete(t *testing.T, url string, token string) {
 	t.Helper()
 	doRawRequest(t, http.MethodDelete, url, nil, http.StatusOK, token)
@@ -561,24 +566,24 @@ func testActivityScheduling(t *testing.T) {
 	// Set activity preferences.
 	prefBase := sessionBase + "/counselors/"
 	// Alice prefers Swimming
-	mustPost(t, apiURL(ts, prefBase+alice.id+"/activity-preferences"), map[string]any{
-		"activity_id": swimmingID, "rank": 1,
+	mustPut(t, apiURL(ts, prefBase+alice.id+"/activity-preferences"), []map[string]any{
+		{"activity_id": swimmingID, "rank": 1},
 	}, token)
 	// Bob prefers Swimming
-	mustPost(t, apiURL(ts, prefBase+bob.id+"/activity-preferences"), map[string]any{
-		"activity_id": swimmingID, "rank": 1,
+	mustPut(t, apiURL(ts, prefBase+bob.id+"/activity-preferences"), []map[string]any{
+		{"activity_id": swimmingID, "rank": 1},
 	}, token)
 	// Carol prefers Archery
-	mustPost(t, apiURL(ts, prefBase+carol.id+"/activity-preferences"), map[string]any{
-		"activity_id": archeryID, "rank": 1,
+	mustPut(t, apiURL(ts, prefBase+carol.id+"/activity-preferences"), []map[string]any{
+		{"activity_id": archeryID, "rank": 1},
 	}, token)
 	// Dave prefers Arts & Crafts
-	mustPost(t, apiURL(ts, prefBase+dave.id+"/activity-preferences"), map[string]any{
-		"activity_id": artsCraftsID, "rank": 1,
+	mustPut(t, apiURL(ts, prefBase+dave.id+"/activity-preferences"), []map[string]any{
+		{"activity_id": artsCraftsID, "rank": 1},
 	}, token)
 	// Eve prefers Arts & Crafts
-	mustPost(t, apiURL(ts, prefBase+eve.id+"/activity-preferences"), map[string]any{
-		"activity_id": artsCraftsID, "rank": 1,
+	mustPut(t, apiURL(ts, prefBase+eve.id+"/activity-preferences"), []map[string]any{
+		{"activity_id": artsCraftsID, "rank": 1},
 	}, token)
 
 	// Trigger activity_schedule run.
@@ -805,17 +810,14 @@ func testSimpleCamp(t *testing.T) {
 	}
 
 	prefBase := "/sessions/" + session2ID + "/counselors/"
-	mustPost(t, apiURL(ts, prefBase+alice.id+"/age-group-preferences"), map[string]any{
-		"age_group_id": juniorsID,
-		"rank":         1,
+	mustPut(t, apiURL(ts, prefBase+alice.id+"/age-group-preferences"), []map[string]any{
+		{"age_group_id": juniorsID, "rank": 1},
 	}, token)
-	mustPost(t, apiURL(ts, prefBase+bob.id+"/cocounselor-preferences"), map[string]any{
-		"preferred_counselor_id": alice.id,
-		"rank":                   1,
+	mustPut(t, apiURL(ts, prefBase+bob.id+"/cocounselor-preferences"), []map[string]any{
+		{"preferred_counselor_id": alice.id, "rank": 1},
 	}, token)
-	mustPost(t, apiURL(ts, prefBase+carol.id+"/age-group-preferences"), map[string]any{
-		"age_group_id": seniorsID,
-		"rank":         1,
+	mustPut(t, apiURL(ts, prefBase+carol.id+"/age-group-preferences"), []map[string]any{
+		{"age_group_id": seniorsID, "rank": 1},
 	}, token)
 
 	runURL := apiURL(ts, "/sessions/"+session2ID+"/assignment-runs")
@@ -1083,36 +1085,36 @@ func testComplexCamp(t *testing.T) {
 
 	prefBase := "/sessions/" + session2ID + "/counselors/"
 
-	mustPost(t, apiURL(ts, prefBase+gina.id+"/age-group-preferences"), map[string]any{
-		"age_group_id": youngID, "rank": 1,
+	mustPut(t, apiURL(ts, prefBase+gina.id+"/age-group-preferences"), []map[string]any{
+		{"age_group_id": youngID, "rank": 1},
 	}, token)
-	mustPost(t, apiURL(ts, prefBase+hank.id+"/age-group-preferences"), map[string]any{
-		"age_group_id": youngID, "rank": 1,
+	mustPut(t, apiURL(ts, prefBase+hank.id+"/age-group-preferences"), []map[string]any{
+		{"age_group_id": youngID, "rank": 1},
 	}, token)
-	mustPost(t, apiURL(ts, prefBase+hank.id+"/cocounselor-preferences"), map[string]any{
-		"preferred_counselor_id": gina.id, "rank": 1,
+	mustPut(t, apiURL(ts, prefBase+hank.id+"/cocounselor-preferences"), []map[string]any{
+		{"preferred_counselor_id": gina.id, "rank": 1},
 	}, token)
-	mustPost(t, apiURL(ts, prefBase+iris.id+"/age-group-preferences"), map[string]any{
-		"age_group_id": middleID, "rank": 1,
+	mustPut(t, apiURL(ts, prefBase+iris.id+"/age-group-preferences"), []map[string]any{
+		{"age_group_id": middleID, "rank": 1},
 	}, token)
-	mustPost(t, apiURL(ts, prefBase+jake.id+"/age-group-preferences"), map[string]any{
-		"age_group_id": teenID, "rank": 1,
+	mustPut(t, apiURL(ts, prefBase+jake.id+"/age-group-preferences"), []map[string]any{
+		{"age_group_id": teenID, "rank": 1},
 	}, token)
-	mustPost(t, apiURL(ts, prefBase+jake.id+"/cocounselor-preferences"), map[string]any{
-		"preferred_counselor_id": kim.id, "rank": 1,
+	mustPut(t, apiURL(ts, prefBase+jake.id+"/cocounselor-preferences"), []map[string]any{
+		{"preferred_counselor_id": kim.id, "rank": 1},
 	}, token)
 	// Kim prefers Young, but Jake wants Kim as a Teen co-counselor -- can't both be satisfied.
-	mustPost(t, apiURL(ts, prefBase+kim.id+"/age-group-preferences"), map[string]any{
-		"age_group_id": youngID, "rank": 1,
+	mustPut(t, apiURL(ts, prefBase+kim.id+"/age-group-preferences"), []map[string]any{
+		{"age_group_id": youngID, "rank": 1},
 	}, token)
-	mustPost(t, apiURL(ts, prefBase+allCounselors[5].id+"/age-group-preferences"), map[string]any{
-		"age_group_id": middleID, "rank": 1,
+	mustPut(t, apiURL(ts, prefBase+allCounselors[5].id+"/age-group-preferences"), []map[string]any{
+		{"age_group_id": middleID, "rank": 1},
 	}, token)
-	mustPost(t, apiURL(ts, prefBase+mia.id+"/age-group-preferences"), map[string]any{
-		"age_group_id": teenID, "rank": 1,
+	mustPut(t, apiURL(ts, prefBase+mia.id+"/age-group-preferences"), []map[string]any{
+		{"age_group_id": teenID, "rank": 1},
 	}, token)
-	mustPost(t, apiURL(ts, prefBase+allCounselors[7].id+"/cocounselor-preferences"), map[string]any{
-		"preferred_counselor_id": mia.id, "rank": 1,
+	mustPut(t, apiURL(ts, prefBase+allCounselors[7].id+"/cocounselor-preferences"), []map[string]any{
+		{"preferred_counselor_id": mia.id, "rank": 1},
 	}, token)
 
 	runURL := apiURL(ts, "/sessions/"+session2ID+"/assignment-runs")
@@ -1428,16 +1430,16 @@ func testCamperFriendPreferences(t *testing.T) {
 	}
 
 	// Amy wants Beth, Beth wants Amy (mutual friends).
-	mustPost(t, apiURL(ts, sessionBase+"/campers/"+amyID+"/friend-preferences"), map[string]any{
-		"preferred_camper_id": bethID, "rank": 1,
+	mustPut(t, apiURL(ts, sessionBase+"/campers/"+amyID+"/friend-preferences"), []map[string]any{
+		{"preferred_camper_id": bethID, "rank": 1},
 	}, token)
-	mustPost(t, apiURL(ts, sessionBase+"/campers/"+bethID+"/friend-preferences"), map[string]any{
-		"preferred_camper_id": amyID, "rank": 1,
+	mustPut(t, apiURL(ts, sessionBase+"/campers/"+bethID+"/friend-preferences"), []map[string]any{
+		{"preferred_camper_id": amyID, "rank": 1},
 	}, token)
 
 	// Carol wants Dana.
-	mustPost(t, apiURL(ts, sessionBase+"/campers/"+carolID+"/friend-preferences"), map[string]any{
-		"preferred_camper_id": danaID, "rank": 1,
+	mustPut(t, apiURL(ts, sessionBase+"/campers/"+carolID+"/friend-preferences"), []map[string]any{
+		{"preferred_camper_id": danaID, "rank": 1},
 	}, token)
 
 	// Trigger camper run.
@@ -1909,11 +1911,11 @@ func testRepeatedUnmetPreferenceBoost(t *testing.T) {
 	// Set preferences: both Alice and Bob want Young.
 	setPreferences := func(sessionID string) {
 		prefBase := "/sessions/" + sessionID + "/counselors/"
-		mustPost(t, apiURL(ts, prefBase+alice.id+"/age-group-preferences"), map[string]any{
-			"age_group_id": youngID, "rank": 1,
+		mustPut(t, apiURL(ts, prefBase+alice.id+"/age-group-preferences"), []map[string]any{
+			{"age_group_id": youngID, "rank": 1},
 		}, token)
-		mustPost(t, apiURL(ts, prefBase+bob.id+"/age-group-preferences"), map[string]any{
-			"age_group_id": youngID, "rank": 1,
+		mustPut(t, apiURL(ts, prefBase+bob.id+"/age-group-preferences"), []map[string]any{
+			{"age_group_id": youngID, "rank": 1},
 		}, token)
 	}
 

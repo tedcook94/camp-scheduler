@@ -56,7 +56,7 @@
 
 	// Sessions available as "previous" (exclude the one being edited)
 	let previousSessionOptions = $derived(
-		sessions.filter((s) => s.id !== editingSession?.id)
+		sessions.filter((s) => s.id !== editingSession?.id && s.season_id === formSeasonId)
 	);
 
 	onMount(async () => {
@@ -273,7 +273,18 @@
 			</div>
 			<div class="grid gap-2">
 				<Label for="session-season">Season</Label>
-				<Select.Select type="single" bind:value={formSeasonId} disabled={submitting} onValueChange={() => (seasonError = "")}>
+				<Select.Select
+					type="single"
+					value={formSeasonId}
+					disabled={submitting}
+					onValueChange={(v) => {
+						if (v !== formSeasonId) {
+							formSeasonId = v;
+							formPreviousSessionId = null;
+						}
+						seasonError = "";
+					}}
+				>
 					<Select.SelectTrigger id="session-season" class="w-full">
 						{#if formSeasonId}
 							{seasonMap.get(formSeasonId) ?? "Select season"}
@@ -293,11 +304,11 @@
 			</div>
 			<div class="grid gap-2">
 				<Label for="session-previous">Previous Session</Label>
-				<Select.Select
-					type="single"
-					value={formPreviousSessionId ?? ""}
-					disabled={submitting}
-					onValueChange={(v) => (formPreviousSessionId = v || null)}
+			<Select.Select
+				type="single"
+				value={formPreviousSessionId ?? ""}
+				disabled={submitting || !formSeasonId}
+				onValueChange={(v) => (formPreviousSessionId = v || null)}
 				>
 					<Select.SelectTrigger id="session-previous" class="w-full">
 						{#if formPreviousSessionId}

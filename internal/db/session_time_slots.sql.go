@@ -158,3 +158,26 @@ func (q *Queries) UpdateSessionTimeSlot(ctx context.Context, arg UpdateSessionTi
 	)
 	return i, err
 }
+
+const updateSessionTimeSlotSortOrder = `-- name: UpdateSessionTimeSlotSortOrder :exec
+UPDATE session_time_slots
+SET sort_order = $4
+WHERE id = $1 AND camp_id = $2 AND session_id = $3
+`
+
+type UpdateSessionTimeSlotSortOrderParams struct {
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	SessionID pgtype.UUID
+	SortOrder int32
+}
+
+func (q *Queries) UpdateSessionTimeSlotSortOrder(ctx context.Context, arg UpdateSessionTimeSlotSortOrderParams) error {
+	_, err := q.db.Exec(ctx, updateSessionTimeSlotSortOrder,
+		arg.ID,
+		arg.CampID,
+		arg.SessionID,
+		arg.SortOrder,
+	)
+	return err
+}

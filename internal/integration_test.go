@@ -2778,3 +2778,91 @@ func TestCopyActivities(t *testing.T) {
 		}
 	})
 }
+
+func TestReorderTimeSlots(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Reorder Test").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-07-31",
+	}, token)
+	session := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Session 1", "season_id": str(season, "id"),
+	}, token)
+	sessionID := str(session, "id")
+	sessionBase := "/sessions/" + sessionID
+
+	p1 := mustPost(t, apiURL(ts, "/time-slots"), map[string]any{"name": "Period 1"}, token)
+	p2 := mustPost(t, apiURL(ts, "/time-slots"), map[string]any{"name": "Period 2"}, token)
+	p3 := mustPost(t, apiURL(ts, "/time-slots"), map[string]any{"name": "Period 3"}, token)
+
+	sts1 := mustPost(t, apiURL(ts, sessionBase+"/time-slots"), map[string]any{
+		"time_slot_id": str(p1, "id"), "sort_order": 1,
+	}, token)
+	sts2 := mustPost(t, apiURL(ts, sessionBase+"/time-slots"), map[string]any{
+		"time_slot_id": str(p2, "id"), "sort_order": 2,
+	}, token)
+	sts3 := mustPost(t, apiURL(ts, sessionBase+"/time-slots"), map[string]any{
+		"time_slot_id": str(p3, "id"), "sort_order": 3,
+	}, token)
+	sts1ID := str(sts1, "id")
+	sts2ID := str(sts2, "id")
+	sts3ID := str(sts3, "id")
+
+	t.Run("successful reorder", func(t *testing.T) {
+		mustPut(t, apiURL(ts, sessionBase+"/time-slots/reorder"), map[string]any{
+			"ordered_ids": []string{sts3ID, sts1ID, sts2ID},
+		}, token)
+
+		result := mustGetList(t, apiURL(ts, sessionBase+"/time-slots"), token)
+		if len(result) != 3 {
+			t.Fatalf("expected 3 time slots, got %d", len(result))
+		}
+		if str(asMap(result[0]), "id") != sts3ID {
+			t.Fatalf("expected first slot to be sts3")
+		}
+		if num(asMap(result[0]), "sort_order") != 1 {
+			t.Fatalf("expected sts3 sort_order=1, got %v", num(asMap(result[0]), "sort_order"))
+		}
+		if str(asMap(result[1]), "id") != sts1ID {
+			t.Fatalf("expected second slot to be sts1")
+		}
+		if str(asMap(result[2]), "id") != sts2ID {
+			t.Fatalf("expected third slot to be sts2")
+		}
+	})
+
+	t.Run("reject duplicate IDs", func(t *testing.T) {
+		doRawRequest(t, "PUT", apiURL(ts, sessionBase+"/time-slots/reorder"), map[string]any{
+			"ordered_ids": []string{sts1ID, sts1ID, sts2ID},
+		}, http.StatusBadRequest, token)
+	})
+
+	t.Run("reject missing IDs", func(t *testing.T) {
+		doRawRequest(t, "PUT", apiURL(ts, sessionBase+"/time-slots/reorder"), map[string]any{
+			"ordered_ids": []string{sts1ID, sts2ID},
+		}, http.StatusBadRequest, token)
+	})
+
+	t.Run("reject IDs from another session", func(t *testing.T) {
+		session2 := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+			"name": "Session 2", "season_id": str(season, "id"),
+		}, token)
+		session2Base := "/sessions/" + str(session2, "id")
+
+		otherSts := mustPost(t, apiURL(ts, session2Base+"/time-slots"), map[string]any{
+			"time_slot_id": str(p1, "id"), "sort_order": 1,
+		}, token)
+
+		doRawRequest(t, "PUT", apiURL(ts, sessionBase+"/time-slots/reorder"), map[string]any{
+			"ordered_ids": []string{sts1ID, sts2ID, str(otherSts, "id")},
+		}, http.StatusBadRequest, token)
+	})
+}

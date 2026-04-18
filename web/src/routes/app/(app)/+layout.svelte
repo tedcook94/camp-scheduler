@@ -17,6 +17,7 @@
 	import UsersIcon from "@lucide/svelte/icons/users";
 	import ClipboardListIcon from "@lucide/svelte/icons/clipboard-list";
 	import PlayIcon from "@lucide/svelte/icons/play";
+	import ActivityIcon from "@lucide/svelte/icons/dumbbell";
 	import MoonIcon from "@lucide/svelte/icons/moon";
 	import SunIcon from "@lucide/svelte/icons/sun";
 	import LogOutIcon from "@lucide/svelte/icons/log-out";
@@ -113,6 +114,14 @@
 			href: "/app/campers",
 		},
 		{
+			label: "Activities",
+			icon: ActivityIcon,
+			href: "/app/activities",
+			children: [
+				{ href: "/app/time-slots", label: "Time Slots" },
+			],
+		},
+		{
 			label: "Assignment Runs",
 			icon: PlayIcon,
 			children: [],
@@ -152,7 +161,7 @@
 									href={item.href}
 									class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors {active
 										? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-										: 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'}"
+										: 'text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground'}"
 								>
 									<item.icon class="size-4" />
 									{item.label}
@@ -160,17 +169,18 @@
 							</li>
 						{:else if item.children}
 							{@const expanded = isParentActive(item)}
-							{@const parentActive = item.href ? $page.url.pathname === item.href : false}
+							{@const parentActive = item.href ? $page.url.pathname.startsWith(item.href) : false}
+							{@const childIsActive = item.children?.some((c) => $page.url.pathname.startsWith(c.href)) ?? false}
 							<li>
 								{#if item.href}
 									<a
 										href={item.href}
-										class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors
-											{parentActive
-												? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-												: expanded
-													? 'text-sidebar-foreground font-medium hover:bg-sidebar-accent/50'
-													: 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'}"
+									class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors
+										{parentActive && !childIsActive
+											? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+											: expanded
+												? 'text-sidebar-foreground font-medium hover:bg-sidebar-accent/70'
+												: 'text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground'}"
 									>
 										<item.icon class="size-4" />
 										{item.label}
@@ -194,9 +204,9 @@
 											<li>
 												<a
 													href={child.href}
-													class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors {childActive
-														? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-														: 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'}"
+												class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors {childActive
+													? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+													: 'text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground'}"
 												>
 													{child.label}
 												</a>

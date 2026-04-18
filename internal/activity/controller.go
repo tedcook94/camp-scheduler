@@ -31,6 +31,8 @@ func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	certs.GET("", ctrl.ListCertifications)
 	certs.POST("", ctrl.AddCertification)
 	certs.DELETE("/:certId", ctrl.RemoveCertification)
+
+	rg.GET("/activity-certifications", ctrl.ListAllCertifications)
 }
 
 type CreateActivityRequest struct {
@@ -208,6 +210,26 @@ func (ctrl *Controller) ListCertifications(c *gin.Context) {
 			With("activity_id", activityID).
 			With("error", err).
 			Error("error listing activity certifications")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, certs)
+}
+
+func (ctrl *Controller) ListAllCertifications(c *gin.Context) {
+	log := auth.Logger(c)
+	campID := auth.GetCampID(c)
+
+	certs, err := ctrl.svc.ListAllCertifications(c.Request.Context(), campID)
+	if err != nil {
+		if api.IsBadInput(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		log.
+			With("error", err).
+			Error("error listing all activity certifications")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}

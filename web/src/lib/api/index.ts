@@ -159,6 +159,8 @@ export const activityApi = {
 };
 
 export const activityCertificationApi = {
+	listAll: () =>
+		api.get<ActivityCertification[]>("/api/v1/activity-certifications"),
 	list: (activityId: string) =>
 		api.get<ActivityCertification[]>(`/api/v1/activities/${activityId}/certifications`),
 	add: (activityId: string, certificationId: string) =>

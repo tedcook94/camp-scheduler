@@ -156,6 +156,31 @@ func (svc *Service) ListCertifications(ctx context.Context, campID, activityID s
 	return result, nil
 }
 
+// ListAllCertifications returns all activity-certification mappings for the camp.
+func (svc *Service) ListAllCertifications(ctx context.Context, campID string) ([]ActivityCertificationResponse, error) {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := svc.queries.ListAllActivityCertifications(ctx, campUUID)
+	if err != nil {
+		return nil, fmt.Errorf("error listing all activity certifications: %w", err)
+	}
+
+	result := make([]ActivityCertificationResponse, len(rows))
+	for i, r := range rows {
+		result[i] = ActivityCertificationResponse{
+			ID:                api.UUIDToString(r.ID),
+			CampID:            api.UUIDToString(r.CampID),
+			ActivityID:        api.UUIDToString(r.ActivityID),
+			CertificationID:   api.UUIDToString(r.CertificationID),
+			CertificationName: r.CertificationName,
+		}
+	}
+	return result, nil
+}
+
 func (svc *Service) AddCertification(ctx context.Context, campID, activityID string, req AddCertificationRequest) (ActivityCertificationResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {

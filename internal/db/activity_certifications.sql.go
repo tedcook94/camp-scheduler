@@ -100,3 +100,45 @@ func (q *Queries) ListActivityCertifications(ctx context.Context, arg ListActivi
 	}
 	return items, nil
 }
+
+const listAllActivityCertifications = `-- name: ListAllActivityCertifications :many
+SELECT ac.id, ac.camp_id, ac.activity_id, ac.certification_id, c.certification_name
+FROM activity_certifications ac
+JOIN certifications c ON c.id = ac.certification_id
+WHERE ac.camp_id = $1
+ORDER BY ac.activity_id, c.certification_name
+`
+
+type ListAllActivityCertificationsRow struct {
+	ID                pgtype.UUID
+	CampID            pgtype.UUID
+	ActivityID        pgtype.UUID
+	CertificationID   pgtype.UUID
+	CertificationName string
+}
+
+func (q *Queries) ListAllActivityCertifications(ctx context.Context, campID pgtype.UUID) ([]ListAllActivityCertificationsRow, error) {
+	rows, err := q.db.Query(ctx, listAllActivityCertifications, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAllActivityCertificationsRow
+	for rows.Next() {
+		var i ListAllActivityCertificationsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.ActivityID,
+			&i.CertificationID,
+			&i.CertificationName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

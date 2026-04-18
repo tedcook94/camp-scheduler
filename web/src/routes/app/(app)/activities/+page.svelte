@@ -70,20 +70,24 @@
 
 	onMount(async () => {
 		try {
-			const [actList, certList] = await Promise.all([
+			const [actList, certList, allActCerts] = await Promise.all([
 				activityApi.list(),
 				certificationApi.list(),
+				activityCertificationApi.listAll(),
 			]);
 			activities = actList;
 			allCertifications = certList;
 
 			const certsMap = new Map<string, ActivityCertification[]>();
-			await Promise.all(
-				actList.map(async (a) => {
-					const certs = await activityCertificationApi.list(a.id);
-					certsMap.set(a.id, certs);
-				})
-			);
+			for (const a of actList) {
+				certsMap.set(a.id, []);
+			}
+			for (const ac of allActCerts) {
+				const list = certsMap.get(ac.activity_id);
+				if (list) {
+					list.push(ac);
+				}
+			}
 			certsByActivity = certsMap;
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to load activities";

@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { goto } from "$app/navigation";
 	import { getContext, onMount } from "svelte";
 	import { ApiClientError } from "$lib/api/client";
 	import { sessionApi, seasonApi } from "$lib/api";
+
 	import { toast } from "svelte-sonner";
 	import { Button } from "$lib/components/ui/button";
 	import { Input } from "$lib/components/ui/input";
@@ -15,6 +17,7 @@
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import TrashIcon from "@lucide/svelte/icons/trash";
 	import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
+	import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 	import SortableTableHead from "$lib/components/sortable-table-head.svelte";
 	import { sortItems, type SortDirection, type SortAccessor } from "$lib/utils";
 
@@ -232,7 +235,7 @@
 			</Table.TableHeader>
 			<Table.TableBody>
 				{#each sortedSessions as session (session.id)}
-					<Table.TableRow>
+					<Table.TableRow class="cursor-pointer hover:bg-muted/50" onclick={() => goto(`/app/sessions/${session.id}`)}>
 						<Table.TableCell>{session.name}</Table.TableCell>
 						<Table.TableCell>{seasonMap.get(session.season_id) ?? "Unknown"}</Table.TableCell>
 						<Table.TableCell>
@@ -249,7 +252,7 @@
 									size="icon-sm"
 									disabled={disabled}
 									title="Edit"
-									onclick={() => openEdit(session)}
+									onclick={(e: MouseEvent) => { e.stopPropagation(); openEdit(session); }}
 								>
 									<PencilIcon class="size-4" />
 									<span class="sr-only">Edit</span>
@@ -259,11 +262,19 @@
 									size="icon-sm"
 									disabled={disabled}
 									title="Delete"
-									onclick={() => confirmDelete(session)}
+									onclick={(e: MouseEvent) => { e.stopPropagation(); confirmDelete(session); }}
 								>
 									<TrashIcon class="size-4" />
 									<span class="sr-only">Delete</span>
 								</Button>
+								<a
+									href={`/app/sessions/${session.id}`}
+									class="ml-1 inline-flex items-center text-muted-foreground hover:text-foreground"
+									onclick={(e: MouseEvent) => e.stopPropagation()}
+								>
+									<ChevronRightIcon class="size-4" />
+									<span class="sr-only">View details</span>
+								</a>
 							</div>
 						</Table.TableCell>
 					</Table.TableRow>

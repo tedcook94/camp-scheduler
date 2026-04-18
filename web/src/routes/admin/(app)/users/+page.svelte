@@ -490,7 +490,6 @@
 		<AlertDialog.AlertDialogFooter>
 			<AlertDialog.AlertDialogCancel disabled={deleting}>Cancel</AlertDialog.AlertDialogCancel>
 			<AlertDialog.AlertDialogAction
-				variant="destructive"
 				onclick={handleDelete}
 				disabled={deleting}
 			>

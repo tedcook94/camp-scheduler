@@ -316,7 +316,6 @@
 			<AlertDialog.AlertDialogAction
 				disabled={deleting}
 				onclick={handleDelete}
-				class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
 			>
 				{#if deleting}
 					<LoaderCircleIcon class="mr-2 size-4 animate-spin" />

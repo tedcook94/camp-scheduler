@@ -134,6 +134,7 @@
 	let ageGroupPrefs = $state<AgeGroupPreference[]>([]);
 	let cocounselorPrefs = $state<CocounselorPreference[]>([]);
 	let activityPrefs = $state<ActivityPreference[]>([]);
+	let prefSaving = $state(false);
 
 	let addAgeGroupId = $state("");
 	let addCocounselorId = $state("");
@@ -386,7 +387,8 @@
 	}
 
 	async function addAgeGroupPref() {
-		if (!addAgeGroupId || !prefSessionId) return;
+		if (!addAgeGroupId || !prefSessionId || prefSaving) return;
+		prefSaving = true;
 		const items = [
 			...ageGroupPrefs.map((p, i) => ({ age_group_id: p.age_group_id, rank: i + 1 })),
 			{ age_group_id: addAgeGroupId, rank: ageGroupPrefs.length + 1 },
@@ -399,11 +401,14 @@
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to update preferences";
 			toast.error(message);
+		} finally {
+			prefSaving = false;
 		}
 	}
 
 	async function addCocounselorPref() {
-		if (!addCocounselorId || !prefSessionId) return;
+		if (!addCocounselorId || !prefSessionId || prefSaving) return;
+		prefSaving = true;
 		const items = [
 			...cocounselorPrefs.map((p, i) => ({ preferred_counselor_id: p.preferred_counselor_id, rank: i + 1 })),
 			{ preferred_counselor_id: addCocounselorId, rank: cocounselorPrefs.length + 1 },
@@ -416,11 +421,14 @@
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to update preferences";
 			toast.error(message);
+		} finally {
+			prefSaving = false;
 		}
 	}
 
 	async function addActivityPref() {
-		if (!addActivityId || !prefSessionId) return;
+		if (!addActivityId || !prefSessionId || prefSaving) return;
+		prefSaving = true;
 		const items = [
 			...activityPrefs.map((p, i) => ({ activity_id: p.activity_id, rank: i + 1 })),
 			{ activity_id: addActivityId, rank: activityPrefs.length + 1 },
@@ -433,54 +441,70 @@
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to update preferences";
 			toast.error(message);
+		} finally {
+			prefSaving = false;
 		}
 	}
 
 	async function moveAgeGroupPref(index: number, direction: -1 | 1) {
+		if (prefSaving) return;
 		const newIndex = index + direction;
 		const reordered = [...ageGroupPrefs];
 		[reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]];
 		const items = reordered.map((p, i) => ({ age_group_id: p.age_group_id, rank: i + 1 }));
+		prefSaving = true;
 		try {
 			ageGroupPrefs = await ageGroupPreferenceApi.replaceAll(prefSessionId, counselorId, items);
 			ageGroupPrefs = ageGroupPrefs.sort((a, b) => a.rank - b.rank);
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to reorder preferences";
 			toast.error(message);
+		} finally {
+			prefSaving = false;
 		}
 	}
 
 	async function moveCocounselorPref(index: number, direction: -1 | 1) {
+		if (prefSaving) return;
 		const newIndex = index + direction;
 		const reordered = [...cocounselorPrefs];
 		[reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]];
 		const items = reordered.map((p, i) => ({ preferred_counselor_id: p.preferred_counselor_id, rank: i + 1 }));
+		prefSaving = true;
 		try {
 			cocounselorPrefs = await cocounselorPreferenceApi.replaceAll(prefSessionId, counselorId, items);
 			cocounselorPrefs = cocounselorPrefs.sort((a, b) => a.rank - b.rank);
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to reorder preferences";
 			toast.error(message);
+		} finally {
+			prefSaving = false;
 		}
 	}
 
 	async function moveActivityPref(index: number, direction: -1 | 1) {
+		if (prefSaving) return;
 		const newIndex = index + direction;
 		const reordered = [...activityPrefs];
 		[reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]];
 		const items = reordered.map((p, i) => ({ activity_id: p.activity_id, rank: i + 1 }));
+		prefSaving = true;
 		try {
 			activityPrefs = await activityPreferenceApi.replaceAll(prefSessionId, counselorId, items);
 			activityPrefs = activityPrefs.sort((a, b) => a.rank - b.rank);
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to reorder preferences";
 			toast.error(message);
+		} finally {
+			prefSaving = false;
 		}
 	}
 
 	async function removeAgeGroupPref(index: number) {
+		if (prefSaving) return;
 		const remaining = ageGroupPrefs.filter((_, i) => i !== index);
 		const items = remaining.map((p, i) => ({ age_group_id: p.age_group_id, rank: i + 1 }));
+		prefSaving = true;
 		try {
 			ageGroupPrefs = await ageGroupPreferenceApi.replaceAll(prefSessionId, counselorId, items);
 			ageGroupPrefs = ageGroupPrefs.sort((a, b) => a.rank - b.rank);
@@ -488,12 +512,16 @@
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to update preferences";
 			toast.error(message);
+		} finally {
+			prefSaving = false;
 		}
 	}
 
 	async function removeCocounselorPref(index: number) {
+		if (prefSaving) return;
 		const remaining = cocounselorPrefs.filter((_, i) => i !== index);
 		const items = remaining.map((p, i) => ({ preferred_counselor_id: p.preferred_counselor_id, rank: i + 1 }));
+		prefSaving = true;
 		try {
 			cocounselorPrefs = await cocounselorPreferenceApi.replaceAll(prefSessionId, counselorId, items);
 			cocounselorPrefs = cocounselorPrefs.sort((a, b) => a.rank - b.rank);
@@ -501,12 +529,16 @@
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to update preferences";
 			toast.error(message);
+		} finally {
+			prefSaving = false;
 		}
 	}
 
 	async function removeActivityPref(index: number) {
+		if (prefSaving) return;
 		const remaining = activityPrefs.filter((_, i) => i !== index);
 		const items = remaining.map((p, i) => ({ activity_id: p.activity_id, rank: i + 1 }));
+		prefSaving = true;
 		try {
 			activityPrefs = await activityPreferenceApi.replaceAll(prefSessionId, counselorId, items);
 			activityPrefs = activityPrefs.sort((a, b) => a.rank - b.rank);
@@ -514,6 +546,8 @@
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to update preferences";
 			toast.error(message);
+		} finally {
+			prefSaving = false;
 		}
 	}
 
@@ -734,6 +768,7 @@
 								type="single"
 								value={prefSessionId}
 								onValueChange={handlePrefSessionChange}
+								disabled={prefSaving}
 							>
 								<Select.Trigger class="w-64">
 									{prefSessionId
@@ -783,15 +818,15 @@
 												<Table.TableCell>{getAgeGroupName(pref.age_group_id)}</Table.TableCell>
 												<Table.TableCell>
 													<div class="flex justify-end gap-1">
-														<Button variant="ghost" size="icon-sm" title="Move up" disabled={disabled || i === 0} onclick={() => moveAgeGroupPref(i, -1)}>
+														<Button variant="ghost" size="icon-sm" title="Move up" disabled={disabled || prefSaving || i === 0} onclick={() => moveAgeGroupPref(i, -1)}>
 															<ArrowUpIcon class="size-4" />
 															<span class="sr-only">Move up</span>
 														</Button>
-														<Button variant="ghost" size="icon-sm" title="Move down" disabled={disabled || i === ageGroupPrefs.length - 1} onclick={() => moveAgeGroupPref(i, 1)}>
+														<Button variant="ghost" size="icon-sm" title="Move down" disabled={disabled || prefSaving || i === ageGroupPrefs.length - 1} onclick={() => moveAgeGroupPref(i, 1)}>
 															<ArrowDownIcon class="size-4" />
 															<span class="sr-only">Move down</span>
 														</Button>
-														<Button variant="ghost" size="icon-sm" title="Remove" disabled={disabled} onclick={() => removeAgeGroupPref(i)}>
+														<Button variant="ghost" size="icon-sm" title="Remove" disabled={disabled || prefSaving} onclick={() => removeAgeGroupPref(i)}>
 															<TrashIcon class="size-4" />
 															<span class="sr-only">Remove</span>
 														</Button>
@@ -820,7 +855,7 @@
 											{/each}
 										</Select.Content>
 									</Select.Root>
-									<Button size="sm" disabled={disabled || !addAgeGroupId} onclick={addAgeGroupPref}>
+									<Button size="sm" disabled={disabled || prefSaving || !addAgeGroupId} onclick={addAgeGroupPref}>
 										<PlusIcon class="mr-1 size-4" />
 										Add
 									</Button>
@@ -857,15 +892,15 @@
 												<Table.TableCell>{getCounselorName(pref.preferred_counselor_id)}</Table.TableCell>
 												<Table.TableCell>
 													<div class="flex justify-end gap-1">
-														<Button variant="ghost" size="icon-sm" title="Move up" disabled={disabled || i === 0} onclick={() => moveCocounselorPref(i, -1)}>
+														<Button variant="ghost" size="icon-sm" title="Move up" disabled={disabled || prefSaving || i === 0} onclick={() => moveCocounselorPref(i, -1)}>
 															<ArrowUpIcon class="size-4" />
 															<span class="sr-only">Move up</span>
 														</Button>
-														<Button variant="ghost" size="icon-sm" title="Move down" disabled={disabled || i === cocounselorPrefs.length - 1} onclick={() => moveCocounselorPref(i, 1)}>
+														<Button variant="ghost" size="icon-sm" title="Move down" disabled={disabled || prefSaving || i === cocounselorPrefs.length - 1} onclick={() => moveCocounselorPref(i, 1)}>
 															<ArrowDownIcon class="size-4" />
 															<span class="sr-only">Move down</span>
 														</Button>
-														<Button variant="ghost" size="icon-sm" title="Remove" disabled={disabled} onclick={() => removeCocounselorPref(i)}>
+														<Button variant="ghost" size="icon-sm" title="Remove" disabled={disabled || prefSaving} onclick={() => removeCocounselorPref(i)}>
 															<TrashIcon class="size-4" />
 															<span class="sr-only">Remove</span>
 														</Button>
@@ -894,7 +929,7 @@
 											{/each}
 										</Select.Content>
 									</Select.Root>
-									<Button size="sm" disabled={disabled || !addCocounselorId} onclick={addCocounselorPref}>
+									<Button size="sm" disabled={disabled || prefSaving || !addCocounselorId} onclick={addCocounselorPref}>
 										<PlusIcon class="mr-1 size-4" />
 										Add
 									</Button>
@@ -931,15 +966,15 @@
 												<Table.TableCell>{getActivityName(pref.activity_id)}</Table.TableCell>
 												<Table.TableCell>
 													<div class="flex justify-end gap-1">
-														<Button variant="ghost" size="icon-sm" title="Move up" disabled={disabled || i === 0} onclick={() => moveActivityPref(i, -1)}>
+														<Button variant="ghost" size="icon-sm" title="Move up" disabled={disabled || prefSaving || i === 0} onclick={() => moveActivityPref(i, -1)}>
 															<ArrowUpIcon class="size-4" />
 															<span class="sr-only">Move up</span>
 														</Button>
-														<Button variant="ghost" size="icon-sm" title="Move down" disabled={disabled || i === activityPrefs.length - 1} onclick={() => moveActivityPref(i, 1)}>
+														<Button variant="ghost" size="icon-sm" title="Move down" disabled={disabled || prefSaving || i === activityPrefs.length - 1} onclick={() => moveActivityPref(i, 1)}>
 															<ArrowDownIcon class="size-4" />
 															<span class="sr-only">Move down</span>
 														</Button>
-														<Button variant="ghost" size="icon-sm" title="Remove" disabled={disabled} onclick={() => removeActivityPref(i)}>
+														<Button variant="ghost" size="icon-sm" title="Remove" disabled={disabled || prefSaving} onclick={() => removeActivityPref(i)}>
 															<TrashIcon class="size-4" />
 															<span class="sr-only">Remove</span>
 														</Button>
@@ -968,7 +1003,7 @@
 											{/each}
 										</Select.Content>
 									</Select.Root>
-									<Button size="sm" disabled={disabled || !addActivityId} onclick={addActivityPref}>
+									<Button size="sm" disabled={disabled || prefSaving || !addActivityId} onclick={addActivityPref}>
 										<PlusIcon class="mr-1 size-4" />
 										Add
 									</Button>

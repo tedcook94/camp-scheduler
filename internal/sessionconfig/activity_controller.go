@@ -33,11 +33,17 @@ func (ctrl *ActivityController) RegisterRoutes(rg *gin.RouterGroup) {
 	activities.POST("", ctrl.CreateActivity)
 	activities.PUT("/:activityId", ctrl.UpdateActivity)
 	activities.DELETE("/:activityId", ctrl.DeleteActivity)
+
+	timeSlots.POST("/:timeSlotId/copy-activities", ctrl.CopyActivities)
 }
 
 type CreateSessionTimeSlotRequest struct {
 	TimeSlotID string `json:"time_slot_id" binding:"required"`
 	SortOrder  int32  `json:"sort_order"`
+}
+
+type CopyActivitiesRequest struct {
+	SourceSessionTimeSlotID string `json:"source_session_time_slot_id" binding:"required"`
 }
 
 type UpdateSessionTimeSlotRequest struct {
@@ -412,4 +418,47 @@ func (ctrl *ActivityController) DeleteActivity(c *gin.Context) {
 	}
 
 	c.Status(http.StatusOK)
+}
+
+func (ctrl *ActivityController) CopyActivities(c *gin.Context) {
+	log := auth.Logger(c)
+	campID := auth.GetCampID(c)
+	sessionID := c.Param("sessionId")
+	targetTimeSlotID := c.Param("timeSlotId")
+
+	var req CopyActivitiesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	activities, err := ctrl.svc.CopyActivities(c.Request.Context(), campID, sessionID, targetTimeSlotID, req.SourceSessionTimeSlotID)
+	if err != nil {
+		if api.IsBadInput(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "session time slot not found for this session"})
+			return
+		}
+		if api.IsUniqueViolation(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": "duplicate activity in target time slot"})
+			return
+		}
+		if api.IsFKViolation(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": "target time slot has dependent records that prevent replacement"})
+			return
+		}
+		log.
+			With("session_id", sessionID).
+			With("target_time_slot_id", targetTimeSlotID).
+			With("source_time_slot_id", req.SourceSessionTimeSlotID).
+			With("error", err).
+			Error("error copying activities")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, activities)
 }

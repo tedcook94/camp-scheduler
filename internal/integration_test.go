@@ -2615,3 +2615,166 @@ func testSessionSeasonChangeWithDependents(t *testing.T) {
 		t.Fatalf("expected season_id %s, got %s", season1ID, str(got, "season_id"))
 	}
 }
+
+func TestCopyActivities(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Copy Test").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	// Setup: season, session, time slots, activities.
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-07-31",
+	}, token)
+	seasonID := str(season, "id")
+
+	session := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Session 1", "season_id": seasonID,
+	}, token)
+	sessionID := str(session, "id")
+	sessionBase := "/sessions/" + sessionID
+
+	swimming := mustPost(t, apiURL(ts, "/activities"), map[string]any{"name": "Swimming"}, token)
+	swimmingID := str(swimming, "id")
+
+	archery := mustPost(t, apiURL(ts, "/activities"), map[string]any{"name": "Archery"}, token)
+	archeryID := str(archery, "id")
+
+	period1 := mustPost(t, apiURL(ts, "/time-slots"), map[string]any{"name": "Period 1"}, token)
+	period1ID := str(period1, "id")
+
+	period2 := mustPost(t, apiURL(ts, "/time-slots"), map[string]any{"name": "Period 2"}, token)
+	period2ID := str(period2, "id")
+
+	period3 := mustPost(t, apiURL(ts, "/time-slots"), map[string]any{"name": "Period 3"}, token)
+	period3ID := str(period3, "id")
+
+	sts1 := mustPost(t, apiURL(ts, sessionBase+"/time-slots"), map[string]any{
+		"time_slot_id": period1ID, "sort_order": 1,
+	}, token)
+	sts1ID := str(sts1, "id")
+
+	sts2 := mustPost(t, apiURL(ts, sessionBase+"/time-slots"), map[string]any{
+		"time_slot_id": period2ID, "sort_order": 2,
+	}, token)
+	sts2ID := str(sts2, "id")
+
+	sts3 := mustPost(t, apiURL(ts, sessionBase+"/time-slots"), map[string]any{
+		"time_slot_id": period3ID, "sort_order": 3,
+	}, token)
+	sts3ID := str(sts3, "id")
+
+	// Add activities to source (sts1).
+	mustPost(t, apiURL(ts, sessionBase+"/time-slots/"+sts1ID+"/activities"), map[string]any{
+		"activity_id": swimmingID, "capacity": 20, "required_counselors": 2,
+	}, token)
+	mustPost(t, apiURL(ts, sessionBase+"/time-slots/"+sts1ID+"/activities"), map[string]any{
+		"activity_id": archeryID, "capacity": 15, "required_counselors": 1,
+	}, token)
+
+	t.Run("copy into empty target", func(t *testing.T) {
+		// Use POST to copy
+		raw := doRawRequest(t, http.MethodPost,
+			apiURL(ts, sessionBase+"/time-slots/"+sts2ID+"/copy-activities"),
+			map[string]any{"source_session_time_slot_id": sts1ID},
+			http.StatusOK, token)
+		var result []any
+		if err := json.Unmarshal(raw, &result); err != nil {
+			t.Fatalf("unmarshaling copy result: %v", err)
+		}
+		if len(result) != 2 {
+			t.Fatalf("expected 2 copied activities, got %d", len(result))
+		}
+
+		// Verify the target has the activities.
+		acts := mustGetList(t, apiURL(ts, sessionBase+"/time-slots/"+sts2ID+"/activities"), token)
+		if len(acts) != 2 {
+			t.Fatalf("expected 2 activities in target, got %d", len(acts))
+		}
+	})
+
+	t.Run("replace existing target activities", func(t *testing.T) {
+		// sts2 now has 2 activities from previous test. Add one to sts3.
+		mustPost(t, apiURL(ts, sessionBase+"/time-slots/"+sts3ID+"/activities"), map[string]any{
+			"activity_id": archeryID, "capacity": 10, "required_counselors": 1,
+		}, token)
+
+		// Copy from sts1 (2 activities) to sts3 (1 activity) — should replace.
+		raw := doRawRequest(t, http.MethodPost,
+			apiURL(ts, sessionBase+"/time-slots/"+sts3ID+"/copy-activities"),
+			map[string]any{"source_session_time_slot_id": sts1ID},
+			http.StatusOK, token)
+		var result []any
+		if err := json.Unmarshal(raw, &result); err != nil {
+			t.Fatalf("unmarshaling copy result: %v", err)
+		}
+		if len(result) != 2 {
+			t.Fatalf("expected 2 copied activities, got %d", len(result))
+		}
+
+		acts := mustGetList(t, apiURL(ts, sessionBase+"/time-slots/"+sts3ID+"/activities"), token)
+		if len(acts) != 2 {
+			t.Fatalf("expected 2 activities after replacement, got %d", len(acts))
+		}
+	})
+
+	t.Run("reject self-copy", func(t *testing.T) {
+		doRawRequest(t, http.MethodPost,
+			apiURL(ts, sessionBase+"/time-slots/"+sts1ID+"/copy-activities"),
+			map[string]any{"source_session_time_slot_id": sts1ID},
+			http.StatusBadRequest, token)
+	})
+
+	t.Run("reject source from another session", func(t *testing.T) {
+		// Create a second session with its own time slot.
+		session2 := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+			"name": "Session 2", "season_id": seasonID,
+		}, token)
+		session2ID := str(session2, "id")
+
+		otherSTS := mustPost(t, apiURL(ts, "/sessions/"+session2ID+"/time-slots"), map[string]any{
+			"time_slot_id": period1ID, "sort_order": 1,
+		}, token)
+		otherSTSID := str(otherSTS, "id")
+
+		// Try to copy from the other session's time slot — current handler behavior
+		// treats this as not found because the source lookup is scoped by session.
+		doRawRequest(t, http.MethodPost,
+			apiURL(ts, sessionBase+"/time-slots/"+sts2ID+"/copy-activities"),
+			map[string]any{"source_session_time_slot_id": otherSTSID},
+			http.StatusNotFound, token)
+	})
+
+	t.Run("empty source clears target", func(t *testing.T) {
+		// Create a new time slot with no activities.
+		period4 := mustPost(t, apiURL(ts, "/time-slots"), map[string]any{"name": "Period 4"}, token)
+		period4ID := str(period4, "id")
+		sts4 := mustPost(t, apiURL(ts, sessionBase+"/time-slots"), map[string]any{
+			"time_slot_id": period4ID, "sort_order": 4,
+		}, token)
+		sts4ID := str(sts4, "id")
+
+		// Copy from empty sts4 to sts2 (which has 2 activities).
+		raw := doRawRequest(t, http.MethodPost,
+			apiURL(ts, sessionBase+"/time-slots/"+sts2ID+"/copy-activities"),
+			map[string]any{"source_session_time_slot_id": sts4ID},
+			http.StatusOK, token)
+		var result []any
+		if err := json.Unmarshal(raw, &result); err != nil {
+			t.Fatalf("unmarshaling copy result: %v", err)
+		}
+		if len(result) != 0 {
+			t.Fatalf("expected 0 copied activities, got %d", len(result))
+		}
+
+		acts := mustGetList(t, apiURL(ts, sessionBase+"/time-slots/"+sts2ID+"/activities"), token)
+		if len(acts) != 0 {
+			t.Fatalf("expected 0 activities after copy from empty, got %d", len(acts))
+		}
+	})
+}

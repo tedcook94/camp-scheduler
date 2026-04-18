@@ -56,6 +56,10 @@ JOIN time_slots ts ON ts.id = sts.time_slot_id
 WHERE sts.session_id = $1 AND sa.camp_id = $2
 ORDER BY sts.sort_order, a.activity_name;
 
+-- name: DeleteSessionActivitiesByTimeSlot :execrows
+DELETE FROM session_activities
+WHERE session_time_slot_id = $1 AND camp_id = $2;
+
 -- name: ListActivityCertificationsBySession :many
 SELECT
     sa.id AS session_activity_id,

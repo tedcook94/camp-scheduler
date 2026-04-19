@@ -10,16 +10,18 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var ErrNotFound = errors.New("session not found")
 
 type Service struct {
 	queries *db.Queries
+	pool    *pgxpool.Pool
 }
 
-func NewService(queries *db.Queries) *Service {
-	return &Service{queries: queries}
+func NewService(queries *db.Queries, pool *pgxpool.Pool) *Service {
+	return &Service{queries: queries, pool: pool}
 }
 
 func (svc *Service) List(ctx context.Context, campID string) ([]SessionResponse, error) {
@@ -228,4 +230,159 @@ func (svc *Service) validatePreviousSession(ctx context.Context, campID, seasonI
 	}
 
 	return nil
+}
+
+// Copy structurally clones an existing session into a new one. The clone
+// includes session age groups, session age group cabins, session time slots,
+// and session activities — all in a single transaction. Camper enrollments,
+// counselor preferences, and assignment runs are deliberately not copied.
+func (svc *Service) Copy(ctx context.Context, campID, sourceID string, req CopySessionRequest) (SessionResponse, error) {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return SessionResponse{}, err
+	}
+
+	sourceUUID, err := api.ParseUUID(sourceID)
+	if err != nil {
+		return SessionResponse{}, err
+	}
+
+	seasonUUID, err := api.ParseUUID(req.SeasonID)
+	if err != nil {
+		return SessionResponse{}, err
+	}
+
+	prevUUID, err := api.ToPgUUID(req.PreviousSessionID)
+	if err != nil {
+		return SessionResponse{}, err
+	}
+
+	// Source must exist in this camp.
+	if _, err := svc.queries.GetSession(ctx, db.GetSessionParams{
+		ID:     sourceUUID,
+		CampID: campUUID,
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return SessionResponse{}, ErrNotFound
+		}
+		return SessionResponse{}, fmt.Errorf("error getting source session %s: %w", sourceID, err)
+	}
+
+	if err := svc.validatePreviousSession(ctx, campUUID, seasonUUID, pgtype.UUID{}, req.PreviousSessionID); err != nil {
+		return SessionResponse{}, err
+	}
+
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return SessionResponse{}, fmt.Errorf("error beginning copy session transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	newSession, err := qtx.CreateSession(ctx, db.CreateSessionParams{
+		CampID:          campUUID,
+		SeasonID:        seasonUUID,
+		SessionName:     req.Name,
+		PreviousSession: prevUUID,
+	})
+	if err != nil {
+		return SessionResponse{}, fmt.Errorf("error creating copied session: %w", err)
+	}
+
+	// Copy session_age_groups, building a map from old SAG id to new SAG id
+	// so we can remap session_age_group_cabins below.
+	sourceSAGs, err := qtx.ListSessionAgeGroups(ctx, db.ListSessionAgeGroupsParams{
+		SessionID: sourceUUID,
+		CampID:    campUUID,
+	})
+	if err != nil {
+		return SessionResponse{}, fmt.Errorf("error listing source session age groups: %w", err)
+	}
+	sagIDMap := make(map[pgtype.UUID]pgtype.UUID, len(sourceSAGs))
+	for _, sag := range sourceSAGs {
+		newSAG, err := qtx.CreateSessionAgeGroup(ctx, db.CreateSessionAgeGroupParams{
+			CampID:     campUUID,
+			SessionID:  newSession.ID,
+			AgeGroupID: sag.AgeGroupID,
+		})
+		if err != nil {
+			return SessionResponse{}, fmt.Errorf("error copying session age group: %w", err)
+		}
+		sagIDMap[sag.ID] = newSAG.ID
+	}
+
+	sourceCabins, err := qtx.ListSessionAgeGroupCabinsBySession(ctx, db.ListSessionAgeGroupCabinsBySessionParams{
+		SessionID: sourceUUID,
+		CampID:    campUUID,
+	})
+	if err != nil {
+		return SessionResponse{}, fmt.Errorf("error listing source session cabins: %w", err)
+	}
+	for _, sc := range sourceCabins {
+		newSAGID, ok := sagIDMap[sc.SessionAgeGroupID]
+		if !ok {
+			return SessionResponse{}, fmt.Errorf("error remapping session age group id during copy: source session_age_group_id=%v source session_id=%s", sc.SessionAgeGroupID, sourceID)
+		}
+		if _, err := qtx.CreateSessionAgeGroupCabin(ctx, db.CreateSessionAgeGroupCabinParams{
+			CampID:             campUUID,
+			SessionAgeGroupID:  newSAGID,
+			CabinID:            sc.CabinID,
+			GroupSize:          sc.GroupSize,
+			RequiredCounselors: sc.RequiredCounselors,
+		}); err != nil {
+			return SessionResponse{}, fmt.Errorf("error copying session cabin: %w", err)
+		}
+	}
+
+	// Copy session_time_slots, building a map from old STS id to new STS id
+	// so we can remap session_activities below.
+	sourceSTSs, err := qtx.ListSessionTimeSlots(ctx, db.ListSessionTimeSlotsParams{
+		SessionID: sourceUUID,
+		CampID:    campUUID,
+	})
+	if err != nil {
+		return SessionResponse{}, fmt.Errorf("error listing source session time slots: %w", err)
+	}
+	stsIDMap := make(map[pgtype.UUID]pgtype.UUID, len(sourceSTSs))
+	for _, sts := range sourceSTSs {
+		newSTS, err := qtx.CreateSessionTimeSlot(ctx, db.CreateSessionTimeSlotParams{
+			CampID:     campUUID,
+			SessionID:  newSession.ID,
+			TimeSlotID: sts.TimeSlotID,
+			SortOrder:  sts.SortOrder,
+		})
+		if err != nil {
+			return SessionResponse{}, fmt.Errorf("error copying session time slot: %w", err)
+		}
+		stsIDMap[sts.ID] = newSTS.ID
+	}
+
+	sourceActivities, err := qtx.ListSessionActivities(ctx, db.ListSessionActivitiesParams{
+		SessionID: sourceUUID,
+		CampID:    campUUID,
+	})
+	if err != nil {
+		return SessionResponse{}, fmt.Errorf("error listing source session activities: %w", err)
+	}
+	for _, sa := range sourceActivities {
+		newSTSID, ok := stsIDMap[sa.SessionTimeSlotID]
+		if !ok {
+			return SessionResponse{}, fmt.Errorf("error remapping session time slot id during copy: source session_time_slot_id=%v source session_id=%s", sa.SessionTimeSlotID, sourceID)
+		}
+		if _, err := qtx.CreateSessionActivity(ctx, db.CreateSessionActivityParams{
+			CampID:             campUUID,
+			SessionTimeSlotID:  newSTSID,
+			ActivityID:         sa.ActivityID,
+			Capacity:           sa.Capacity,
+			RequiredCounselors: sa.RequiredCounselors,
+		}); err != nil {
+			return SessionResponse{}, fmt.Errorf("error copying session activity: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return SessionResponse{}, fmt.Errorf("error committing copy session transaction: %w", err)
+	}
+
+	return toSessionResponse(newSession), nil
 }

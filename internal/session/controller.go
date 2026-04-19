@@ -26,6 +26,7 @@ func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	sessions.POST("", ctrl.Create)
 	sessions.PUT("/:sessionId", ctrl.Update)
 	sessions.DELETE("/:sessionId", ctrl.Delete)
+	sessions.POST("/:sessionId/copy", ctrl.Copy)
 }
 
 type CreateSessionRequest struct {
@@ -35,6 +36,15 @@ type CreateSessionRequest struct {
 }
 
 type UpdateSessionRequest struct {
+	Name              string  `json:"name" binding:"required"`
+	SeasonID          string  `json:"season_id" binding:"required"`
+	PreviousSessionID *string `json:"previous_session_id"`
+}
+
+// CopySessionRequest creates a new session by structurally cloning an existing
+// one (age groups, cabins, time slots, activities). The source session is
+// identified by the URL.
+type CopySessionRequest struct {
 	Name              string  `json:"name" binding:"required"`
 	SeasonID          string  `json:"season_id" binding:"required"`
 	PreviousSessionID *string `json:"previous_session_id"`
@@ -176,4 +186,40 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 	}
 
 	c.Status(http.StatusOK)
+}
+
+func (ctrl *Controller) Copy(c *gin.Context) {
+	log := auth.Logger(c)
+	campID := auth.GetCampID(c)
+	sourceID := c.Param("sessionId")
+
+	var req CopySessionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	session, err := ctrl.svc.Copy(c.Request.Context(), campID, sourceID, req)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
+			return
+		}
+		if api.IsBadInput(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if api.IsUniqueViolation(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": "a session with that name already exists in this season"})
+			return
+		}
+		log.
+			With("source_session_id", sourceID).
+			With("error", err).
+			Error("error copying session")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, session)
 }

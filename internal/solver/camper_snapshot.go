@@ -63,15 +63,11 @@ func loadCamperCabins(ctx context.Context, queries *db.Queries, sessionID, campI
 
 	cabins := make([]CamperCabin, len(rows))
 	for i, r := range rows {
-		capacity := 0
-		if r.GroupSize.Valid {
-			capacity = int(r.GroupSize.Int32)
-		}
 		cabins[i] = CamperCabin{
 			ID:         api.UUIDToString(r.ID),
 			Name:       r.CabinName,
 			AgeGroupID: api.UUIDToString(r.AgeGroupID),
-			Capacity:   capacity,
+			Capacity:   int(r.GroupSize),
 		}
 	}
 	return cabins, nil

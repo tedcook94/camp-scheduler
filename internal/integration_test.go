@@ -680,6 +680,8 @@ func testSimpleCamp(t *testing.T) {
 	pine := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
 		"name":                 "Pine",
 		"default_age_group_id": juniorsID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
 	}, token)
 	pineID := str(pine, "id")
 	if got := str(pine, "default_age_group_name"); got != "Juniors" {
@@ -689,6 +691,8 @@ func testSimpleCamp(t *testing.T) {
 	oak := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
 		"name":                 "Oak",
 		"default_age_group_id": juniorsID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
 	}, token)
 	oakID := str(oak, "id")
 	if got := str(oak, "default_age_group_name"); got != "Juniors" {
@@ -698,6 +702,8 @@ func testSimpleCamp(t *testing.T) {
 	maple := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
 		"name":                 "Maple",
 		"default_age_group_id": seniorsID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
 	}, token)
 	mapleID := str(maple, "id")
 	if got := str(maple, "default_age_group_name"); got != "Seniors" {
@@ -707,6 +713,8 @@ func testSimpleCamp(t *testing.T) {
 	cedar := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
 		"name":                 "Cedar",
 		"default_age_group_id": seniorsID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
 	}, token)
 	cedarID := str(cedar, "id")
 	if got := str(cedar, "default_age_group_name"); got != "Seniors" {
@@ -782,6 +790,7 @@ func testSimpleCamp(t *testing.T) {
 		mustPost(t, apiURL(ts, "/sessions/"+session2ID+"/cabins"), map[string]any{
 			"session_age_group_id": cfg.sagID,
 			"cabin_id":             cfg.cabinID,
+			"group_size":           4,
 			"required_counselors":  reqCounselors,
 		}, token)
 	}
@@ -977,6 +986,8 @@ func testComplexCamp(t *testing.T) {
 		resp := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
 			"name":                 cd.name,
 			"default_age_group_id": cd.ageGroupID,
+			"default_group_size":          8,
+			"default_required_counselors": 1,
 		}, token)
 		cabins[i] = cabinInfo{id: str(resp, "id"), name: cd.name}
 	}
@@ -1059,6 +1070,7 @@ func testComplexCamp(t *testing.T) {
 		mustPost(t, apiURL(ts, "/sessions/"+session2ID+"/cabins"), map[string]any{
 			"session_age_group_id": sagIDs[i],
 			"cabin_id":             cab.id,
+			"group_size":           4,
 			"required_counselors":  reqCounselors,
 		}, token)
 	}
@@ -1251,6 +1263,8 @@ func testBasicCamperAssignment(t *testing.T) {
 	// Create cabins.
 	cabinA := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
 		"name": "Birch", "default_age_group_id": juniorsID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
 	}, token)
 	cabinAID := str(cabinA, "id")
 	if got := str(cabinA, "default_age_group_name"); got != "Young" {
@@ -1259,6 +1273,8 @@ func testBasicCamperAssignment(t *testing.T) {
 
 	cabinB := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
 		"name": "Elm", "default_age_group_id": juniorsID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
 	}, token)
 	cabinBID := str(cabinB, "id")
 	if got := str(cabinB, "default_age_group_name"); got != "Young" {
@@ -1371,6 +1387,8 @@ func testCamperFriendPreferences(t *testing.T) {
 
 	cabin1 := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
 		"name": "Hawk", "default_age_group_id": teensID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
 	}, token)
 	cabin1ID := str(cabin1, "id")
 	if got := str(cabin1, "default_age_group_name"); got != "Teens" {
@@ -1379,6 +1397,8 @@ func testCamperFriendPreferences(t *testing.T) {
 
 	cabin2 := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
 		"name": "Eagle", "default_age_group_id": teensID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
 	}, token)
 	cabin2ID := str(cabin2, "id")
 	if got := str(cabin2, "default_age_group_name"); got != "Teens" {
@@ -1634,6 +1654,8 @@ func testGetSolutionRunOwnership(t *testing.T) {
 
 	cabin := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
 		"name": "Pine", "default_age_group_id": agID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
 	}, token)
 	cabinID := str(cabin, "id")
 
@@ -1738,6 +1760,8 @@ func testSelectSolutionCamperRun(t *testing.T) {
 
 	cabin := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
 		"name": "Hawk", "default_age_group_id": agID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
 	}, token)
 	cabinID := str(cabin, "id")
 
@@ -1843,11 +1867,15 @@ func testRepeatedUnmetPreferenceBoost(t *testing.T) {
 	// Create cabins.
 	pine := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
 		"name": "Pine", "default_age_group_id": youngID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
 	}, token)
 	pineID := str(pine, "id")
 
 	oak := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
 		"name": "Oak", "default_age_group_id": oldID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
 	}, token)
 	oakID := str(oak, "id")
 
@@ -1896,11 +1924,13 @@ func testRepeatedUnmetPreferenceBoost(t *testing.T) {
 		mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
 			"session_age_group_id": str(sagYoung, "id"),
 			"cabin_id":             pineID,
+			"group_size":           4,
 			"required_counselors":  1,
 		}, token)
 		mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
 			"session_age_group_id": str(sagOld, "id"),
 			"cabin_id":             oakID,
+			"group_size":           4,
 			"required_counselors":  1,
 		}, token)
 	}
@@ -2010,6 +2040,8 @@ func testCrossCampIsolation(t *testing.T) {
 
 	cabin := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
 		"name": "Pine", "default_age_group_id": ageGroupID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
 	}, tokenA)
 	cabinID := str(cabin, "id")
 

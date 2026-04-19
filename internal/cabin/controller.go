@@ -29,21 +29,27 @@ func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 }
 
 type CreateCabinRequest struct {
-	Name              string `json:"name" binding:"required"`
-	DefaultAgeGroupID string `json:"default_age_group_id" binding:"required"`
+	Name                      string `json:"name" binding:"required"`
+	DefaultAgeGroupID         string `json:"default_age_group_id" binding:"required"`
+	DefaultGroupSize          int32  `json:"default_group_size" binding:"required,min=1"`
+	DefaultRequiredCounselors int32  `json:"default_required_counselors" binding:"required,min=1"`
 }
 
 type UpdateCabinRequest struct {
-	Name              string `json:"name" binding:"required"`
-	DefaultAgeGroupID string `json:"default_age_group_id" binding:"required"`
+	Name                      string `json:"name" binding:"required"`
+	DefaultAgeGroupID         string `json:"default_age_group_id" binding:"required"`
+	DefaultGroupSize          int32  `json:"default_group_size" binding:"required,min=1"`
+	DefaultRequiredCounselors int32  `json:"default_required_counselors" binding:"required,min=1"`
 }
 
 type CabinResponse struct {
-	ID                  string `json:"id"`
-	CampID              string `json:"camp_id"`
-	DefaultAgeGroupID   string `json:"default_age_group_id"`
-	DefaultAgeGroupName string `json:"default_age_group_name"`
-	Name                string `json:"name"`
+	ID                        string `json:"id"`
+	CampID                    string `json:"camp_id"`
+	DefaultAgeGroupID         string `json:"default_age_group_id"`
+	DefaultAgeGroupName       string `json:"default_age_group_name"`
+	Name                      string `json:"name"`
+	DefaultGroupSize          int32  `json:"default_group_size"`
+	DefaultRequiredCounselors int32  `json:"default_required_counselors"`
 }
 
 func (ctrl *Controller) List(c *gin.Context) {

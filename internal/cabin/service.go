@@ -33,11 +33,13 @@ func (svc *Service) List(ctx context.Context, campID string) ([]CabinResponse, e
 	result := make([]CabinResponse, len(cabins))
 	for i, c := range cabins {
 		result[i] = CabinResponse{
-			ID:                  api.UUIDToString(c.ID),
-			CampID:              api.UUIDToString(c.CampID),
-			DefaultAgeGroupID:   api.UUIDToString(c.DefaultAgeGroupID),
-			DefaultAgeGroupName: c.DefaultAgeGroupName,
-			Name:                c.CabinName,
+			ID:                        api.UUIDToString(c.ID),
+			CampID:                    api.UUIDToString(c.CampID),
+			DefaultAgeGroupID:         api.UUIDToString(c.DefaultAgeGroupID),
+			DefaultAgeGroupName:       c.DefaultAgeGroupName,
+			Name:                      c.CabinName,
+			DefaultGroupSize:          c.DefaultGroupSize,
+			DefaultRequiredCounselors: c.DefaultRequiredCounselors,
 		}
 	}
 	return result, nil
@@ -63,11 +65,13 @@ func (svc *Service) GetByID(ctx context.Context, campID, id string) (CabinRespon
 	}
 
 	return CabinResponse{
-		ID:                  api.UUIDToString(cabin.ID),
-		CampID:              api.UUIDToString(cabin.CampID),
-		DefaultAgeGroupID:   api.UUIDToString(cabin.DefaultAgeGroupID),
-		DefaultAgeGroupName: cabin.DefaultAgeGroupName,
-		Name:                cabin.CabinName,
+		ID:                        api.UUIDToString(cabin.ID),
+		CampID:                    api.UUIDToString(cabin.CampID),
+		DefaultAgeGroupID:         api.UUIDToString(cabin.DefaultAgeGroupID),
+		DefaultAgeGroupName:       cabin.DefaultAgeGroupName,
+		Name:                      cabin.CabinName,
+		DefaultGroupSize:          cabin.DefaultGroupSize,
+		DefaultRequiredCounselors: cabin.DefaultRequiredCounselors,
 	}, nil
 }
 
@@ -83,20 +87,24 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCabinRe
 	}
 
 	cabin, err := svc.queries.CreateCabin(ctx, db.CreateCabinParams{
-		CampID:            campUUID,
-		DefaultAgeGroupID: ageGroupUUID,
-		CabinName:         req.Name,
+		CampID:                    campUUID,
+		DefaultAgeGroupID:         ageGroupUUID,
+		CabinName:                 req.Name,
+		DefaultGroupSize:          req.DefaultGroupSize,
+		DefaultRequiredCounselors: req.DefaultRequiredCounselors,
 	})
 	if err != nil {
 		return CabinResponse{}, fmt.Errorf("error creating cabin: %w", err)
 	}
 
 	return CabinResponse{
-		ID:                  api.UUIDToString(cabin.ID),
-		CampID:              api.UUIDToString(cabin.CampID),
-		DefaultAgeGroupID:   api.UUIDToString(cabin.DefaultAgeGroupID),
-		DefaultAgeGroupName: cabin.DefaultAgeGroupName,
-		Name:                cabin.CabinName,
+		ID:                        api.UUIDToString(cabin.ID),
+		CampID:                    api.UUIDToString(cabin.CampID),
+		DefaultAgeGroupID:         api.UUIDToString(cabin.DefaultAgeGroupID),
+		DefaultAgeGroupName:       cabin.DefaultAgeGroupName,
+		Name:                      cabin.CabinName,
+		DefaultGroupSize:          cabin.DefaultGroupSize,
+		DefaultRequiredCounselors: cabin.DefaultRequiredCounselors,
 	}, nil
 }
 
@@ -117,21 +125,25 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCab
 	}
 
 	cabin, err := svc.queries.UpdateCabin(ctx, db.UpdateCabinParams{
-		ID:                uid,
-		CampID:            campUUID,
-		DefaultAgeGroupID: ageGroupUUID,
-		CabinName:         req.Name,
+		ID:                        uid,
+		CampID:                    campUUID,
+		DefaultAgeGroupID:         ageGroupUUID,
+		CabinName:                 req.Name,
+		DefaultGroupSize:          req.DefaultGroupSize,
+		DefaultRequiredCounselors: req.DefaultRequiredCounselors,
 	})
 	if err != nil {
 		return CabinResponse{}, fmt.Errorf("error updating cabin %s: %w", id, err)
 	}
 
 	return CabinResponse{
-		ID:                  api.UUIDToString(cabin.ID),
-		CampID:              api.UUIDToString(cabin.CampID),
-		DefaultAgeGroupID:   api.UUIDToString(cabin.DefaultAgeGroupID),
-		DefaultAgeGroupName: cabin.DefaultAgeGroupName,
-		Name:                cabin.CabinName,
+		ID:                        api.UUIDToString(cabin.ID),
+		CampID:                    api.UUIDToString(cabin.CampID),
+		DefaultAgeGroupID:         api.UUIDToString(cabin.DefaultAgeGroupID),
+		DefaultAgeGroupName:       cabin.DefaultAgeGroupName,
+		Name:                      cabin.CabinName,
+		DefaultGroupSize:          cabin.DefaultGroupSize,
+		DefaultRequiredCounselors: cabin.DefaultRequiredCounselors,
 	}, nil
 }
 

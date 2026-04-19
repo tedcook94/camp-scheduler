@@ -21,8 +21,8 @@ type CreateSessionAgeGroupCabinParams struct {
 	CampID             pgtype.UUID
 	SessionAgeGroupID  pgtype.UUID
 	CabinID            pgtype.UUID
-	GroupSize          pgtype.Int4
-	RequiredCounselors pgtype.Int4
+	GroupSize          int32
+	RequiredCounselors int32
 }
 
 func (q *Queries) CreateSessionAgeGroupCabin(ctx context.Context, arg CreateSessionAgeGroupCabinParams) (SessionAgeGroupCabin, error) {
@@ -194,7 +194,7 @@ type ListSessionCabinsRow struct {
 	ID                 pgtype.UUID
 	CabinName          string
 	AgeGroupID         pgtype.UUID
-	RequiredCounselors pgtype.Int4
+	RequiredCounselors int32
 }
 
 func (q *Queries) ListSessionCabins(ctx context.Context, arg ListSessionCabinsParams) ([]ListSessionCabinsRow, error) {
@@ -245,8 +245,8 @@ type ListSessionCabinsWithCapacityRow struct {
 	ID                 pgtype.UUID
 	CabinName          string
 	AgeGroupID         pgtype.UUID
-	GroupSize          pgtype.Int4
-	RequiredCounselors pgtype.Int4
+	GroupSize          int32
+	RequiredCounselors int32
 }
 
 func (q *Queries) ListSessionCabinsWithCapacity(ctx context.Context, arg ListSessionCabinsWithCapacityParams) ([]ListSessionCabinsWithCapacityRow, error) {
@@ -291,8 +291,8 @@ type UpdateSessionAgeGroupCabinParams struct {
 	CampID             pgtype.UUID
 	SessionID          pgtype.UUID
 	CabinID            pgtype.UUID
-	GroupSize          pgtype.Int4
-	RequiredCounselors pgtype.Int4
+	GroupSize          int32
+	RequiredCounselors int32
 }
 
 func (q *Queries) UpdateSessionAgeGroupCabin(ctx context.Context, arg UpdateSessionAgeGroupCabinParams) (SessionAgeGroupCabin, error) {

@@ -18,6 +18,6 @@ headers: []
 authentication: {}
 authenticationType: null
 body:
-  text: '{"name": "Updated Cabin Name", "default_age_group_id": "${[ test-age-group-id ]}"}'
+  text: '{"name": "Updated Cabin Name", "default_age_group_id": "${[ test-age-group-id ]}", "default_group_size": 8, "default_required_counselors": 1}'
 bodyType: application/json
 sortPriority: 3.0

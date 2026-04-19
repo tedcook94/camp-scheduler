@@ -71,10 +71,12 @@ type AssignmentRunSelectedSolution struct {
 }
 
 type Cabin struct {
-	ID                pgtype.UUID
-	CampID            pgtype.UUID
-	DefaultAgeGroupID pgtype.UUID
-	CabinName         string
+	ID                        pgtype.UUID
+	CampID                    pgtype.UUID
+	DefaultAgeGroupID         pgtype.UUID
+	CabinName                 string
+	DefaultGroupSize          int32
+	DefaultRequiredCounselors int32
 }
 
 type Camp struct {
@@ -266,8 +268,8 @@ type SessionAgeGroupCabin struct {
 	CampID             pgtype.UUID
 	SessionAgeGroupID  pgtype.UUID
 	CabinID            pgtype.UUID
-	GroupSize          pgtype.Int4
-	RequiredCounselors pgtype.Int4
+	GroupSize          int32
+	RequiredCounselors int32
 }
 
 type SessionTimeSlot struct {

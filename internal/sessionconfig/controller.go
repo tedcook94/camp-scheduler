@@ -57,14 +57,14 @@ type SessionAgeGroupResponse struct {
 type CreateSessionCabinRequest struct {
 	SessionAgeGroupID  string `json:"session_age_group_id" binding:"required"`
 	CabinID            string `json:"cabin_id" binding:"required"`
-	GroupSize          *int32 `json:"group_size"`
-	RequiredCounselors *int32 `json:"required_counselors"`
+	GroupSize          int32  `json:"group_size" binding:"required,min=1"`
+	RequiredCounselors int32  `json:"required_counselors" binding:"required,min=1"`
 }
 
 type UpdateSessionCabinRequest struct {
 	CabinID            string `json:"cabin_id" binding:"required"`
-	GroupSize          *int32 `json:"group_size"`
-	RequiredCounselors *int32 `json:"required_counselors"`
+	GroupSize          int32  `json:"group_size" binding:"required,min=1"`
+	RequiredCounselors int32  `json:"required_counselors" binding:"required,min=1"`
 }
 
 type SessionCabinResponse struct {
@@ -73,8 +73,8 @@ type SessionCabinResponse struct {
 	SessionID          string `json:"session_id"`
 	SessionAgeGroupID  string `json:"session_age_group_id"`
 	CabinID            string `json:"cabin_id"`
-	GroupSize          *int32 `json:"group_size"`
-	RequiredCounselors *int32 `json:"required_counselors"`
+	GroupSize          int32  `json:"group_size"`
+	RequiredCounselors int32  `json:"required_counselors"`
 }
 
 // Session age group handlers

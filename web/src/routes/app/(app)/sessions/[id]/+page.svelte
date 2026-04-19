@@ -34,6 +34,7 @@
 	import * as AlertDialog from "$lib/components/ui/alert-dialog";
 	import * as Select from "$lib/components/ui/select";
 	import * as Tabs from "$lib/components/ui/tabs";
+	import { parsePositiveInt } from "$lib/utils";
 	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
@@ -711,17 +712,6 @@
 
 	// --- Cabin management ---
 
-	function parseOptionalSize(value: string | number | null | undefined): { ok: true; value: number | null } | { ok: false; error: string } {
-		if (value === null || value === undefined || value === "") {
-			return { ok: true, value: null };
-		}
-		const n = typeof value === "number" ? value : parseInt(String(value).trim());
-		if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) {
-			return { ok: false, error: "Must be a positive whole number." };
-		}
-		return { ok: true, value: n };
-	}
-
 	function openAddCabin() {
 		addCabinId = "";
 		addCabinAgeGroupId = "";
@@ -735,7 +725,8 @@
 	}
 
 	// When the cabin selection changes, default the age-group select to the
-	// chosen cabin's default_age_group_id (only if user hasn't manually picked one yet).
+	// chosen cabin's default_age_group_id and seed group size + required
+	// counselors from the cabin defaults.
 	function onAddCabinSelected(cabinId: string) {
 		addCabinId = cabinId;
 		addCabinError = "";
@@ -743,6 +734,10 @@
 		if (cabin) {
 			addCabinAgeGroupId = cabin.default_age_group_id;
 			addCabinAgeGroupError = "";
+			addCabinGroupSize = String(cabin.default_group_size);
+			addCabinCounselors = String(cabin.default_required_counselors);
+			addCabinGroupSizeError = "";
+			addCabinCounselorsError = "";
 		}
 	}
 
@@ -762,12 +757,12 @@
 			addCabinAgeGroupError = "Age group is required.";
 			valid = false;
 		}
-		const sizeResult = parseOptionalSize(addCabinGroupSize);
+		const sizeResult = parsePositiveInt(addCabinGroupSize);
 		if (!sizeResult.ok) {
 			addCabinGroupSizeError = sizeResult.error;
 			valid = false;
 		}
-		const counselorsResult = parseOptionalSize(addCabinCounselors);
+		const counselorsResult = parsePositiveInt(addCabinCounselors);
 		if (!counselorsResult.ok) {
 			addCabinCounselorsError = counselorsResult.error;
 			valid = false;
@@ -819,9 +814,8 @@
 
 	function openEditCabin(sc: SessionCabin) {
 		editCabinTarget = sc;
-		editCabinGroupSize = sc.group_size != null ? String(sc.group_size) : "";
-		editCabinCounselors =
-			sc.required_counselors != null ? String(sc.required_counselors) : "";
+		editCabinGroupSize = String(sc.group_size);
+		editCabinCounselors = String(sc.required_counselors);
 		editCabinGroupSizeError = "";
 		editCabinCounselorsError = "";
 		editCabinOpen = true;
@@ -833,11 +827,11 @@
 		editCabinGroupSizeError = "";
 		editCabinCounselorsError = "";
 
-		const sizeResult = parseOptionalSize(editCabinGroupSize);
+		const sizeResult = parsePositiveInt(editCabinGroupSize);
 		if (!sizeResult.ok) {
 			editCabinGroupSizeError = sizeResult.error;
 		}
-		const counselorsResult = parseOptionalSize(editCabinCounselors);
+		const counselorsResult = parsePositiveInt(editCabinCounselors);
 		if (!counselorsResult.ok) {
 			editCabinCounselorsError = counselorsResult.error;
 		}
@@ -1023,10 +1017,10 @@
 														{cabinMap.get(sc.cabin_id)?.name ?? "Unknown"}
 													</Table.TableCell>
 													<Table.TableCell>
-														{sc.group_size ?? "—"}
+														{sc.group_size}
 													</Table.TableCell>
 													<Table.TableCell>
-														{sc.required_counselors ?? "—"}
+														{sc.required_counselors}
 													</Table.TableCell>
 													<Table.TableCell>
 														<div class="flex justify-end gap-1">
@@ -1654,12 +1648,12 @@
 				{/if}
 			</div>
 			<div class="grid gap-2">
-				<Label for="cabin-group-size">Group Size (optional)</Label>
+				<Label for="cabin-group-size">Group Size</Label>
 				<Input
 					id="cabin-group-size"
 					type="number"
 					min="1"
-					placeholder="Leave blank for no override"
+					required
 					bind:value={addCabinGroupSize}
 					disabled={addingCabin}
 					oninput={() => (addCabinGroupSizeError = "")}
@@ -1669,12 +1663,12 @@
 				{/if}
 			</div>
 			<div class="grid gap-2">
-				<Label for="cabin-counselors">Required Counselors (optional)</Label>
+				<Label for="cabin-counselors">Required Counselors</Label>
 				<Input
 					id="cabin-counselors"
 					type="number"
 					min="1"
-					placeholder="Leave blank for no override"
+					required
 					bind:value={addCabinCounselors}
 					disabled={addingCabin}
 					oninput={() => (addCabinCounselorsError = "")}
@@ -1715,12 +1709,12 @@
 		</Dialog.DialogHeader>
 		<form onsubmit={handleEditCabin} class="grid gap-4">
 			<div class="grid gap-2">
-				<Label for="edit-cabin-group-size">Group Size (optional)</Label>
+				<Label for="edit-cabin-group-size">Group Size</Label>
 				<Input
 					id="edit-cabin-group-size"
 					type="number"
 					min="1"
-					placeholder="Leave blank for no override"
+					required
 					bind:value={editCabinGroupSize}
 					disabled={editingCabin}
 					oninput={() => (editCabinGroupSizeError = "")}
@@ -1730,12 +1724,12 @@
 				{/if}
 			</div>
 			<div class="grid gap-2">
-				<Label for="edit-cabin-counselors">Required Counselors (optional)</Label>
+				<Label for="edit-cabin-counselors">Required Counselors</Label>
 				<Input
 					id="edit-cabin-counselors"
 					type="number"
 					min="1"
-					placeholder="Leave blank for no override"
+					required
 					bind:value={editCabinCounselors}
 					disabled={editingCabin}
 					oninput={() => (editCabinCounselorsError = "")}

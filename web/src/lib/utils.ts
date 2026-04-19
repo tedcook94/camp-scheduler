@@ -39,3 +39,18 @@ export function sortItems<T>(
 		return direction === "asc" ? cmp : -cmp;
 	});
 }
+
+export type PositiveIntResult =
+	| { ok: true; value: number }
+	| { ok: false; error: string };
+
+export function parsePositiveInt(value: string | number | null | undefined): PositiveIntResult {
+	if (value === null || value === undefined || value === "") {
+		return { ok: false, error: "Required." };
+	}
+	const n = typeof value === "number" ? value : Number(String(value).trim());
+	if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) {
+		return { ok: false, error: "Must be a whole number 1 or greater." };
+	}
+	return { ok: true, value: n };
+}

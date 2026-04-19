@@ -16,7 +16,7 @@
 	import TrashIcon from "@lucide/svelte/icons/trash";
 	import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
 	import SortableTableHead from "$lib/components/sortable-table-head.svelte";
-	import { sortItems, type SortDirection } from "$lib/utils";
+	import { sortItems, parsePositiveInt, type SortDirection } from "$lib/utils";
 
 	const getCampDisabled = getContext<() => boolean>("campDisabled");
 	const getCamp = getContext<() => Camp | null>("camp");
@@ -48,15 +48,19 @@
 	let editingCabin = $state<Cabin | null>(null);
 	let formName = $state("");
 	let formAgeGroupId = $state("");
+	let formGroupSize = $state("");
+	let formRequiredCounselors = $state("");
 	let submitting = $state(false);
 	let nameError = $state("");
 	let ageGroupError = $state("");
+	let groupSizeError = $state("");
+	let requiredCounselorsError = $state("");
 
 	let dialogTitle = $derived(editingCabin ? "Edit Cabin" : "Add Cabin");
 	let dialogDescription = $derived(
 		editingCabin
-			? "Update the cabin name and default age group."
-			: "Enter a name and select a default age group for the new cabin."
+			? "Update the cabin details."
+			: "Enter the details for the new cabin."
 	);
 
 	// Delete confirmation
@@ -84,12 +88,16 @@
 	function clearErrors() {
 		nameError = "";
 		ageGroupError = "";
+		groupSizeError = "";
+		requiredCounselorsError = "";
 	}
 
 	function openCreate() {
 		editingCabin = null;
 		formName = "";
 		formAgeGroupId = "";
+		formGroupSize = "";
+		formRequiredCounselors = "";
 		clearErrors();
 		dialogOpen = true;
 	}
@@ -98,6 +106,8 @@
 		editingCabin = cabin;
 		formName = cabin.name;
 		formAgeGroupId = cabin.default_age_group_id;
+		formGroupSize = String(cabin.default_group_size);
+		formRequiredCounselors = String(cabin.default_required_counselors);
 		clearErrors();
 		dialogOpen = true;
 	}
@@ -116,7 +126,17 @@
 			ageGroupError = "Age group is required.";
 			valid = false;
 		}
-		if (!valid) return;
+		const groupSize = parsePositiveInt(formGroupSize);
+		if (!groupSize.ok) {
+			groupSizeError = groupSize.error;
+			valid = false;
+		}
+		const requiredCounselors = parsePositiveInt(formRequiredCounselors);
+		if (!requiredCounselors.ok) {
+			requiredCounselorsError = requiredCounselors.error;
+			valid = false;
+		}
+		if (!valid || !groupSize.ok || !requiredCounselors.ok) return;
 
 		submitting = true;
 
@@ -125,6 +145,8 @@
 				const updated = await cabinApi.update(editingCabin.id, {
 					name,
 					default_age_group_id: formAgeGroupId,
+					default_group_size: groupSize.value,
+					default_required_counselors: requiredCounselors.value,
 				});
 				cabins = cabins.map((c) => (c.id === updated.id ? updated : c));
 				toast.success("Cabin updated");
@@ -132,6 +154,8 @@
 				const created = await cabinApi.create({
 					name,
 					default_age_group_id: formAgeGroupId,
+					default_group_size: groupSize.value,
+					default_required_counselors: requiredCounselors.value,
 				});
 				cabins = [...cabins, created];
 				toast.success("Cabin created");
@@ -206,6 +230,8 @@
 				<Table.TableRow>
 					<SortableTableHead label="Name" active={sortKey === "name"} direction={sortDirection} onclick={() => toggleSort("name")} />
 					<SortableTableHead label="Default Age Group" active={sortKey === "default_age_group_name"} direction={sortDirection} onclick={() => toggleSort("default_age_group_name")} />
+					<Table.TableHead>Default Group Size</Table.TableHead>
+					<Table.TableHead>Default Required Counselors</Table.TableHead>
 					<Table.TableHead class="w-24">
 						<span class="sr-only">Actions</span>
 					</Table.TableHead>
@@ -216,6 +242,8 @@
 					<Table.TableRow>
 						<Table.TableCell>{cabin.name}</Table.TableCell>
 						<Table.TableCell>{cabin.default_age_group_name}</Table.TableCell>
+						<Table.TableCell>{cabin.default_group_size}</Table.TableCell>
+						<Table.TableCell>{cabin.default_required_counselors}</Table.TableCell>
 						<Table.TableCell>
 							<div class="flex justify-end gap-1">
 								<Button
@@ -287,6 +315,36 @@
 				</Select.Select>
 				{#if ageGroupError}
 					<p class="text-destructive text-sm">{ageGroupError}</p>
+				{/if}
+			</div>
+			<div class="grid gap-2">
+				<Label for="cabin-group-size">Default Group Size</Label>
+				<Input
+					id="cabin-group-size"
+					type="number"
+					min="1"
+					placeholder="e.g. 8"
+					bind:value={formGroupSize}
+					disabled={submitting}
+					oninput={() => (groupSizeError = "")}
+				/>
+				{#if groupSizeError}
+					<p class="text-destructive text-sm">{groupSizeError}</p>
+				{/if}
+			</div>
+			<div class="grid gap-2">
+				<Label for="cabin-required-counselors">Default Required Counselors</Label>
+				<Input
+					id="cabin-required-counselors"
+					type="number"
+					min="1"
+					placeholder="e.g. 1"
+					bind:value={formRequiredCounselors}
+					disabled={submitting}
+					oninput={() => (requiredCounselorsError = "")}
+				/>
+				{#if requiredCounselorsError}
+					<p class="text-destructive text-sm">{requiredCounselorsError}</p>
 				{/if}
 			</div>
 			<Dialog.DialogFooter>

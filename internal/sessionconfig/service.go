@@ -263,8 +263,8 @@ func (svc *Service) CreateCabin(ctx context.Context, campID, sessionID string, r
 		CampID:             campUUID,
 		SessionAgeGroupID:  sessionAgeGroupUUID,
 		CabinID:            cabinUUID,
-		GroupSize:          api.ToPgInt4(req.GroupSize),
-		RequiredCounselors: api.ToPgInt4(req.RequiredCounselors),
+		GroupSize:          req.GroupSize,
+		RequiredCounselors: req.RequiredCounselors,
 	})
 	if err != nil {
 		return SessionCabinResponse{}, fmt.Errorf("error creating session cabin: %w", err)
@@ -299,8 +299,8 @@ func (svc *Service) UpdateCabin(ctx context.Context, campID, sessionID, id strin
 		CampID:             campUUID,
 		SessionID:          sessionUUID,
 		CabinID:            cabinUUID,
-		GroupSize:          api.ToPgInt4(req.GroupSize),
-		RequiredCounselors: api.ToPgInt4(req.RequiredCounselors),
+		GroupSize:          req.GroupSize,
+		RequiredCounselors: req.RequiredCounselors,
 	})
 	if err != nil {
 		return SessionCabinResponse{}, fmt.Errorf("error updating session cabin %s: %w", id, err)
@@ -358,7 +358,7 @@ func toSessionCabinResponse(r db.SessionAgeGroupCabin, sessionID string) Session
 		SessionID:          sessionID,
 		SessionAgeGroupID:  api.UUIDToString(r.SessionAgeGroupID),
 		CabinID:            api.UUIDToString(r.CabinID),
-		GroupSize:          api.FromPgInt4(r.GroupSize),
-		RequiredCounselors: api.FromPgInt4(r.RequiredCounselors),
+		GroupSize:          r.GroupSize,
+		RequiredCounselors: r.RequiredCounselors,
 	}
 }

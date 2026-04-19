@@ -78,16 +78,22 @@ export interface Cabin {
 	default_age_group_id: string;
 	default_age_group_name: string;
 	name: string;
+	default_group_size: number;
+	default_required_counselors: number;
 }
 
 export interface CreateCabinRequest {
 	name: string;
 	default_age_group_id: string;
+	default_group_size: number;
+	default_required_counselors: number;
 }
 
 export interface UpdateCabinRequest {
 	name: string;
 	default_age_group_id: string;
+	default_group_size: number;
+	default_required_counselors: number;
 }
 
 export interface Season {
@@ -327,21 +333,21 @@ export interface SessionCabin {
 	session_id: string;
 	session_age_group_id: string;
 	cabin_id: string;
-	group_size: number | null;
-	required_counselors: number | null;
+	group_size: number;
+	required_counselors: number;
 }
 
 export interface CreateSessionCabinRequest {
 	session_age_group_id: string;
 	cabin_id: string;
-	group_size?: number | null;
-	required_counselors?: number | null;
+	group_size: number;
+	required_counselors: number;
 }
 
 export interface UpdateSessionCabinRequest {
 	cabin_id: string;
-	group_size?: number | null;
-	required_counselors?: number | null;
+	group_size: number;
+	required_counselors: number;
 }
 
 export interface Enrollment {

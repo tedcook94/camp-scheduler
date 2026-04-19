@@ -7,15 +7,23 @@
 		sessionApi,
 		sessionTimeSlotApi,
 		sessionActivityApi,
+		sessionAgeGroupApi,
+		sessionCabinApi,
 		timeSlotApi,
 		activityApi,
+		ageGroupApi,
+		cabinApi,
 	} from "$lib/api";
 	import type {
 		Session,
 		SessionTimeSlot,
 		SessionActivity,
+		SessionAgeGroup,
+		SessionCabin,
 		TimeSlot,
 		Activity,
+		AgeGroup,
+		Cabin,
 	} from "$lib/api/types";
 	import { toast } from "svelte-sonner";
 	import { Button } from "$lib/components/ui/button";
@@ -25,6 +33,7 @@
 	import * as Dialog from "$lib/components/ui/dialog";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog";
 	import * as Select from "$lib/components/ui/select";
+	import * as Tabs from "$lib/components/ui/tabs";
 	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
@@ -40,18 +49,42 @@
 
 	const sessionId = page.params.id!;
 
+	const TAB_VALUES = ["cabins", "activities"] as const;
+	type TabValue = (typeof TAB_VALUES)[number];
+
+	let activeTab = $derived.by<TabValue>(() => {
+		const t = page.url.searchParams.get("tab");
+		return TAB_VALUES.includes(t as TabValue) ? (t as TabValue) : "cabins";
+	});
+
+	function setActiveTab(value: string) {
+		const url = new URL(page.url);
+		if (value === "cabins") {
+			url.searchParams.delete("tab");
+		} else {
+			url.searchParams.set("tab", value);
+		}
+		goto(url, { replaceState: true, keepFocus: true, noScroll: true });
+	}
+
 	let session = $state<Session | null>(null);
 	let sessionTimeSlots = $state<SessionTimeSlot[]>([]);
 	let allTimeSlots = $state<TimeSlot[]>([]);
 	let allActivities = $state<Activity[]>([]);
 	// Map from session_time_slot id to its activities
 	let activitiesByTimeSlot = $state<Map<string, SessionActivity[]>>(new Map());
+	let sessionAgeGroups = $state<SessionAgeGroup[]>([]);
+	let sessionCabins = $state<SessionCabin[]>([]);
+	let allAgeGroups = $state<AgeGroup[]>([]);
+	let allCabins = $state<Cabin[]>([]);
 	let loading = $state(true);
 	let loadError = $state(false);
 
 	// Lookup maps
 	let timeSlotMap = $derived(new Map(allTimeSlots.map((t) => [t.id, t.name])));
 	let activityMap = $derived(new Map(allActivities.map((a) => [a.id, a.name])));
+	let ageGroupMap = $derived(new Map(allAgeGroups.map((a) => [a.id, a.name])));
+	let cabinMap = $derived(new Map(allCabins.map((c) => [c.id, c])));
 
 	// Sorted session time slots by DB sort_order
 	let sortedSessionTimeSlots = $derived(
@@ -112,6 +145,93 @@
 	// Target can be an existing session time slot ID (prefixed "existing:") or an unassigned time slot ID (prefixed "new:")
 	let copyTargetValue = $state("");
 	let copyingActivities = $state(false);
+
+	// --- Cabins state ---
+
+	// session_age_groups sorted by underlying age-group name
+	let sortedSessionAgeGroups = $derived(
+		[...sessionAgeGroups].sort((a, b) =>
+			(ageGroupMap.get(a.age_group_id) ?? "").localeCompare(
+				ageGroupMap.get(b.age_group_id) ?? ""
+			)
+		)
+	);
+
+	// Cabins grouped by session_age_group_id, sorted alphabetically by cabin name
+	let cabinsByAgeGroup = $derived.by(() => {
+		const m = new Map<string, SessionCabin[]>();
+		for (const sag of sessionAgeGroups) {
+			m.set(sag.id, []);
+		}
+		for (const sc of sessionCabins) {
+			const list = m.get(sc.session_age_group_id);
+			if (list) list.push(sc);
+		}
+		for (const list of m.values()) {
+			list.sort((a, b) =>
+				(cabinMap.get(a.cabin_id)?.name ?? "").localeCompare(
+					cabinMap.get(b.cabin_id)?.name ?? ""
+				)
+			);
+		}
+		return m;
+	});
+
+	// Only render age-group cards that have at least one cabin assigned
+	let nonEmptyAgeGroups = $derived(
+		sortedSessionAgeGroups.filter(
+			(sag) => (cabinsByAgeGroup.get(sag.id) ?? []).length > 0
+		)
+	);
+
+	// Cabins not yet assigned anywhere in this session
+	let availableCabinsForSession = $derived.by(() => {
+		const assigned = new Set(sessionCabins.map((sc) => sc.cabin_id));
+		return allCabins
+			.filter((c) => !assigned.has(c.id))
+			.sort((a, b) => a.name.localeCompare(b.name));
+	});
+
+	// Collapsible age-group cards (only those with cabins)
+	let expandedAgeGroups = $state<Set<string>>(new Set());
+	let allAgeGroupsExpanded = $derived(
+		nonEmptyAgeGroups.length > 0 &&
+			nonEmptyAgeGroups.every((sag) => expandedAgeGroups.has(sag.id))
+	);
+
+	function toggleExpandAllAgeGroups() {
+		if (allAgeGroupsExpanded) {
+			expandedAgeGroups = new Set();
+		} else {
+			expandedAgeGroups = new Set(nonEmptyAgeGroups.map((sag) => sag.id));
+		}
+	}
+
+	// Add cabin dialog
+	let addCabinOpen = $state(false);
+	let addCabinId = $state("");
+	let addCabinAgeGroupId = $state("");
+	let addCabinGroupSize = $state("");
+	let addCabinCounselors = $state("");
+	let addingCabin = $state(false);
+	let addCabinError = $state("");
+	let addCabinAgeGroupError = $state("");
+	let addCabinGroupSizeError = $state("");
+	let addCabinCounselorsError = $state("");
+
+	// Edit cabin dialog
+	let editCabinOpen = $state(false);
+	let editCabinTarget = $state<SessionCabin | null>(null);
+	let editCabinGroupSize = $state("");
+	let editCabinCounselors = $state("");
+	let editingCabin = $state(false);
+	let editCabinGroupSizeError = $state("");
+	let editCabinCounselorsError = $state("");
+
+	// Remove cabin confirmation
+	let removeCabinOpen = $state(false);
+	let removeCabinTarget = $state<SessionCabin | null>(null);
+	let removingCabin = $state(false);
 
 	// Collapsible time slot cards — all collapsed by default
 	let expandedTimeSlots = $state<Set<string>>(new Set());
@@ -213,17 +333,26 @@
 
 	onMount(async () => {
 		try {
-			const [s, stSlots, ts, acts, allSessionActs] = await Promise.all([
-				sessionApi.get(sessionId),
-				sessionTimeSlotApi.list(sessionId),
-				timeSlotApi.list(),
-				activityApi.list(),
-				sessionActivityApi.listAll(sessionId),
-			]);
+			const [s, stSlots, ts, acts, allSessionActs, sAgeGroups, sCabins, ags, cbs] =
+				await Promise.all([
+					sessionApi.get(sessionId),
+					sessionTimeSlotApi.list(sessionId),
+					timeSlotApi.list(),
+					activityApi.list(),
+					sessionActivityApi.listAll(sessionId),
+					sessionAgeGroupApi.list(sessionId),
+					sessionCabinApi.list(sessionId),
+					ageGroupApi.list(),
+					cabinApi.list(),
+				]);
 			session = s;
 			sessionTimeSlots = stSlots;
 			allTimeSlots = ts;
 			allActivities = acts;
+			sessionAgeGroups = sAgeGroups;
+			sessionCabins = sCabins;
+			allAgeGroups = ags;
+			allCabins = cbs;
 
 			// Group activities by session time slot
 			const activitiesByTimeSlotMap = new Map<string, SessionActivity[]>();
@@ -346,21 +475,24 @@
 			activityError = "Activity is required.";
 			valid = false;
 		}
-		const capacity = parseInt(addActivityCapacity);
-		if (!addActivityCapacity || isNaN(capacity) || capacity < 1) {
+		const capacityResult = parsePositiveInt(addActivityCapacity);
+		if (!capacityResult.ok) {
 			capacityError = "Capacity must be at least 1.";
 			valid = false;
 		}
-		const counselors = parseInt(addActivityCounselors);
-		if (!addActivityCounselors || isNaN(counselors) || counselors < 1) {
+		const counselorsResult = parsePositiveInt(addActivityCounselors);
+		if (!counselorsResult.ok) {
 			counselorsError = "Required counselors must be at least 1.";
 			valid = false;
 		}
-		if (valid && counselors > capacity) {
+		if (capacityResult.ok && counselorsResult.ok && counselorsResult.value > capacityResult.value) {
 			counselorsError = "Required counselors cannot exceed capacity.";
 			valid = false;
 		}
 		if (!valid) return;
+
+		const capacity = capacityResult.ok ? capacityResult.value : 0;
+		const counselors = counselorsResult.ok ? counselorsResult.value : 0;
 
 		addingActivity = true;
 
@@ -451,21 +583,24 @@
 		editCounselorsError = "";
 
 		let valid = true;
-		const capacity = parseInt(editActivityCapacity);
-		if (!editActivityCapacity || isNaN(capacity) || capacity < 1) {
+		const capacityResult = parsePositiveInt(editActivityCapacity);
+		if (!capacityResult.ok) {
 			editCapacityError = "Capacity must be at least 1.";
 			valid = false;
 		}
-		const counselors = parseInt(editActivityCounselors);
-		if (!editActivityCounselors || isNaN(counselors) || counselors < 1) {
+		const counselorsResult = parsePositiveInt(editActivityCounselors);
+		if (!counselorsResult.ok) {
 			editCounselorsError = "Required counselors must be at least 1.";
 			valid = false;
 		}
-		if (valid && counselors > capacity) {
+		if (capacityResult.ok && counselorsResult.ok && counselorsResult.value > capacityResult.value) {
 			editCounselorsError = "Required counselors cannot exceed capacity.";
 			valid = false;
 		}
 		if (!valid) return;
+
+		const capacity = capacityResult.ok ? capacityResult.value : 0;
+		const counselors = counselorsResult.ok ? counselorsResult.value : 0;
 
 		editingActivity = true;
 		const { sessionTimeSlot, activity } = editActivityTarget;
@@ -573,6 +708,206 @@
 			copyingActivities = false;
 		}
 	}
+
+	// --- Cabin management ---
+
+	function parseOptionalSize(value: string | number | null | undefined): { ok: true; value: number | null } | { ok: false; error: string } {
+		if (value === null || value === undefined || value === "") {
+			return { ok: true, value: null };
+		}
+		const n = typeof value === "number" ? value : parseInt(String(value).trim());
+		if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) {
+			return { ok: false, error: "Must be a positive whole number." };
+		}
+		return { ok: true, value: n };
+	}
+
+	function openAddCabin() {
+		addCabinId = "";
+		addCabinAgeGroupId = "";
+		addCabinGroupSize = "";
+		addCabinCounselors = "";
+		addCabinError = "";
+		addCabinAgeGroupError = "";
+		addCabinGroupSizeError = "";
+		addCabinCounselorsError = "";
+		addCabinOpen = true;
+	}
+
+	// When the cabin selection changes, default the age-group select to the
+	// chosen cabin's default_age_group_id (only if user hasn't manually picked one yet).
+	function onAddCabinSelected(cabinId: string) {
+		addCabinId = cabinId;
+		addCabinError = "";
+		const cabin = cabinMap.get(cabinId);
+		if (cabin) {
+			addCabinAgeGroupId = cabin.default_age_group_id;
+			addCabinAgeGroupError = "";
+		}
+	}
+
+	async function handleAddCabin(e: SubmitEvent) {
+		e.preventDefault();
+		addCabinError = "";
+		addCabinAgeGroupError = "";
+		addCabinGroupSizeError = "";
+		addCabinCounselorsError = "";
+
+		let valid = true;
+		if (!addCabinId) {
+			addCabinError = "Cabin is required.";
+			valid = false;
+		}
+		if (!addCabinAgeGroupId) {
+			addCabinAgeGroupError = "Age group is required.";
+			valid = false;
+		}
+		const sizeResult = parseOptionalSize(addCabinGroupSize);
+		if (!sizeResult.ok) {
+			addCabinGroupSizeError = sizeResult.error;
+			valid = false;
+		}
+		const counselorsResult = parseOptionalSize(addCabinCounselors);
+		if (!counselorsResult.ok) {
+			addCabinCounselorsError = counselorsResult.error;
+			valid = false;
+		}
+		if (!valid || !sizeResult.ok || !counselorsResult.ok) return;
+
+		addingCabin = true;
+		// Track a session_age_group we create so we can roll it back on cabin failure
+		let createdSessionAgeGroupId: string | null = null;
+		try {
+			let sag = sessionAgeGroups.find((s) => s.age_group_id === addCabinAgeGroupId);
+			if (!sag) {
+				sag = await sessionAgeGroupApi.create(sessionId, {
+					age_group_id: addCabinAgeGroupId,
+				});
+				createdSessionAgeGroupId = sag.id;
+				sessionAgeGroups = [...sessionAgeGroups, sag];
+			}
+
+			const created = await sessionCabinApi.create(sessionId, {
+				session_age_group_id: sag.id,
+				cabin_id: addCabinId,
+				group_size: sizeResult.value,
+				required_counselors: counselorsResult.value,
+			});
+			sessionCabins = [...sessionCabins, created];
+			expandedAgeGroups = new Set([...expandedAgeGroups, sag.id]);
+			toast.success("Cabin added");
+			addCabinOpen = false;
+		} catch (err) {
+			// Roll back the session_age_group we just created (if any)
+			if (createdSessionAgeGroupId) {
+				try {
+					await sessionAgeGroupApi.delete(sessionId, createdSessionAgeGroupId);
+					sessionAgeGroups = sessionAgeGroups.filter(
+						(s) => s.id !== createdSessionAgeGroupId
+					);
+				} catch {
+					// Rollback failed — leave the empty session_age_group; harmless
+				}
+			}
+			const message =
+				err instanceof ApiClientError ? err.message : "Failed to add cabin";
+			toast.error(message);
+		} finally {
+			addingCabin = false;
+		}
+	}
+
+	function openEditCabin(sc: SessionCabin) {
+		editCabinTarget = sc;
+		editCabinGroupSize = sc.group_size != null ? String(sc.group_size) : "";
+		editCabinCounselors =
+			sc.required_counselors != null ? String(sc.required_counselors) : "";
+		editCabinGroupSizeError = "";
+		editCabinCounselorsError = "";
+		editCabinOpen = true;
+	}
+
+	async function handleEditCabin(e: SubmitEvent) {
+		e.preventDefault();
+		if (!editCabinTarget) return;
+		editCabinGroupSizeError = "";
+		editCabinCounselorsError = "";
+
+		const sizeResult = parseOptionalSize(editCabinGroupSize);
+		if (!sizeResult.ok) {
+			editCabinGroupSizeError = sizeResult.error;
+		}
+		const counselorsResult = parseOptionalSize(editCabinCounselors);
+		if (!counselorsResult.ok) {
+			editCabinCounselorsError = counselorsResult.error;
+		}
+		if (!sizeResult.ok || !counselorsResult.ok) return;
+
+		editingCabin = true;
+		const target = editCabinTarget;
+		try {
+			const updated = await sessionCabinApi.update(sessionId, target.id, {
+				cabin_id: target.cabin_id,
+				group_size: sizeResult.value,
+				required_counselors: counselorsResult.value,
+			});
+			sessionCabins = sessionCabins.map((sc) => (sc.id === target.id ? updated : sc));
+			toast.success("Cabin updated");
+			editCabinOpen = false;
+			editCabinTarget = null;
+		} catch (err) {
+			const message =
+				err instanceof ApiClientError ? err.message : "Failed to update cabin";
+			toast.error(message);
+		} finally {
+			editingCabin = false;
+		}
+	}
+
+	function confirmRemoveCabin(sc: SessionCabin) {
+		removeCabinTarget = sc;
+		removeCabinOpen = true;
+	}
+
+	async function handleRemoveCabin() {
+		if (!removeCabinTarget) return;
+		removingCabin = true;
+		const target = removeCabinTarget;
+		try {
+			await sessionCabinApi.delete(sessionId, target.id);
+			const remainingCabins = sessionCabins.filter((sc) => sc.id !== target.id);
+			sessionCabins = remainingCabins;
+
+			// If this was the last cabin under its session_age_group, delete the
+			// session_age_group too — the user no longer manages those directly.
+			const ageGroupStillUsed = remainingCabins.some(
+				(sc) => sc.session_age_group_id === target.session_age_group_id
+			);
+			if (!ageGroupStillUsed) {
+				try {
+					await sessionAgeGroupApi.delete(sessionId, target.session_age_group_id);
+					sessionAgeGroups = sessionAgeGroups.filter(
+						(sag) => sag.id !== target.session_age_group_id
+					);
+					const next = new Set(expandedAgeGroups);
+					next.delete(target.session_age_group_id);
+					expandedAgeGroups = next;
+				} catch {
+					// Best-effort: empty session_age_group remains; harmless.
+				}
+			}
+
+			toast.success("Cabin removed");
+			removeCabinOpen = false;
+			removeCabinTarget = null;
+		} catch (err) {
+			const message =
+				err instanceof ApiClientError ? err.message : "Failed to remove cabin";
+			toast.error(message);
+		} finally {
+			removingCabin = false;
+		}
+	}
 </script>
 
 <div class="grid gap-6">
@@ -588,7 +923,7 @@
 			{:else if session}
 				<h1 class="text-2xl font-semibold tracking-tight">{session.name}</h1>
 				<p class="text-muted-foreground text-sm">
-					Manage time slots and activity assignments for this session.
+					Configure age groups, cabins, time slots, and activities for this session.
 				</p>
 			{/if}
 		</div>
@@ -601,11 +936,140 @@
 			Failed to load session details. Try refreshing the page.
 		</div>
 	{:else if session}
+		<Tabs.Tabs value={activeTab} onValueChange={setActiveTab}>
+			<Tabs.TabsList>
+				<Tabs.TabsTrigger value="cabins">Cabins</Tabs.TabsTrigger>
+				<Tabs.TabsTrigger value="activities">Activities</Tabs.TabsTrigger>
+			</Tabs.TabsList>
+
+			<!-- Cabins Tab -->
+			<Tabs.TabsContent value="cabins">
+				<div class="grid gap-4">
+					<div class="flex items-center justify-between">
+						<h2 class="text-lg font-semibold">Cabins</h2>
+						<div class="flex items-center gap-2">
+							{#if nonEmptyAgeGroups.length > 0}
+								<Button
+									variant="ghost"
+									size="sm"
+									onclick={toggleExpandAllAgeGroups}
+									title={allAgeGroupsExpanded ? "Collapse All" : "Expand All"}
+								>
+									<ChevronsUpDownIcon class="mr-1 size-4" />
+									{allAgeGroupsExpanded ? "Collapse All" : "Expand All"}
+								</Button>
+							{/if}
+							<Button
+								size="sm"
+								disabled={disabled || availableCabinsForSession.length === 0}
+								onclick={openAddCabin}
+							>
+								<PlusIcon class="mr-2 size-4" />
+								Add Cabin
+							</Button>
+						</div>
+					</div>
+
+					{#if allCabins.length === 0}
+						<div class="text-muted-foreground py-4 text-center text-sm">
+							No cabins defined.
+							<a href="/app/cabins" class="text-foreground underline">Create cabins</a>
+							first.
+						</div>
+					{:else if nonEmptyAgeGroups.length === 0}
+						<div class="text-muted-foreground py-4 text-center text-sm">
+							No cabins assigned to this session yet. Click "Add Cabin" to assign one.
+						</div>
+					{:else}
+						{#each nonEmptyAgeGroups as sag (sag.id)}
+							{@const cabins = cabinsByAgeGroup.get(sag.id) ?? []}
+							{@const isExpanded = expandedAgeGroups.has(sag.id)}
+							<div class="border-border overflow-hidden rounded-lg border">
+								<button
+									type="button"
+									class="bg-muted flex w-full items-center gap-2 px-4 py-3 text-left"
+									onclick={() => {
+										const next = new Set(expandedAgeGroups);
+										if (next.has(sag.id)) next.delete(sag.id);
+										else next.add(sag.id);
+										expandedAgeGroups = next;
+									}}
+								>
+									<ChevronDownIcon class="size-4 transition-transform {isExpanded ? '' : '-rotate-90'}" />
+									<h3 class="font-medium">
+										{ageGroupMap.get(sag.age_group_id) ?? "Unknown Age Group"}
+									</h3>
+									<span class="text-muted-foreground text-sm">
+										— {cabins.length} {cabins.length === 1 ? "cabin" : "cabins"}
+									</span>
+								</button>
+
+								{#if isExpanded}
+									<Table.Table>
+										<Table.TableHeader>
+											<Table.TableRow>
+												<Table.TableHead>Cabin</Table.TableHead>
+												<Table.TableHead class="w-32">Group Size</Table.TableHead>
+												<Table.TableHead class="w-40">Required Counselors</Table.TableHead>
+												<Table.TableHead class="w-16">
+													<span class="sr-only">Actions</span>
+												</Table.TableHead>
+											</Table.TableRow>
+										</Table.TableHeader>
+										<Table.TableBody>
+											{#each cabins as sc (sc.id)}
+												<Table.TableRow>
+													<Table.TableCell>
+														{cabinMap.get(sc.cabin_id)?.name ?? "Unknown"}
+													</Table.TableCell>
+													<Table.TableCell>
+														{sc.group_size ?? "—"}
+													</Table.TableCell>
+													<Table.TableCell>
+														{sc.required_counselors ?? "—"}
+													</Table.TableCell>
+													<Table.TableCell>
+														<div class="flex justify-end gap-1">
+															<Button
+																variant="ghost"
+																size="icon-sm"
+																disabled={disabled}
+																title="Edit"
+																onclick={() => openEditCabin(sc)}
+															>
+																<PencilIcon class="size-4" />
+																<span class="sr-only">Edit</span>
+															</Button>
+															<Button
+																variant="ghost"
+																size="icon-sm"
+																disabled={disabled}
+																title="Remove"
+																onclick={() => confirmRemoveCabin(sc)}
+															>
+																<TrashIcon class="size-4" />
+																<span class="sr-only">Remove</span>
+															</Button>
+														</div>
+													</Table.TableCell>
+												</Table.TableRow>
+											{/each}
+										</Table.TableBody>
+									</Table.Table>
+								{/if}
+							</div>
+						{/each}
+					{/if}
+				</div>
+			</Tabs.TabsContent>
+
+			<!-- Time Slots & Activities Tab -->
+			<Tabs.TabsContent value="activities">
 		<!-- Time Slots Section -->
 		<div class="grid gap-4">
 			<div class="flex items-center justify-between">
+				<h2 class="text-lg font-semibold">Time Slots</h2>
 				<div class="flex items-center gap-2">
-					<h2 class="text-lg font-semibold">Time Slots</h2>
 					{#if sortedSessionTimeSlots.length > 0}
 						<Button
 							variant="ghost"
@@ -617,15 +1081,15 @@
 							{allExpanded ? "Collapse All" : "Expand All"}
 						</Button>
 					{/if}
+					<Button
+						size="sm"
+						disabled={disabled || availableTimeSlots.length === 0}
+						onclick={openAddTimeSlot}
+					>
+						<PlusIcon class="mr-2 size-4" />
+						Add Time Slot
+					</Button>
 				</div>
-				<Button
-					size="sm"
-					disabled={disabled || availableTimeSlots.length === 0}
-					onclick={openAddTimeSlot}
-				>
-					<PlusIcon class="mr-2 size-4" />
-					Add Time Slot
-				</Button>
 			</div>
 
 			{#if allTimeSlots.length === 0}
@@ -640,7 +1104,9 @@
 				</div>
 			{:else}
 				{#each sortedSessionTimeSlots as st (st.id)}
-					{@const activities = activitiesByTimeSlot.get(st.id) ?? []}
+					{@const activities = [...(activitiesByTimeSlot.get(st.id) ?? [])].sort((a, b) =>
+						(activityMap.get(a.activity_id) ?? "").localeCompare(activityMap.get(b.activity_id) ?? "")
+					)}
 					{@const availableActs = getAvailableActivities(st.id)}
 					{@const isExpanded = expandedTimeSlots.has(st.id)}
 				<div
@@ -655,7 +1121,7 @@
 					{#if dropInsert?.id === st.id && dropInsert.position === "after"}
 						<div class="bg-primary absolute -bottom-[9px] right-4 left-4 h-[2px] rounded-full"></div>
 					{/if}
-						<div class="bg-muted flex items-center justify-between px-4 py-3">
+						<div class="bg-muted flex items-center justify-between rounded-t-lg px-4 py-3 {isExpanded ? '' : 'rounded-b-lg'}">
 							<div class="flex items-center gap-2">
 								{#if !disabled}
 									<button
@@ -783,6 +1249,8 @@
 				{/each}
 			{/if}
 		</div>
+			</Tabs.TabsContent>
+		</Tabs.Tabs>
 	{/if}
 </div>
 
@@ -1113,6 +1581,209 @@
 				onclick={handleRemoveActivity}
 			>
 				{#if removingActivity}
+					<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+				{/if}
+				Remove
+			</AlertDialog.AlertDialogAction>
+		</AlertDialog.AlertDialogFooter>
+	</AlertDialog.AlertDialogContent>
+</AlertDialog.AlertDialog>
+
+<!-- Add Cabin Dialog -->
+<Dialog.Dialog bind:open={addCabinOpen}>
+	<Dialog.DialogContent onInteractOutside={(e) => e.preventDefault()}>
+		<Dialog.DialogHeader>
+			<Dialog.DialogTitle>Add Cabin</Dialog.DialogTitle>
+			<Dialog.DialogDescription>
+				Assign a cabin to this session. The age group defaults to the cabin's
+				default age group, but can be changed.
+			</Dialog.DialogDescription>
+		</Dialog.DialogHeader>
+		<form onsubmit={handleAddCabin} class="grid gap-4">
+			<div class="grid gap-2">
+				<Label for="cabin-select">Cabin</Label>
+				<Select.Select
+					type="single"
+					value={addCabinId}
+					disabled={addingCabin}
+					onValueChange={onAddCabinSelected}
+				>
+					<Select.SelectTrigger id="cabin-select" class="w-full">
+						{#if addCabinId}
+							{cabinMap.get(addCabinId)?.name ?? "Select cabin"}
+						{:else}
+							<span class="text-muted-foreground">Select cabin</span>
+						{/if}
+					</Select.SelectTrigger>
+					<Select.SelectContent>
+						{#each availableCabinsForSession as c (c.id)}
+							<Select.SelectItem value={c.id}>{c.name}</Select.SelectItem>
+						{/each}
+					</Select.SelectContent>
+				</Select.Select>
+				{#if addCabinError}
+					<p class="text-destructive text-sm">{addCabinError}</p>
+				{/if}
+			</div>
+			<div class="grid gap-2">
+				<Label for="cabin-age-group-select">Age Group</Label>
+				<Select.Select
+					type="single"
+					value={addCabinAgeGroupId}
+					disabled={addingCabin || !addCabinId}
+					onValueChange={(v) => {
+						addCabinAgeGroupId = v;
+						addCabinAgeGroupError = "";
+					}}
+				>
+					<Select.SelectTrigger id="cabin-age-group-select" class="w-full">
+						{#if addCabinAgeGroupId}
+							{ageGroupMap.get(addCabinAgeGroupId) ?? "Select age group"}
+						{:else}
+							<span class="text-muted-foreground">Select age group</span>
+						{/if}
+					</Select.SelectTrigger>
+					<Select.SelectContent>
+						{#each allAgeGroups as ag (ag.id)}
+							<Select.SelectItem value={ag.id}>{ag.name}</Select.SelectItem>
+						{/each}
+					</Select.SelectContent>
+				</Select.Select>
+				{#if addCabinAgeGroupError}
+					<p class="text-destructive text-sm">{addCabinAgeGroupError}</p>
+				{/if}
+			</div>
+			<div class="grid gap-2">
+				<Label for="cabin-group-size">Group Size (optional)</Label>
+				<Input
+					id="cabin-group-size"
+					type="number"
+					min="1"
+					placeholder="Leave blank for no override"
+					bind:value={addCabinGroupSize}
+					disabled={addingCabin}
+					oninput={() => (addCabinGroupSizeError = "")}
+				/>
+				{#if addCabinGroupSizeError}
+					<p class="text-destructive text-sm">{addCabinGroupSizeError}</p>
+				{/if}
+			</div>
+			<div class="grid gap-2">
+				<Label for="cabin-counselors">Required Counselors (optional)</Label>
+				<Input
+					id="cabin-counselors"
+					type="number"
+					min="1"
+					placeholder="Leave blank for no override"
+					bind:value={addCabinCounselors}
+					disabled={addingCabin}
+					oninput={() => (addCabinCounselorsError = "")}
+				/>
+				{#if addCabinCounselorsError}
+					<p class="text-destructive text-sm">{addCabinCounselorsError}</p>
+				{/if}
+			</div>
+			<Dialog.DialogFooter>
+				<Button
+					type="button"
+					variant="outline"
+					disabled={addingCabin}
+					onclick={() => (addCabinOpen = false)}
+				>
+					Cancel
+				</Button>
+				<Button type="submit" disabled={addingCabin}>
+					{#if addingCabin}
+						<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+					{/if}
+					Add
+				</Button>
+			</Dialog.DialogFooter>
+		</form>
+	</Dialog.DialogContent>
+</Dialog.Dialog>
+
+<!-- Edit Cabin Dialog -->
+<Dialog.Dialog bind:open={editCabinOpen}>
+	<Dialog.DialogContent onInteractOutside={(e) => e.preventDefault()}>
+		<Dialog.DialogHeader>
+			<Dialog.DialogTitle>Edit Cabin</Dialog.DialogTitle>
+			<Dialog.DialogDescription>
+				Update group size and required counselors for
+				{editCabinTarget ? cabinMap.get(editCabinTarget.cabin_id)?.name ?? "this cabin" : "this cabin"}.
+			</Dialog.DialogDescription>
+		</Dialog.DialogHeader>
+		<form onsubmit={handleEditCabin} class="grid gap-4">
+			<div class="grid gap-2">
+				<Label for="edit-cabin-group-size">Group Size (optional)</Label>
+				<Input
+					id="edit-cabin-group-size"
+					type="number"
+					min="1"
+					placeholder="Leave blank for no override"
+					bind:value={editCabinGroupSize}
+					disabled={editingCabin}
+					oninput={() => (editCabinGroupSizeError = "")}
+				/>
+				{#if editCabinGroupSizeError}
+					<p class="text-destructive text-sm">{editCabinGroupSizeError}</p>
+				{/if}
+			</div>
+			<div class="grid gap-2">
+				<Label for="edit-cabin-counselors">Required Counselors (optional)</Label>
+				<Input
+					id="edit-cabin-counselors"
+					type="number"
+					min="1"
+					placeholder="Leave blank for no override"
+					bind:value={editCabinCounselors}
+					disabled={editingCabin}
+					oninput={() => (editCabinCounselorsError = "")}
+				/>
+				{#if editCabinCounselorsError}
+					<p class="text-destructive text-sm">{editCabinCounselorsError}</p>
+				{/if}
+			</div>
+			<Dialog.DialogFooter>
+				<Button
+					type="button"
+					variant="outline"
+					disabled={editingCabin}
+					onclick={() => (editCabinOpen = false)}
+				>
+					Cancel
+				</Button>
+				<Button type="submit" disabled={editingCabin}>
+					{#if editingCabin}
+						<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+					{/if}
+					Save
+				</Button>
+			</Dialog.DialogFooter>
+		</form>
+	</Dialog.DialogContent>
+</Dialog.Dialog>
+
+<!-- Remove Cabin Confirmation -->
+<AlertDialog.AlertDialog bind:open={removeCabinOpen}>
+	<AlertDialog.AlertDialogContent>
+		<AlertDialog.AlertDialogHeader>
+			<AlertDialog.AlertDialogTitle>Remove Cabin</AlertDialog.AlertDialogTitle>
+			<AlertDialog.AlertDialogDescription>
+				Are you sure you want to remove
+				"{removeCabinTarget ? cabinMap.get(removeCabinTarget.cabin_id)?.name ?? 'this cabin' : ''}"
+				from this age group?
+			</AlertDialog.AlertDialogDescription>
+		</AlertDialog.AlertDialogHeader>
+		<AlertDialog.AlertDialogFooter>
+			<AlertDialog.AlertDialogCancel disabled={removingCabin}>
+				Cancel
+			</AlertDialog.AlertDialogCancel>
+			<AlertDialog.AlertDialogAction
+				disabled={removingCabin}
+				onclick={handleRemoveCabin}
+			>
+				{#if removingCabin}
 					<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
 				{/if}
 				Remove

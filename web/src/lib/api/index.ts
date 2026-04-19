@@ -49,6 +49,7 @@ export {
 	camperApi,
 	enrollmentApi,
 	sessionAgeGroupApi,
+	sessionCabinApi,
 	camperFriendPreferenceApi,
 } from "./campers";
 

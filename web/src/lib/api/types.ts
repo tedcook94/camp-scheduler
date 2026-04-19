@@ -313,6 +313,37 @@ export interface SessionAgeGroup {
 	age_group_id: string;
 }
 
+export interface CreateSessionAgeGroupRequest {
+	age_group_id: string;
+}
+
+export interface UpdateSessionAgeGroupRequest {
+	age_group_id: string;
+}
+
+export interface SessionCabin {
+	id: string;
+	camp_id: string;
+	session_id: string;
+	session_age_group_id: string;
+	cabin_id: string;
+	group_size: number | null;
+	required_counselors: number | null;
+}
+
+export interface CreateSessionCabinRequest {
+	session_age_group_id: string;
+	cabin_id: string;
+	group_size?: number | null;
+	required_counselors?: number | null;
+}
+
+export interface UpdateSessionCabinRequest {
+	cabin_id: string;
+	group_size?: number | null;
+	required_counselors?: number | null;
+}
+
 export interface Enrollment {
 	id: string;
 	camp_id: string;

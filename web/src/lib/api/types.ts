@@ -311,7 +311,6 @@ export interface SessionAgeGroup {
 	camp_id: string;
 	session_id: string;
 	age_group_id: string;
-	group_size: number | null;
 }
 
 export interface Enrollment {

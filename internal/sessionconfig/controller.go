@@ -39,12 +39,10 @@ func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 
 type CreateSessionAgeGroupRequest struct {
 	AgeGroupID string `json:"age_group_id" binding:"required"`
-	GroupSize  *int32 `json:"group_size"`
 }
 
 type UpdateSessionAgeGroupRequest struct {
 	AgeGroupID string `json:"age_group_id" binding:"required"`
-	GroupSize  *int32 `json:"group_size"`
 }
 
 type SessionAgeGroupResponse struct {
@@ -52,7 +50,6 @@ type SessionAgeGroupResponse struct {
 	CampID     string `json:"camp_id"`
 	SessionID  string `json:"session_id"`
 	AgeGroupID string `json:"age_group_id"`
-	GroupSize  *int32 `json:"group_size"`
 }
 
 // Session cabin types

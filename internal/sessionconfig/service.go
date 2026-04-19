@@ -98,7 +98,6 @@ func (svc *Service) CreateAgeGroup(ctx context.Context, campID, sessionID string
 		CampID:     campUUID,
 		SessionID:  sessionUUID,
 		AgeGroupID: ageGroupUUID,
-		GroupSize:  api.ToPgInt4(req.GroupSize),
 	})
 	if err != nil {
 		return SessionAgeGroupResponse{}, fmt.Errorf("error creating session age group: %w", err)
@@ -133,7 +132,6 @@ func (svc *Service) UpdateAgeGroup(ctx context.Context, campID, sessionID, id st
 		CampID:     campUUID,
 		SessionID:  sessionUUID,
 		AgeGroupID: ageGroupUUID,
-		GroupSize:  api.ToPgInt4(req.GroupSize),
 	})
 	if err != nil {
 		return SessionAgeGroupResponse{}, fmt.Errorf("error updating session age group %s: %w", id, err)
@@ -350,7 +348,6 @@ func toSessionAgeGroupResponse(r db.SessionAgeGroup) SessionAgeGroupResponse {
 		CampID:     api.UUIDToString(r.CampID),
 		SessionID:  api.UUIDToString(r.SessionID),
 		AgeGroupID: api.UUIDToString(r.AgeGroupID),
-		GroupSize:  api.FromPgInt4(r.GroupSize),
 	}
 }
 

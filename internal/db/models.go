@@ -259,7 +259,6 @@ type SessionAgeGroup struct {
 	CampID     pgtype.UUID
 	SessionID  pgtype.UUID
 	AgeGroupID pgtype.UUID
-	GroupSize  pgtype.Int4
 }
 
 type SessionAgeGroupCabin struct {

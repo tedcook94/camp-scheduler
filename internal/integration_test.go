@@ -1279,7 +1279,7 @@ func testBasicCamperAssignment(t *testing.T) {
 
 	// Configure session age group and cabins with capacity.
 	sag := mustPost(t, apiURL(ts, sessionBase+"/age-groups"), map[string]any{
-		"age_group_id": juniorsID, "group_size": 20,
+		"age_group_id": juniorsID,
 	}, token)
 	sagID := str(sag, "id")
 
@@ -1399,7 +1399,7 @@ func testCamperFriendPreferences(t *testing.T) {
 
 	// Configure cabins with capacity 3 each.
 	sag := mustPost(t, apiURL(ts, sessionBase+"/age-groups"), map[string]any{
-		"age_group_id": teensID, "group_size": 6,
+		"age_group_id": teensID,
 	}, token)
 	sagID := str(sag, "id")
 
@@ -1646,7 +1646,7 @@ func testGetSolutionRunOwnership(t *testing.T) {
 	sessionID := str(session, "id")
 
 	sag := mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/age-groups"), map[string]any{
-		"age_group_id": agID, "group_size": 10,
+		"age_group_id": agID,
 	}, token)
 	sagID := str(sag, "id")
 
@@ -1751,7 +1751,7 @@ func testSelectSolutionCamperRun(t *testing.T) {
 	sessionBase := "/sessions/" + sessionID
 
 	sag := mustPost(t, apiURL(ts, sessionBase+"/age-groups"), map[string]any{
-		"age_group_id": agID, "group_size": 10,
+		"age_group_id": agID,
 	}, token)
 	sagID := str(sag, "id")
 

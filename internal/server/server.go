@@ -128,7 +128,7 @@ func (s *Server) routes() {
 	seasonController := season.NewController(seasonService)
 	seasonController.RegisterRoutes(protected)
 
-	sessionService := session.NewService(queries)
+	sessionService := session.NewService(queries, s.pool)
 	sessionController := session.NewController(sessionService)
 	sessionController.RegisterRoutes(protected)
 

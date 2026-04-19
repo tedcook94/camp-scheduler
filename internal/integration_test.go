@@ -2898,3 +2898,243 @@ func TestReorderTimeSlots(t *testing.T) {
 		}, http.StatusBadRequest, token)
 	})
 }
+
+// TestCopySession exercises a structural session copy: age groups, cabins,
+// time slots, and activities are cloned from a source session into a fresh
+// session in the same camp, with new row IDs but preserved configuration.
+func TestCopySession(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	if err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Copy Session").Scan(&campID); err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	// Seasons.
+	season1 := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-07-31",
+	}, token)
+	season1ID := str(season1, "id")
+	season2 := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Fall", "start_date": "2026-08-01", "end_date": "2026-09-30",
+	}, token)
+	season2ID := str(season2, "id")
+
+	// Camp-level resources.
+	juniors := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Juniors"}, token)
+	seniors := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Seniors"}, token)
+	juniorsID := str(juniors, "id")
+	seniorsID := str(seniors, "id")
+
+	pine := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name": "Pine", "default_age_group_id": juniorsID,
+		"default_group_size": 8, "default_required_counselors": 1,
+	}, token)
+	oak := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name": "Oak", "default_age_group_id": seniorsID,
+		"default_group_size": 10, "default_required_counselors": 2,
+	}, token)
+	pineID := str(pine, "id")
+	oakID := str(oak, "id")
+
+	morning := mustPost(t, apiURL(ts, "/time-slots"), map[string]any{"name": "Morning"}, token)
+	afternoon := mustPost(t, apiURL(ts, "/time-slots"), map[string]any{"name": "Afternoon"}, token)
+	morningID := str(morning, "id")
+	afternoonID := str(afternoon, "id")
+
+	swim := mustPost(t, apiURL(ts, "/activities"), map[string]any{"name": "Swim"}, token)
+	craft := mustPost(t, apiURL(ts, "/activities"), map[string]any{"name": "Craft"}, token)
+	swimID := str(swim, "id")
+	craftID := str(craft, "id")
+
+	// Source session in season1, fully configured.
+	source := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Session 1", "season_id": season1ID,
+	}, token)
+	sourceID := str(source, "id")
+	sourceBase := "/sessions/" + sourceID
+
+	sagJ := mustPost(t, apiURL(ts, sourceBase+"/age-groups"), map[string]any{
+		"age_group_id": juniorsID,
+	}, token)
+	sagS := mustPost(t, apiURL(ts, sourceBase+"/age-groups"), map[string]any{
+		"age_group_id": seniorsID,
+	}, token)
+
+	mustPost(t, apiURL(ts, sourceBase+"/cabins"), map[string]any{
+		"session_age_group_id": str(sagJ, "id"),
+		"cabin_id":             pineID,
+		"group_size":           8,
+		"required_counselors":  1,
+	}, token)
+	mustPost(t, apiURL(ts, sourceBase+"/cabins"), map[string]any{
+		"session_age_group_id": str(sagS, "id"),
+		"cabin_id":             oakID,
+		"group_size":           10,
+		"required_counselors":  2,
+	}, token)
+
+	stsM := mustPost(t, apiURL(ts, sourceBase+"/time-slots"), map[string]any{
+		"time_slot_id": morningID, "sort_order": 1,
+	}, token)
+	stsA := mustPost(t, apiURL(ts, sourceBase+"/time-slots"), map[string]any{
+		"time_slot_id": afternoonID, "sort_order": 2,
+	}, token)
+
+	mustPost(t, apiURL(ts, sourceBase+"/time-slots/"+str(stsM, "id")+"/activities"), map[string]any{
+		"activity_id": swimID, "capacity": 12, "required_counselors": 2,
+	}, token)
+	mustPost(t, apiURL(ts, sourceBase+"/time-slots/"+str(stsA, "id")+"/activities"), map[string]any{
+		"activity_id": craftID, "capacity": 8, "required_counselors": 1,
+	}, token)
+
+	t.Run("structural clone", func(t *testing.T) {
+		copied := doRequest(t, http.MethodPost, apiURL(ts, sourceBase+"/copy"), map[string]any{
+			"name":                "Session 1 (Copy)",
+			"season_id":           season1ID,
+			"previous_session_id": sourceID,
+		}, http.StatusCreated, token)
+
+		newID := str(copied, "id")
+		if newID == "" || newID == sourceID {
+			t.Fatalf("expected new distinct session id, got %q (source %q)", newID, sourceID)
+		}
+		if got := str(copied, "name"); got != "Session 1 (Copy)" {
+			t.Fatalf("expected name %q, got %q", "Session 1 (Copy)", got)
+		}
+		if got := str(copied, "previous_session_id"); got != sourceID {
+			t.Fatalf("expected previous_session_id %q, got %q", sourceID, got)
+		}
+
+		newBase := "/sessions/" + newID
+
+		// Age groups: 2 entries with same age_group_ids and distinct ids.
+		newSAGs := mustGetList(t, apiURL(ts, newBase+"/age-groups"), token)
+		if len(newSAGs) != 2 {
+			t.Fatalf("expected 2 session age groups, got %d", len(newSAGs))
+		}
+		newAgeGroupIDs := map[string]string{}
+		for _, raw := range newSAGs {
+			m := asMap(raw)
+			id := str(m, "id")
+			ag := str(m, "age_group_id")
+			if id == str(sagJ, "id") || id == str(sagS, "id") {
+				t.Fatalf("copied SAG re-used source id %s", id)
+			}
+			newAgeGroupIDs[ag] = id
+		}
+		if _, ok := newAgeGroupIDs[juniorsID]; !ok {
+			t.Fatalf("missing juniors SAG in copy")
+		}
+		if _, ok := newAgeGroupIDs[seniorsID]; !ok {
+			t.Fatalf("missing seniors SAG in copy")
+		}
+
+		// Cabins: 2 entries, mapped to new SAG ids, preserving group_size + counselors.
+		newCabins := mustGetList(t, apiURL(ts, newBase+"/cabins"), token)
+		if len(newCabins) != 2 {
+			t.Fatalf("expected 2 session cabins, got %d", len(newCabins))
+		}
+		seenCabins := map[string]map[string]any{}
+		for _, raw := range newCabins {
+			m := asMap(raw)
+			seenCabins[str(m, "cabin_id")] = m
+		}
+		if pc, ok := seenCabins[pineID]; !ok {
+			t.Fatalf("missing pine cabin in copy")
+		} else {
+			if pc["session_age_group_id"] != newAgeGroupIDs[juniorsID] {
+				t.Fatalf("pine cabin session_age_group_id mismatch")
+			}
+			if num(pc, "group_size") != 8 || num(pc, "required_counselors") != 1 {
+				t.Fatalf("pine cabin sizing not preserved: %v", pc)
+			}
+		}
+		if oc, ok := seenCabins[oakID]; !ok {
+			t.Fatalf("missing oak cabin in copy")
+		} else {
+			if oc["session_age_group_id"] != newAgeGroupIDs[seniorsID] {
+				t.Fatalf("oak cabin session_age_group_id mismatch")
+			}
+			if num(oc, "group_size") != 10 || num(oc, "required_counselors") != 2 {
+				t.Fatalf("oak cabin sizing not preserved: %v", oc)
+			}
+		}
+
+		// Time slots: 2 entries with preserved sort_order; new ids.
+		newSTSs := mustGetList(t, apiURL(ts, newBase+"/time-slots"), token)
+		if len(newSTSs) != 2 {
+			t.Fatalf("expected 2 session time slots, got %d", len(newSTSs))
+		}
+		newSTSByTimeSlot := map[string]map[string]any{}
+		for _, raw := range newSTSs {
+			m := asMap(raw)
+			newSTSByTimeSlot[str(m, "time_slot_id")] = m
+			if str(m, "id") == str(stsM, "id") || str(m, "id") == str(stsA, "id") {
+				t.Fatalf("copied STS re-used source id %s", str(m, "id"))
+			}
+		}
+		if mts := newSTSByTimeSlot[morningID]; mts == nil || num(mts, "sort_order") != 1 {
+			t.Fatalf("morning slot missing or wrong sort_order: %v", mts)
+		}
+		if ats := newSTSByTimeSlot[afternoonID]; ats == nil || num(ats, "sort_order") != 2 {
+			t.Fatalf("afternoon slot missing or wrong sort_order: %v", ats)
+		}
+
+		// Activities: 2 entries across the two time slots, preserved capacity + counselors.
+		newActivities := mustGetList(t, apiURL(ts, newBase+"/activities"), token)
+		if len(newActivities) != 2 {
+			t.Fatalf("expected 2 session activities, got %d", len(newActivities))
+		}
+		seenAct := map[string]map[string]any{}
+		for _, raw := range newActivities {
+			m := asMap(raw)
+			seenAct[str(m, "activity_id")] = m
+		}
+		if sw := seenAct[swimID]; sw == nil {
+			t.Fatalf("missing swim activity in copy")
+		} else {
+			if sw["session_time_slot_id"] != str(newSTSByTimeSlot[morningID], "id") {
+				t.Fatalf("swim activity session_time_slot_id not remapped to morning")
+			}
+			if num(sw, "capacity") != 12 || num(sw, "required_counselors") != 2 {
+				t.Fatalf("swim activity sizing not preserved: %v", sw)
+			}
+		}
+		if cr := seenAct[craftID]; cr == nil {
+			t.Fatalf("missing craft activity in copy")
+		} else {
+			if cr["session_time_slot_id"] != str(newSTSByTimeSlot[afternoonID], "id") {
+				t.Fatalf("craft activity session_time_slot_id not remapped to afternoon")
+			}
+			if num(cr, "capacity") != 8 || num(cr, "required_counselors") != 1 {
+				t.Fatalf("craft activity sizing not preserved: %v", cr)
+			}
+		}
+
+		// Source session must be unchanged.
+		srcSAGs := mustGetList(t, apiURL(ts, sourceBase+"/age-groups"), token)
+		if len(srcSAGs) != 2 {
+			t.Fatalf("source session mutated: expected 2 SAGs, got %d", len(srcSAGs))
+		}
+	})
+
+	t.Run("reject nonexistent source", func(t *testing.T) {
+		// Random unknown UUID.
+		fakeID := "00000000-0000-0000-0000-000000000000"
+		doRawRequest(t, http.MethodPost, apiURL(ts, "/sessions/"+fakeID+"/copy"), map[string]any{
+			"name": "Bad", "season_id": season1ID,
+		}, http.StatusNotFound, token)
+	})
+
+	t.Run("reject cross-season previous", func(t *testing.T) {
+		// previous_session_id refers to source (season1), but new session targets season2.
+		doRawRequest(t, http.MethodPost, apiURL(ts, sourceBase+"/copy"), map[string]any{
+			"name":                "Cross-season copy",
+			"season_id":           season2ID,
+			"previous_session_id": sourceID,
+		}, http.StatusBadRequest, token)
+	})
+}

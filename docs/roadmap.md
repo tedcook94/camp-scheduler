@@ -143,7 +143,7 @@ viable configurations and understand trade-offs.
   - [x] Counselors: list, create, edit, delete; manage preferences (age group, co-counselor, activity); certifications; session history
   - [x] Campers: list, create, edit, delete; friend preferences; session enrollments
   - [x] Activities & time slots: CRUD for both; certification requirements; assign time slots and activities to sessions; copy activities between time slots; drag-and-drop reorder
-  - [ ] Session configuration: assign age groups, cabins, activities, and time slots to a session
+  - [x] Session configuration: assign age groups, cabins, activities, and time slots to a session
   - [ ] Assignment runs: trigger solver, view run history, compare ranked solutions, select a solution
 - [ ] Filter counselor preference options to session-configured age groups and activities
 - [ ] Filter camper preference options to session-enrolled campers

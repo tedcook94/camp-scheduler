@@ -13,6 +13,7 @@ import type {
 	Certification,
 	CocounselorPreference,
 	CocounselorPreferenceItem,
+	CopySessionRequest,
 	Counselor,
 	CounselorCertification,
 	CreateCabinRequest,
@@ -148,6 +149,8 @@ export const sessionApi = {
 	update: (id: string, data: UpdateSessionRequest) =>
 		api.put<Session>(`/api/v1/sessions/${id}`, data),
 	delete: (id: string) => api.delete<void>(`/api/v1/sessions/${id}`),
+	copy: (sourceId: string, data: CopySessionRequest) =>
+		api.post<Session>(`/api/v1/sessions/${sourceId}/copy`, data),
 };
 
 export const activityApi = {

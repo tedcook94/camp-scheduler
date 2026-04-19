@@ -15,6 +15,7 @@
 	import type { Session, Season, Camp } from "$lib/api/types";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
+	import CopyIcon from "@lucide/svelte/icons/copy";
 	import TrashIcon from "@lucide/svelte/icons/trash";
 	import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
 	import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
@@ -54,6 +55,19 @@
 	let deleteOpen = $state(false);
 	let deleteTarget = $state<Session | null>(null);
 	let deleting = $state(false);
+
+	// Copy dialog
+	let copyOpen = $state(false);
+	let copySource = $state<Session | null>(null);
+	let copyName = $state("");
+	let copySeasonId = $state("");
+	let copySetPrevious = $state(true);
+	let copying = $state(false);
+	let copyNameError = $state("");
+	let copySeasonError = $state("");
+	let copyPreviousAllowed = $derived(
+		copySource !== null && copySeasonId === copySource.season_id
+	);
 
 	// Lookup helpers
 	let seasonMap = $derived(new Map(seasons.map((s) => [s.id, s.name])));
@@ -189,6 +203,55 @@
 			deleting = false;
 		}
 	}
+
+	function openCopy(session: Session) {
+		copySource = session;
+		copyName = `${session.name} (Copy)`;
+		copySeasonId = session.season_id;
+		copySetPrevious = true;
+		copyNameError = "";
+		copySeasonError = "";
+		copyOpen = true;
+	}
+
+	async function handleCopy(e: SubmitEvent) {
+		e.preventDefault();
+		if (!copySource) return;
+		copyNameError = "";
+		copySeasonError = "";
+
+		const name = copyName.trim();
+		let valid = true;
+		if (!name) {
+			copyNameError = "Name is required.";
+			valid = false;
+		}
+		if (!copySeasonId) {
+			copySeasonError = "Season is required.";
+			valid = false;
+		}
+		if (!valid) return;
+
+		copying = true;
+		try {
+			const previousId = copySetPrevious && copyPreviousAllowed ? copySource.id : null;
+			const created = await sessionApi.copy(copySource.id, {
+				name,
+				season_id: copySeasonId,
+				previous_session_id: previousId,
+			});
+			sessions = [...sessions, created];
+			expandedSeasons = new Set([...expandedSeasons, created.season_id]);
+			toast.success("Session copied");
+			copyOpen = false;
+			copySource = null;
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to copy session";
+			toast.error(message);
+		} finally {
+			copying = false;
+		}
+	}
 </script>
 
 <div class="grid gap-6">
@@ -256,6 +319,16 @@
 								>
 									<PencilIcon class="size-4" />
 									<span class="sr-only">Edit</span>
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon-sm"
+									disabled={disabled}
+									title="Copy"
+									onclick={(e: MouseEvent) => { e.stopPropagation(); openCopy(session); }}
+								>
+									<CopyIcon class="size-4" />
+									<span class="sr-only">Copy</span>
 								</Button>
 								<Button
 									variant="ghost"
@@ -369,6 +442,93 @@
 						<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
 					{/if}
 					{editingSession ? "Save" : "Create"}
+				</Button>
+			</Dialog.DialogFooter>
+		</form>
+	</Dialog.DialogContent>
+</Dialog.Dialog>
+
+<!-- Copy dialog -->
+<Dialog.Dialog bind:open={copyOpen}>
+	<Dialog.DialogContent onInteractOutside={(e) => e.preventDefault()}>
+		<Dialog.DialogHeader>
+			<Dialog.DialogTitle>Copy Session</Dialog.DialogTitle>
+			<Dialog.DialogDescription>
+				Create a new session by copying the structural configuration (age groups, cabins, time slots, and activities) from "{copySource?.name}".
+			</Dialog.DialogDescription>
+		</Dialog.DialogHeader>
+		<form onsubmit={handleCopy} class="grid gap-4">
+			<div class="grid gap-2">
+				<Label for="copy-session-name">Name</Label>
+				<Input
+					id="copy-session-name"
+					type="text"
+					placeholder="Session name"
+					bind:value={copyName}
+					disabled={copying}
+					oninput={() => (copyNameError = "")}
+				/>
+				{#if copyNameError}
+					<p class="text-destructive text-sm">{copyNameError}</p>
+				{/if}
+			</div>
+			<div class="grid gap-2">
+				<Label for="copy-session-season">Season</Label>
+				<Select.Select
+					type="single"
+					value={copySeasonId}
+					disabled={copying}
+					onValueChange={(v) => {
+						copySeasonId = v;
+						copySeasonError = "";
+					}}
+				>
+					<Select.SelectTrigger id="copy-session-season" class="w-full">
+						{#if copySeasonId}
+							{seasonMap.get(copySeasonId) ?? "Select season"}
+						{:else}
+							<span class="text-muted-foreground">Select season</span>
+						{/if}
+					</Select.SelectTrigger>
+					<Select.SelectContent>
+						{#each seasons as season (season.id)}
+							<Select.SelectItem value={season.id}>{season.name}</Select.SelectItem>
+						{/each}
+					</Select.SelectContent>
+				</Select.Select>
+				{#if copySeasonError}
+					<p class="text-destructive text-sm">{copySeasonError}</p>
+				{/if}
+			</div>
+			<div class="grid gap-1">
+				<div class="flex items-center gap-2">
+					<input
+						id="copy-session-set-previous"
+						type="checkbox"
+						class="border-input size-4 rounded"
+						checked={copySetPrevious && copyPreviousAllowed}
+						disabled={copying || !copyPreviousAllowed}
+						onchange={(e) => (copySetPrevious = (e.target as HTMLInputElement).checked)}
+					/>
+					<Label for="copy-session-set-previous" class="font-normal">
+						Set "{copySource?.name}" as the previous session
+					</Label>
+				</div>
+				{#if !copyPreviousAllowed}
+					<p class="text-muted-foreground ml-6 text-xs">
+						Only available when copying into the same season.
+					</p>
+				{/if}
+			</div>
+			<Dialog.DialogFooter>
+				<Button type="button" variant="outline" disabled={copying} onclick={() => (copyOpen = false)}>
+					Cancel
+				</Button>
+				<Button type="submit" disabled={copying}>
+					{#if copying}
+						<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+					{/if}
+					Copy
 				</Button>
 			</Dialog.DialogFooter>
 		</form>

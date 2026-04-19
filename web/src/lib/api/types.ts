@@ -136,6 +136,12 @@ export interface UpdateSessionRequest {
 	previous_session_id?: string | null;
 }
 
+export interface CopySessionRequest {
+	name: string;
+	season_id: string;
+	previous_session_id?: string | null;
+}
+
 export interface Activity {
 	id: string;
 	camp_id: string;

@@ -19,8 +19,8 @@
 	import TrashIcon from "@lucide/svelte/icons/trash";
 	import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
 	import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
-	import SortableTableHead from "$lib/components/sortable-table-head.svelte";
-	import { sortItems, type SortDirection, type SortAccessor } from "$lib/utils";
+	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+	import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
 
 	const getCampDisabled = getContext<() => boolean>("campDisabled");
 	const getCamp = getContext<() => Camp | null>("camp");
@@ -73,23 +73,38 @@
 	let seasonMap = $derived(new Map(seasons.map((s) => [s.id, s.name])));
 	let sessionMap = $derived(new Map(sessions.map((s) => [s.id, s.name])));
 
-	type SessionSortKey = "name" | "season_name";
-	let sortKey = $state<SessionSortKey>("name");
-	let sortDirection = $state<SortDirection>("asc");
-
-	let sortAccessor = $derived<SortAccessor<Session>>(
-		sortKey === "season_name"
-			? (s: Session) => seasonMap.get(s.season_id) ?? ""
-			: "name"
+	// Group sessions by season; newest seasons first; sessions sorted by name asc.
+	let sortedSeasons = $derived(
+		[...seasons].sort((a, b) => b.start_date.localeCompare(a.start_date))
 	);
-	let sortedSessions = $derived(sortItems(sessions, sortAccessor, sortDirection));
+	let sessionsBySeason = $derived.by(() => {
+		const map = new Map<string, Session[]>();
+		for (const s of sessions) {
+			const list = map.get(s.season_id) ?? [];
+			list.push(s);
+			map.set(s.season_id, list);
+		}
+		for (const list of map.values()) {
+			list.sort((a, b) => a.name.localeCompare(b.name));
+		}
+		return map;
+	});
 
-	function toggleSort(key: SessionSortKey) {
-		if (sortKey === key) {
-			sortDirection = sortDirection === "asc" ? "desc" : "asc";
+	let expandedSeasons = $state<Set<string>>(new Set());
+
+	let nonEmptySeasons = $derived(
+		sortedSeasons.filter((s) => (sessionsBySeason.get(s.id) ?? []).length > 0)
+	);
+	let allSeasonsExpanded = $derived(
+		nonEmptySeasons.length > 0 &&
+			nonEmptySeasons.every((s) => expandedSeasons.has(s.id))
+	);
+
+	function toggleExpandAllSeasons() {
+		if (allSeasonsExpanded) {
+			expandedSeasons = new Set();
 		} else {
-			sortKey = key;
-			sortDirection = "asc";
+			expandedSeasons = new Set(nonEmptySeasons.map((s) => s.id));
 		}
 	}
 
@@ -106,6 +121,7 @@
 			]);
 			sessions = sessionList;
 			seasons = seasonList;
+			expandedSeasons = new Set(seasonList.map((s) => s.id));
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to load sessions";
 			toast.error(message);
@@ -169,6 +185,7 @@
 			} else {
 				const created = await sessionApi.create(payload);
 				sessions = [...sessions, created];
+				expandedSeasons = new Set([...expandedSeasons, created.season_id]);
 				toast.success("Session created");
 			}
 			dialogOpen = false;
@@ -261,10 +278,23 @@
 			<p class="text-muted-foreground text-sm">Manage sessions within your camp seasons.</p>
 		</div>
 		{#if camp}
-			<Button size="sm" disabled={loading || disabled || noSeasons} onclick={openCreate}>
-				<PlusIcon class="mr-2 size-4" />
-				Add Session
-			</Button>
+			<div class="flex items-center gap-2">
+				{#if nonEmptySeasons.length > 0}
+					<Button
+						variant="ghost"
+						size="sm"
+						onclick={toggleExpandAllSeasons}
+						title={allSeasonsExpanded ? "Collapse All" : "Expand All"}
+					>
+						<ChevronsUpDownIcon class="mr-1 size-4" />
+						{allSeasonsExpanded ? "Collapse All" : "Expand All"}
+					</Button>
+				{/if}
+				<Button size="sm" disabled={loading || disabled || noSeasons} onclick={openCreate}>
+					<PlusIcon class="mr-2 size-4" />
+					Add Session
+				</Button>
+			</div>
 		{/if}
 	</div>
 
@@ -285,75 +315,102 @@
 			No sessions yet. Click "Add Session" to create one.
 		</div>
 	{:else}
-		<Table.Table>
-			<Table.TableHeader>
-				<Table.TableRow>
-					<SortableTableHead label="Name" active={sortKey === "name"} direction={sortDirection} onclick={() => toggleSort("name")} />
-					<SortableTableHead label="Season" active={sortKey === "season_name"} direction={sortDirection} onclick={() => toggleSort("season_name")} />
-					<Table.TableHead>Previous Session</Table.TableHead>
-					<Table.TableHead class="w-24">
-						<span class="sr-only">Actions</span>
-					</Table.TableHead>
-				</Table.TableRow>
-			</Table.TableHeader>
-			<Table.TableBody>
-				{#each sortedSessions as session (session.id)}
-					<Table.TableRow class="cursor-pointer hover:bg-muted/50" onclick={() => goto(`/app/sessions/${session.id}`)}>
-						<Table.TableCell>{session.name}</Table.TableCell>
-						<Table.TableCell>{seasonMap.get(session.season_id) ?? "Unknown"}</Table.TableCell>
-						<Table.TableCell>
-							{#if session.previous_session_id}
-								{sessionMap.get(session.previous_session_id) ?? "Unknown"}
-							{:else}
-								<span class="text-muted-foreground">—</span>
-							{/if}
-						</Table.TableCell>
-						<Table.TableCell>
-							<div class="flex justify-end gap-1">
-								<Button
-									variant="ghost"
-									size="icon-sm"
-									disabled={disabled}
-									title="Edit"
-									onclick={(e: MouseEvent) => { e.stopPropagation(); openEdit(session); }}
-								>
-									<PencilIcon class="size-4" />
-									<span class="sr-only">Edit</span>
-								</Button>
-								<Button
-									variant="ghost"
-									size="icon-sm"
-									disabled={disabled}
-									title="Copy"
-									onclick={(e: MouseEvent) => { e.stopPropagation(); openCopy(session); }}
-								>
-									<CopyIcon class="size-4" />
-									<span class="sr-only">Copy</span>
-								</Button>
-								<Button
-									variant="ghost"
-									size="icon-sm"
-									disabled={disabled}
-									title="Delete"
-									onclick={(e: MouseEvent) => { e.stopPropagation(); confirmDelete(session); }}
-								>
-									<TrashIcon class="size-4" />
-									<span class="sr-only">Delete</span>
-								</Button>
-								<a
-									href={`/app/sessions/${session.id}`}
-									class="ml-1 inline-flex items-center text-muted-foreground hover:text-foreground"
-									onclick={(e: MouseEvent) => e.stopPropagation()}
-								>
-									<ChevronRightIcon class="size-4" />
-									<span class="sr-only">View details</span>
-								</a>
-							</div>
-						</Table.TableCell>
-					</Table.TableRow>
-				{/each}
-			</Table.TableBody>
-		</Table.Table>
+		<div class="grid gap-4">
+			{#each sortedSeasons as season (season.id)}
+				{@const seasonSessions = sessionsBySeason.get(season.id) ?? []}
+				{#if seasonSessions.length > 0}
+					{@const isExpanded = expandedSeasons.has(season.id)}
+					<div class="border-border overflow-hidden rounded-lg border">
+						<button
+							type="button"
+							class="bg-muted flex w-full items-center gap-2 px-4 py-3 text-left"
+							onclick={() => {
+								const next = new Set(expandedSeasons);
+								if (next.has(season.id)) next.delete(season.id);
+								else next.add(season.id);
+								expandedSeasons = next;
+							}}
+						>
+							<ChevronDownIcon class="size-4 transition-transform {isExpanded ? '' : '-rotate-90'}" />
+							<h3 class="font-medium">{season.name}</h3>
+							<span class="text-muted-foreground text-sm">
+								— {seasonSessions.length} {seasonSessions.length === 1 ? "session" : "sessions"}
+							</span>
+						</button>
+
+						{#if isExpanded}
+							<Table.Table>
+								<Table.TableHeader>
+									<Table.TableRow>
+										<Table.TableHead>Name</Table.TableHead>
+										<Table.TableHead>Previous Session</Table.TableHead>
+										<Table.TableHead class="w-32">
+											<span class="sr-only">Actions</span>
+										</Table.TableHead>
+									</Table.TableRow>
+								</Table.TableHeader>
+								<Table.TableBody>
+									{#each seasonSessions as session (session.id)}
+										<Table.TableRow class="cursor-pointer hover:bg-muted/50" onclick={() => goto(`/app/sessions/${session.id}`)}>
+											<Table.TableCell>{session.name}</Table.TableCell>
+											<Table.TableCell>
+												{#if session.previous_session_id}
+													{sessionMap.get(session.previous_session_id) ?? "Unknown"}
+												{:else}
+													<span class="text-muted-foreground">—</span>
+												{/if}
+											</Table.TableCell>
+											<Table.TableCell>
+												<div class="flex justify-end gap-1">
+													<Button
+														variant="ghost"
+														size="icon-sm"
+														disabled={disabled}
+														title="Edit"
+														onclick={(e: MouseEvent) => { e.stopPropagation(); openEdit(session); }}
+													>
+														<PencilIcon class="size-4" />
+														<span class="sr-only">Edit</span>
+													</Button>
+													<Button
+														variant="ghost"
+														size="icon-sm"
+														disabled={disabled}
+														title="Copy"
+														onclick={(e: MouseEvent) => { e.stopPropagation(); openCopy(session); }}
+													>
+														<CopyIcon class="size-4" />
+														<span class="sr-only">Copy</span>
+													</Button>
+													<Button
+														variant="ghost"
+														size="icon-sm"
+														disabled={disabled}
+														title="Delete"
+														onclick={(e: MouseEvent) => { e.stopPropagation(); confirmDelete(session); }}
+													>
+														<TrashIcon class="size-4" />
+														<span class="sr-only">Delete</span>
+													</Button>
+													<a
+														href={`/app/sessions/${session.id}`}
+														class="text-muted-foreground hover:text-foreground ml-1 inline-flex items-center"
+														onclick={(e: MouseEvent) => e.stopPropagation()}
+													>
+														<ChevronRightIcon class="size-4" />
+														<span class="sr-only">View details</span>
+													</a>
+												</div>
+											</Table.TableCell>
+										</Table.TableRow>
+									{/each}
+								</Table.TableBody>
+							</Table.Table>
+						{/if}
+					</div>
+				{/if}
+			{/each}
+		</div>
 	{/if}
 </div>
 

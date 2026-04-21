@@ -124,7 +124,7 @@
 		{
 			label: "Assignment Runs",
 			icon: PlayIcon,
-			children: [],
+			href: "/app/assignment-runs",
 		},
 		{ href: "/app/settings", label: "Camp Settings", icon: SettingsIcon },
 	];

@@ -54,6 +54,8 @@ export {
 	camperFriendPreferenceApi,
 } from "./campers";
 
+export { assignmentApi } from "./assignment";
+
 export const authApi = {
 	login: (username: string, password: string) =>
 		api.post<TokenResponse>("/api/v1/auth/login", { username, password }),

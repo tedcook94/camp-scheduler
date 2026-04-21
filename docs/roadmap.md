@@ -146,12 +146,12 @@ viable configurations and understand trade-offs.
   - [x] Session configuration: assign age groups, cabins, activities, and time slots to a session
   - [x] Copy a session's structural configuration into a new session
   - [x] Assignment runs: trigger solver, view run history, compare ranked solutions, select a solution
+- [x] Demo camp seeding tool
 - [ ] Filter counselor preference options to session-configured age groups and activities
 - [ ] Filter camper preference options to session-enrolled campers
 - [ ] Add dedicated camper enrollments endpoint to eliminate N+1 loading on camper detail page
 - [ ] "Dirty" flag for when changes have been made since assignment run
 - [ ] Archive (soft delete) objects
-- [ ] Demo camp seeding tool
 - [ ] Overrides (locking assignments before solver runs)
 - [ ] Data import (CSV/spreadsheet)
 - [ ] Auditing

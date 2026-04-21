@@ -127,6 +127,10 @@ run = "migrate create -ext sql -dir database/migrations -seq \"${usage_name:?}\"
 description = "Create a super-admin user (interactive)"
 run = "go run ./cmd/seed-super-admin"
 
+[tasks."seed:demo"]
+description = "Seed demo camp data (idempotent: deletes and recreates)"
+run = "go run ./cmd/seed-demo"
+
 [tasks."db:reset"]
 description = "Destroy and recreate the local databases (next 'mise run dev' reinitializes)"
 run = "docker compose down -v"

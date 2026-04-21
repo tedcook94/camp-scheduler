@@ -70,6 +70,7 @@ Override any value locally with `mise.local.toml` (gitignored).
 | `mise run migration <name>` | Create a new migration file                  |
 | `mise run db:reset` | Destroy local databases and volumes                  |
 | `mise run seed:super-admin` | Create a super-admin user (interactive)        |
+| `mise run seed:demo` | Seed demo camp data (idempotent: deletes and recreates) |
 | `mise run web`      | Start Vite dev server with HMR (port 5173)           |
 | `mise run web:build`| Build frontend static files                          |
 | `mise run web:check`| Run svelte-check type checking                       |
@@ -128,6 +129,34 @@ Integration tests connect to a `camp_scheduler_test` database.
 running), applies migrations, runs the tests, and stops Postgres afterwards if
 it was started by the task. If Postgres was already running (e.g., from
 `mise run dev`), it is left as-is.
+
+## Demo Data
+
+```sh
+mise run seed:demo
+```
+
+Seeds a fully configured "Demo Camp" with realistic data for testing and
+demonstration. The tool is idempotent — running it again deletes all existing
+demo data and recreates it from scratch.
+
+What it creates:
+
+- 1 camp ("Demo Camp") with 1 season and 2 linked sessions
+- 3 age groups, 6 cabins, 6 activities, 4 time slots, 3 certifications
+- Full session configuration (age groups, cabins, time slots, activities per
+  session)
+- 12 counselors with certifications and preferences (age group, co-counselor,
+  activity) varying between sessions
+- 4 counselor session history entries (from Session 1)
+- 36 campers with friend preferences, enrolled in both sessions
+- 1 camp admin user (username: `demo`, password: `demo123`)
+
+**Intentional constraint failure:** Session 2's activity schedule is deliberately
+unsolvable. Its Morning 2 time slot has both Swimming and Canoeing, which each
+require Lifeguard certification (4 Lifeguard slots total), but only 3 counselors
+hold that certification. This demonstrates what happens when hard constraints
+cannot be satisfied. Session 1's activity schedule is solvable.
 
 ## API Testing
 

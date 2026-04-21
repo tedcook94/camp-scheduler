@@ -32,6 +32,9 @@ func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	runs.DELETE("/:runId", ctrl.DeleteRun)
 	runs.GET("/:runId/solutions/:solutionId", ctrl.GetSolution)
 	runs.POST("/:runId/solutions/:solutionId/select", ctrl.SelectSolution)
+
+	byId := rg.Group("/assignment-runs")
+	byId.GET("/:runId", ctrl.GetRunById)
 }
 
 type TriggerRunRequest struct {
@@ -173,8 +176,13 @@ func (ctrl *Controller) TriggerRun(c *gin.Context) {
 }
 
 func (ctrl *Controller) handleTriggerError(c *gin.Context, log *slog.Logger, sessionID string, err error) {
+	var preconditionErr *PreconditionError
+	if errors.As(err, &preconditionErr) {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": preconditionErr.Error()})
+		return
+	}
 	if errors.Is(err, ErrNoSolutions) {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "solver produced no valid solutions"})
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "The solver could not find any valid assignments. This usually means constraints are too restrictive — check cabin requirements, counselor availability, or camper enrollment."})
 		return
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -215,6 +223,32 @@ func (ctrl *Controller) ListRuns(c *gin.Context) {
 }
 
 func (ctrl *Controller) GetRun(c *gin.Context) {
+	log := auth.Logger(c)
+	campID := auth.GetCampID(c)
+	runID := c.Param("runId")
+
+	run, err := ctrl.svc.GetRun(c.Request.Context(), campID, runID)
+	if err != nil {
+		if errors.Is(err, ErrRunNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "assignment run not found"})
+			return
+		}
+		if api.IsBadInput(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		log.
+			With("run_id", runID).
+			With("error", err).
+			Error("error getting assignment run")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, run)
+}
+
+func (ctrl *Controller) GetRunById(c *gin.Context) {
 	log := auth.Logger(c)
 	campID := auth.GetCampID(c)
 	runID := c.Param("runId")

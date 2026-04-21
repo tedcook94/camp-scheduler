@@ -20,6 +20,18 @@ var (
 	ErrNoSolutions      = errors.New("solver produced no valid solutions")
 )
 
+type PreconditionError struct {
+	msg string
+}
+
+func NewPreconditionError(msg string) *PreconditionError {
+	return &PreconditionError{msg: msg}
+}
+
+func (e *PreconditionError) Error() string {
+	return e.msg
+}
+
 type Service struct {
 	queries *db.Queries
 	pool    *pgxpool.Pool
@@ -35,6 +47,10 @@ func (svc *Service) TriggerRun(ctx context.Context, campID, sessionID string, cf
 		return RunDetailResponse{}, fmt.Errorf("error building snapshot: %w", err)
 	}
 
+	if msg := validateCounselorCabin(snapshot); msg != "" {
+		return RunDetailResponse{}, NewPreconditionError(msg)
+	}
+
 	solutions := solver.Solve(snapshot, cfg)
 	if len(solutions) == 0 {
 		return RunDetailResponse{}, ErrNoSolutions
@@ -46,6 +62,43 @@ func (svc *Service) TriggerRun(ctx context.Context, campID, sessionID string, cf
 	}
 
 	return svc.GetRun(ctx, campID, runID)
+}
+
+func validateCounselorCabin(snapshot solver.SessionSnapshot) string {
+	if len(snapshot.Cabins) == 0 {
+		return "No cabins configured for this session"
+	}
+
+	totalRequired := 0
+	for _, c := range snapshot.Cabins {
+		totalRequired += c.RequiredCounselors
+	}
+
+	if totalRequired == 0 {
+		return ""
+	}
+
+	if len(snapshot.Counselors) == 0 {
+		return "No enabled counselors found"
+	}
+
+	hasSenior := false
+	for _, c := range snapshot.Counselors {
+		if !c.IsJunior {
+			hasSenior = true
+			break
+		}
+	}
+
+	if !hasSenior {
+		return "No senior counselors available; at least one senior is required to satisfy the senior-counselor constraint for staffed cabins"
+	}
+
+	if len(snapshot.Counselors) < totalRequired {
+		return fmt.Sprintf("Not enough counselors (%d) to fill all cabin requirements (%d)", len(snapshot.Counselors), totalRequired)
+	}
+
+	return ""
 }
 
 func (svc *Service) ListRuns(ctx context.Context, campID, sessionID string) ([]RunResponse, error) {
@@ -80,6 +133,10 @@ func (svc *Service) TriggerActivityRun(ctx context.Context, campID, sessionID st
 		return RunDetailResponse{}, fmt.Errorf("error building activity snapshot: %w", err)
 	}
 
+	if msg := validateActivity(snapshot); msg != "" {
+		return RunDetailResponse{}, NewPreconditionError(msg)
+	}
+
 	solutions := solver.SolveActivity(snapshot, cfg)
 	if len(solutions) == 0 {
 		return RunDetailResponse{}, ErrNoSolutions
@@ -93,10 +150,31 @@ func (svc *Service) TriggerActivityRun(ctx context.Context, campID, sessionID st
 	return svc.GetRun(ctx, campID, runID)
 }
 
+func validateActivity(snapshot solver.ActivitySnapshot) string {
+	if len(snapshot.Slots) == 0 {
+		return "No activities configured for this session"
+	}
+
+	totalRequired := 0
+	for _, s := range snapshot.Slots {
+		totalRequired += s.RequiredCounselors
+	}
+
+	if totalRequired > 0 && len(snapshot.Counselors) == 0 {
+		return "No enabled counselors found"
+	}
+
+	return ""
+}
+
 func (svc *Service) TriggerCamperRun(ctx context.Context, campID, sessionID string, cfg solver.CamperSolverConfig) (RunDetailResponse, error) {
 	snapshot, err := solver.BuildCamperCabinSnapshot(ctx, svc.queries, campID, sessionID)
 	if err != nil {
 		return RunDetailResponse{}, fmt.Errorf("error building camper snapshot: %w", err)
+	}
+
+	if msg := validateCamperCabin(snapshot); msg != "" {
+		return RunDetailResponse{}, NewPreconditionError(msg)
 	}
 
 	solutions := solver.SolveCamperCabin(snapshot, cfg)
@@ -110,6 +188,17 @@ func (svc *Service) TriggerCamperRun(ctx context.Context, campID, sessionID stri
 	}
 
 	return svc.GetRun(ctx, campID, runID)
+}
+
+func validateCamperCabin(snapshot solver.CamperCabinSnapshot) string {
+	if len(snapshot.Campers) == 0 {
+		return "No campers enrolled in this session"
+	}
+	if len(snapshot.Cabins) == 0 {
+		return "No cabins configured for this session"
+	}
+
+	return ""
 }
 
 func (svc *Service) GetRun(ctx context.Context, campID, runID string) (RunDetailResponse, error) {

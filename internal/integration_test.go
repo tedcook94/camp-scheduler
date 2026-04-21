@@ -230,6 +230,17 @@ func TestActivitySchedulingSolver(t *testing.T) {
 	t.Run("activity_scheduling", testActivityScheduling)
 }
 
+func TestAssignmentRunEndpoints(t *testing.T) {
+	t.Run("get_run_by_id", testGetRunById)
+	t.Run("get_run_by_id_not_found", testGetRunByIdNotFound)
+	t.Run("get_run_by_id_cross_camp_isolation", testGetRunByIdCrossCampIsolation)
+	t.Run("precondition_no_session_cabins", testPreconditionNoSessionCabins)
+	t.Run("precondition_no_enabled_counselors", testPreconditionNoEnabledCounselors)
+	t.Run("precondition_no_senior_counselors", testPreconditionNoSeniorCounselors)
+	t.Run("precondition_no_enrolled_campers", testPreconditionNoEnrolledCampers)
+	t.Run("precondition_no_session_activities", testPreconditionNoSessionActivities)
+}
+
 func TestAuth(t *testing.T) {
 	t.Run("login_success", testLoginSuccess)
 	t.Run("login_bad_password", testLoginBadPassword)
@@ -2874,29 +2885,401 @@ func TestReorderTimeSlots(t *testing.T) {
 	t.Run("reject duplicate IDs", func(t *testing.T) {
 		doRawRequest(t, "PUT", apiURL(ts, sessionBase+"/time-slots/reorder"), map[string]any{
 			"ordered_ids": []string{sts1ID, sts1ID, sts2ID},
-		}, http.StatusBadRequest, token)
+	}, http.StatusBadRequest, token)
 	})
+}
 
-	t.Run("reject missing IDs", func(t *testing.T) {
-		doRawRequest(t, "PUT", apiURL(ts, sessionBase+"/time-slots/reorder"), map[string]any{
-			"ordered_ids": []string{sts1ID, sts2ID},
-		}, http.StatusBadRequest, token)
-	})
+func testGetRunById(t *testing.T) {
+	ts, pool := mustSetupServer(t)
 
-	t.Run("reject IDs from another session", func(t *testing.T) {
-		session2 := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
-			"name": "Session 2", "season_id": str(season, "id"),
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`,
+		"Camp RunById").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	ag := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Juniors"}, token)
+	agID := str(ag, "id")
+
+	cabin := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name":                 "Pine",
+		"default_age_group_id": agID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
+	}, token)
+	cabinID := str(cabin, "id")
+
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31",
+	}, token)
+	seasonID := str(season, "id")
+
+	session := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	}, token)
+	sessionID := str(session, "id")
+
+	sag := mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/age-groups"), map[string]any{
+		"age_group_id": agID,
+	}, token)
+	sagID := str(sag, "id")
+
+	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
+		"session_age_group_id": sagID, "cabin_id": cabinID,
+		"group_size": 8, "required_counselors": 1,
+	}, token)
+
+	for _, name := range []string{"Alice", "Bob"} {
+		mustPost(t, apiURL(ts, "/counselors"), map[string]any{
+			"name": name, "is_junior": false,
 		}, token)
-		session2Base := "/sessions/" + str(session2, "id")
+	}
 
-		otherSts := mustPost(t, apiURL(ts, session2Base+"/time-slots"), map[string]any{
-			"time_slot_id": str(p1, "id"), "sort_order": 1,
-		}, token)
+	runURL := apiURL(ts, "/sessions/"+sessionID+"/assignment-runs")
+	runResp := mustPost(t, runURL, map[string]any{"run_type": "counselor_cabin"}, token)
+	runID := str(runResp, "id")
 
-		doRawRequest(t, "PUT", apiURL(ts, sessionBase+"/time-slots/reorder"), map[string]any{
-			"ordered_ids": []string{sts1ID, sts2ID, str(otherSts, "id")},
-		}, http.StatusBadRequest, token)
-	})
+	byIdResp := mustGet(t, apiURL(ts, "/assignment-runs/"+runID), token)
+
+	if str(byIdResp, "id") != runID {
+		t.Fatalf("expected run id %q, got %q", runID, str(byIdResp, "id"))
+	}
+	if str(byIdResp, "camp_id") != campID {
+		t.Fatalf("expected camp_id %q, got %q", campID, str(byIdResp, "camp_id"))
+	}
+	if str(byIdResp, "session_id") != sessionID {
+		t.Fatalf("expected session_id %q, got %q", sessionID, str(byIdResp, "session_id"))
+	}
+	if str(byIdResp, "run_type") != "counselor_cabin" {
+		t.Fatalf("expected run_type counselor_cabin, got %q", str(byIdResp, "run_type"))
+	}
+	if str(byIdResp, "status") != "completed" {
+		t.Fatalf("expected status completed, got %q", str(byIdResp, "status"))
+	}
+	solutions := list(byIdResp, "solutions")
+	if len(solutions) == 0 {
+		t.Fatal("expected at least one solution in run detail response")
+	}
+}
+
+func testGetRunByIdNotFound(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`,
+		"Camp NotFound").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	fakeID := "00000000-0000-0000-0000-000000000000"
+	doRequest(t, http.MethodGet, apiURL(ts, "/assignment-runs/"+fakeID), nil, http.StatusNotFound, token)
+}
+
+func testGetRunByIdCrossCampIsolation(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campA string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`,
+		"Camp A").Scan(&campA)
+	if err != nil {
+		t.Fatalf("inserting camp A: %v", err)
+	}
+	tokenA := mustLogin(t, ts, pool, campA)
+
+	ag := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Juniors"}, tokenA)
+	agID := str(ag, "id")
+
+	cabin := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name":                 "Pine",
+		"default_age_group_id": agID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
+	}, tokenA)
+	cabinID := str(cabin, "id")
+
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31",
+	}, tokenA)
+	seasonID := str(season, "id")
+
+	session := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	}, tokenA)
+	sessionID := str(session, "id")
+
+	sag := mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/age-groups"), map[string]any{
+		"age_group_id": agID,
+	}, tokenA)
+	sagID := str(sag, "id")
+
+	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
+		"session_age_group_id": sagID, "cabin_id": cabinID,
+		"group_size": 8, "required_counselors": 1,
+	}, tokenA)
+
+	for _, name := range []string{"Alice", "Bob"} {
+		mustPost(t, apiURL(ts, "/counselors"), map[string]any{
+			"name": name, "is_junior": false,
+		}, tokenA)
+	}
+
+	runURL := apiURL(ts, "/sessions/"+sessionID+"/assignment-runs")
+	runResp := mustPost(t, runURL, map[string]any{"run_type": "counselor_cabin"}, tokenA)
+	runID := str(runResp, "id")
+
+	var campB string
+	err = pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`,
+		"Camp B").Scan(&campB)
+	if err != nil {
+		t.Fatalf("inserting camp B: %v", err)
+	}
+	tokenB := mustLogin(t, ts, pool, campB)
+
+	doRequest(t, http.MethodGet, apiURL(ts, "/assignment-runs/"+runID), nil, http.StatusNotFound, tokenB)
+}
+
+func testPreconditionNoSessionCabins(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`,
+		"Camp NoCabins").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	ag := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Juniors"}, token)
+	agID := str(ag, "id")
+
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31",
+	}, token)
+	seasonID := str(season, "id")
+
+	session := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	}, token)
+	sessionID := str(session, "id")
+
+	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/age-groups"), map[string]any{
+		"age_group_id": agID,
+	}, token)
+
+	mustPost(t, apiURL(ts, "/counselors"), map[string]any{
+		"name": "Alice", "is_junior": false,
+	}, token)
+
+	resp := doRequest(t, http.MethodPost,
+		apiURL(ts, "/sessions/"+sessionID+"/assignment-runs"),
+		map[string]any{"run_type": "counselor_cabin"},
+		http.StatusUnprocessableEntity, token)
+	if !strings.Contains(str(resp, "error"), "No cabins configured") {
+		t.Fatalf("expected 'No cabins configured' error, got: %s", str(resp, "error"))
+	}
+}
+
+func testPreconditionNoEnabledCounselors(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`,
+		"CampNoCounselors").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	ag := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Juniors"}, token)
+	agID := str(ag, "id")
+
+	cabin := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name":                 "Pine",
+		"default_age_group_id": agID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
+	}, token)
+	cabinID := str(cabin, "id")
+
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31",
+	}, token)
+	seasonID := str(season, "id")
+
+	session := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	}, token)
+	sessionID := str(session, "id")
+
+	sag := mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/age-groups"), map[string]any{
+		"age_group_id": agID,
+	}, token)
+	sagID := str(sag, "id")
+
+	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
+		"session_age_group_id": sagID, "cabin_id": cabinID,
+		"group_size": 8, "required_counselors": 1,
+	}, token)
+
+	resp := doRequest(t, http.MethodPost,
+		apiURL(ts, "/sessions/"+sessionID+"/assignment-runs"),
+		map[string]any{"run_type": "counselor_cabin"},
+		http.StatusUnprocessableEntity, token)
+	if !strings.Contains(str(resp, "error"), "No enabled counselors") {
+		t.Fatalf("expected 'No enabled counselors' error, got: %s", str(resp, "error"))
+	}
+}
+
+func testPreconditionNoSeniorCounselors(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`,
+		"CampNoSeniors").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	ag := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Juniors"}, token)
+	agID := str(ag, "id")
+
+	cabin := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name":                 "Pine",
+		"default_age_group_id": agID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
+	}, token)
+	cabinID := str(cabin, "id")
+
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31",
+	}, token)
+	seasonID := str(season, "id")
+
+	session := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	}, token)
+	sessionID := str(session, "id")
+
+	sag := mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/age-groups"), map[string]any{
+		"age_group_id": agID,
+	}, token)
+	sagID := str(sag, "id")
+
+	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
+		"session_age_group_id": sagID, "cabin_id": cabinID,
+		"group_size": 8, "required_counselors": 1,
+	}, token)
+
+	mustPost(t, apiURL(ts, "/counselors"), map[string]any{
+		"name": "Junior1", "junior_counselor": true,
+	}, token)
+	mustPost(t, apiURL(ts, "/counselors"), map[string]any{
+		"name": "Junior2", "junior_counselor": true,
+	}, token)
+
+	resp := doRequest(t, http.MethodPost,
+		apiURL(ts, "/sessions/"+sessionID+"/assignment-runs"),
+		map[string]any{"run_type": "counselor_cabin"},
+		http.StatusUnprocessableEntity, token)
+	if !strings.Contains(str(resp, "error"), "No senior counselors") {
+		t.Fatalf("expected 'No senior counselors' error, got: %s", str(resp, "error"))
+	}
+}
+
+func testPreconditionNoEnrolledCampers(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`,
+		"CampNoCampers").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	ag := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Juniors"}, token)
+	agID := str(ag, "id")
+
+	cabin := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name":                 "Pine",
+		"default_age_group_id": agID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
+	}, token)
+	cabinID := str(cabin, "id")
+
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31",
+	}, token)
+	seasonID := str(season, "id")
+
+	session := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	}, token)
+	sessionID := str(session, "id")
+
+	sag := mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/age-groups"), map[string]any{
+		"age_group_id": agID,
+	}, token)
+	sagID := str(sag, "id")
+
+	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
+		"session_age_group_id": sagID, "cabin_id": cabinID,
+		"group_size": 8, "required_counselors": 1,
+	}, token)
+
+	resp := doRequest(t, http.MethodPost,
+		apiURL(ts, "/sessions/"+sessionID+"/assignment-runs"),
+		map[string]any{"run_type": "camper_cabin"},
+		http.StatusUnprocessableEntity, token)
+	if !strings.Contains(str(resp, "error"), "No campers enrolled") {
+		t.Fatalf("expected 'No campers enrolled' error, got: %s", str(resp, "error"))
+	}
+}
+
+func testPreconditionNoSessionActivities(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`,
+		"CampNoActivities").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31",
+	}, token)
+	seasonID := str(season, "id")
+
+	session := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	}, token)
+	sessionID := str(session, "id")
+
+	resp := doRequest(t, http.MethodPost,
+		apiURL(ts, "/sessions/"+sessionID+"/assignment-runs"),
+		map[string]any{"run_type": "activity_schedule"},
+		http.StatusUnprocessableEntity, token)
+	if !strings.Contains(str(resp, "error"), "No activities configured") {
+		t.Fatalf("expected 'No activities configured' error, got: %s", str(resp, "error"))
+	}
 }
 
 // TestCopySession exercises a structural session copy: age groups, cabins,

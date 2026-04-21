@@ -87,6 +87,33 @@
 		sessions.filter((s) => !enrollments.some((e) => e.session_id === s.id))
 	);
 
+	let sessionSortLabelById = $derived.by(() => {
+		const seasonNameById = new Map(seasons.map((season) => [season.id, season.name]));
+
+		return new Map(
+			sessions.map((session) => {
+				const seasonName = seasonNameById.get(session.season_id);
+				return [session.id, seasonName ? `${seasonName} - ${session.name}` : session.name];
+			})
+		);
+	});
+
+	let sortedAvailableSessionsForEnroll = $derived.by(() => {
+		return [...availableSessionsForEnroll].sort((a, b) => {
+			const aLabel = sessionSortLabelById.get(a.id) ?? a.name;
+			const bLabel = sessionSortLabelById.get(b.id) ?? b.name;
+			return aLabel.localeCompare(bLabel);
+		});
+	});
+
+	let sortedSessions = $derived.by(() => {
+		return [...sessions].sort((a, b) => {
+			const aLabel = sessionSortLabelById.get(a.id) ?? a.name;
+			const bLabel = sessionSortLabelById.get(b.id) ?? b.name;
+			return aLabel.localeCompare(bLabel);
+		});
+	});
+
 	// Derived: age groups available for the selected session
 	let availableAgeGroupsForEnroll = $derived(
 		sessionAgeGroups.map((sag) => {
@@ -456,7 +483,7 @@
 											: "Select session"}
 									</Select.Trigger>
 									<Select.Content>
-										{#each availableSessionsForEnroll as session (session.id)}
+										{#each sortedAvailableSessionsForEnroll as session (session.id)}
 											<Select.Item value={session.id}>{getSessionLabel(session)}</Select.Item>
 										{/each}
 									</Select.Content>
@@ -525,7 +552,7 @@
 										: "Select session"}
 								</Select.Trigger>
 								<Select.Content>
-									{#each sessions as session (session.id)}
+									{#each sortedSessions as session (session.id)}
 										<Select.Item value={session.id}>{getSessionLabel(session)}</Select.Item>
 									{/each}
 								</Select.Content>

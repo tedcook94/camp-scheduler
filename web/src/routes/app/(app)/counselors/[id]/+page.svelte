@@ -87,6 +87,18 @@
 	let cabins = $state<Cabin[]>([]);
 	let historyFilterSeasonId = $state(page.url.searchParams.get("season") ?? "");
 
+	let seasonNamesById = $derived(new Map(seasons.map((s) => [s.id, s.name])));
+
+	let sortedSessions = $derived.by(() => {
+		return [...sessions].sort((a, b) => {
+			const aSeasonName = seasonNamesById.get(a.season_id);
+			const bSeasonName = seasonNamesById.get(b.season_id);
+			const aLabel = aSeasonName ? `${aSeasonName} - ${a.name}` : a.name;
+			const bLabel = bSeasonName ? `${bSeasonName} - ${b.name}` : b.name;
+			return aLabel.localeCompare(bLabel);
+		});
+	});
+
 	let filteredHistory = $derived(
 		historyFilterSeasonId
 			? historySummary.filter((h) => h.season_id === historyFilterSeasonId)
@@ -551,7 +563,8 @@
 		}
 	}
 
-	function getSessionLabel(session: Session): string {
+	function getSessionLabel(session: Session | undefined): string {
+		if (!session) return "Select session";
 		const season = seasons.find((s) => s.id === session.season_id);
 		return season ? `${season.name} - ${session.name}` : session.name;
 	}
@@ -772,11 +785,11 @@
 							>
 								<Select.Trigger class="w-64">
 									{prefSessionId
-										? getSessionLabel(sessions.find((s) => s.id === prefSessionId)!)
+										? getSessionLabel(sessions.find((s) => s.id === prefSessionId))
 										: "Select session"}
 								</Select.Trigger>
 								<Select.Content>
-									{#each sessions as session (session.id)}
+									{#each sortedSessions as session (session.id)}
 										<Select.Item value={session.id}>{getSessionLabel(session)}</Select.Item>
 									{/each}
 								</Select.Content>
@@ -1105,7 +1118,7 @@
 						{sessions.find((s) => s.id === formSessionId)?.name ?? "Select session"}
 					</Select.Trigger>
 					<Select.Content>
-						{#each sessions as session (session.id)}
+						{#each sortedSessions as session (session.id)}
 							<Select.Item value={session.id}>{session.name}</Select.Item>
 						{/each}
 					</Select.Content>

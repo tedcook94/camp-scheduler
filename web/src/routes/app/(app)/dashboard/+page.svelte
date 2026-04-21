@@ -45,10 +45,11 @@
 			enabled: true,
 		},
 		{
+			href: "/app/assignment-runs",
 			label: "Assignment Runs",
 			description: "Run the solver and review cabin and activity assignments",
 			icon: PlayIcon,
-			enabled: false,
+			enabled: true,
 		},
 		{
 			href: "/app/settings",

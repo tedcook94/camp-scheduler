@@ -384,3 +384,77 @@ export interface CamperFriendPreferenceItem {
 	preferred_camper_id: string;
 	rank: number;
 }
+
+export interface ScoreBreakdown {
+	Constraint: string;
+	Score: number;
+	Message: string;
+}
+
+export interface AssignmentDetail {
+	id: string;
+	counselor_id?: string;
+	camper_id?: string;
+	cabin_id?: string;
+	session_activity_id?: string;
+}
+
+export interface ExplanationDetail {
+	id: string;
+	counselor_id?: string;
+	camper_id?: string;
+	explanation_type: "reason" | "unmet_preference";
+	constraint_name: string | null;
+	message: string;
+}
+
+export interface SolutionDetailResponse {
+	id: string;
+	assignment_run_id: string;
+	solution_index: number;
+	score: number;
+	score_breakdown: ScoreBreakdown[];
+	assignments: AssignmentDetail[];
+	explanations: ExplanationDetail[];
+}
+
+export interface SolutionResponse {
+	id: string;
+	assignment_run_id: string;
+	solution_index: number;
+	score: number;
+	score_breakdown: ScoreBreakdown[];
+}
+
+export interface RunResponse {
+	id: string;
+	camp_id: string;
+	session_id: string;
+	run_type: "counselor_cabin" | "camper_cabin" | "activity_schedule";
+	status: "completed" | "selected";
+	selected_solution_id: string | null;
+	created_at: string;
+}
+
+export interface RunDetailResponse extends RunResponse {
+	solutions: SolutionResponse[];
+}
+
+export interface TriggerRunRequest {
+	run_type?: "counselor_cabin" | "camper_cabin" | "activity_schedule";
+	max_solutions?: number;
+	max_iterations?: number;
+	weights?: {
+		returning_age_group?: number;
+		returning_cabin?: number;
+		cocounselor_preference?: number;
+		age_group_preference?: number;
+		multiple_seniors?: number;
+	};
+	camper_weights?: {
+		friend_preference?: number;
+	};
+	activity_weights?: {
+		activity_preference?: number;
+	};
+}

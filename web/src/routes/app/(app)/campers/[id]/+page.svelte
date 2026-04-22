@@ -76,8 +76,15 @@
 	let prefSaving = $state(false);
 	let addFriendId = $state("");
 
+	// IDs of campers enrolled in the currently selected pref session.
+	let sessionEnrolledCamperIds = $state<Set<string>>(new Set());
+
+	let campersInSession = $derived(
+		allCampers.filter((c) => sessionEnrolledCamperIds.has(c.id))
+	);
+
 	let availableCampersForPref = $derived(
-		allCampers.filter(
+		campersInSession.filter(
 			(c) => c.id !== camperId && !friendPrefs.some((p) => p.preferred_camper_id === c.id)
 		)
 	);
@@ -263,6 +270,7 @@
 
 		if (!sessionId) {
 			friendPrefs = [];
+			sessionEnrolledCamperIds = new Set();
 			prefLoading = false;
 			return;
 		}
@@ -273,9 +281,13 @@
 		prefLoading = true;
 
 		try {
-			const prefs = await camperFriendPreferenceApi.list(sessionId, camperId, signal);
+			const [prefs, sessEnrollments] = await Promise.all([
+				camperFriendPreferenceApi.list(sessionId, camperId, signal),
+				enrollmentApi.list(sessionId),
+			]);
 			if (signal.aborted) return;
 			friendPrefs = prefs.sort((a, b) => a.rank - b.rank);
+			sessionEnrolledCamperIds = new Set(sessEnrollments.map((e) => e.camper_id));
 		} catch (err) {
 			if (signal.aborted) return;
 			const message = err instanceof ApiClientError ? err.message : "Failed to load friend preferences";

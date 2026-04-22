@@ -147,14 +147,17 @@ viable configurations and understand trade-offs.
   - [x] Copy a session's structural configuration into a new session
   - [x] Assignment runs: trigger solver, view run history, compare ranked solutions, select a solution
 - [x] Demo camp seeding tool
+- [ ] Add dedicated camper enrollments endpoint to eliminate N+1 loading on camper detail page
 - [ ] Filter counselor preference options to session-configured age groups and activities
 - [ ] Filter camper preference options to session-enrolled campers
-- [ ] Add dedicated camper enrollments endpoint to eliminate N+1 loading on camper detail page
+- [ ] Enforce gender for cabins
+- [ ] Assign all counselors for cabins/activities
+- [ ] Reports
 - [ ] "Dirty" flag for when changes have been made since assignment run
 - [ ] Archive (soft delete) objects
 - [ ] Overrides (locking assignments before solver runs)
 - [ ] Data import (CSV/spreadsheet)
 - [ ] Auditing
-- [ ] Migrate auth to BetterAuth (enable MFA)
+- [ ] Migrate auth to BetterAuth (camps as orgs, enable MFA)
 - [ ] External system integration (Campminder, etc.)
 - [ ] LLM conversational layer (MCP) for "why was X assigned to Y?" queries

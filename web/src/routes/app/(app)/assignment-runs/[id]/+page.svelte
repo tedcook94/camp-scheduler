@@ -30,9 +30,9 @@
 	type RunType = "counselor_cabin" | "camper_cabin" | "activity_schedule";
 
 	const RUN_TYPE_LABELS: Record<RunType, string> = {
-		counselor_cabin: "Counselor Cabin",
-		camper_cabin: "Camper Cabin",
-		activity_schedule: "Activity Schedule",
+		activity_schedule: "Counselor Activities",
+		counselor_cabin: "Counselor Cabins",
+		camper_cabin: "Camper Cabins",
 	};
 
 	const constraintNameOverrides: Record<string, string> = {

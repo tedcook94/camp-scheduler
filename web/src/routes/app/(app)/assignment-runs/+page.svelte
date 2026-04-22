@@ -30,9 +30,9 @@
 	type RunType = "counselor_cabin" | "camper_cabin" | "activity_schedule";
 
 	const RUN_TYPE_LABELS: Record<RunType, string> = {
-		counselor_cabin: "Counselor Cabin",
-		camper_cabin: "Camper Cabin",
-		activity_schedule: "Activity Schedule",
+		activity_schedule: "Counselor Activities",
+		counselor_cabin: "Counselor Cabins",
+		camper_cabin: "Camper Cabins",
 	};
 
 	let loading = $state(false);
@@ -45,7 +45,7 @@
 
 	let dialogOpen = $state(false);
 	let triggering = $state(false);
-	let triggerRunType = $state<RunType>("counselor_cabin");
+	let triggerRunType = $state<RunType>("activity_schedule");
 
 	let deleteOpen = $state(false);
 	let deleting = $state(false);
@@ -360,23 +360,23 @@
 					onValueChange={(v: string) => (triggerRunType = v as RunType)}
 				>
 					<Select.SelectTrigger id="run-type" class="w-full">
-						{#if triggerRunType === "counselor_cabin"}
-							Counselor Cabin
-						{:else if triggerRunType === "camper_cabin"}
-							Camper Cabin
+						{#if triggerRunType === "activity_schedule"}
+							Counselor Activities
+						{:else if triggerRunType === "counselor_cabin"}
+							Counselor Cabins
 						{:else}
-							Activity Schedule
+							Camper Cabins
 						{/if}
 					</Select.SelectTrigger>
 					<Select.SelectContent>
+						<Select.SelectItem value="activity_schedule">
+							Counselor Activities
+						</Select.SelectItem>
 						<Select.SelectItem value="counselor_cabin">
-							Counselor Cabin
+							Counselor Cabins
 						</Select.SelectItem>
 						<Select.SelectItem value="camper_cabin">
-							Camper Cabin
-						</Select.SelectItem>
-						<Select.SelectItem value="activity_schedule">
-							Activity Schedule
+							Camper Cabins
 						</Select.SelectItem>
 					</Select.SelectContent>
 				</Select.Select>

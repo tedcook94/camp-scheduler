@@ -84,7 +84,14 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateSession
 		return SessionResponse{}, err
 	}
 
-	session, err := svc.queries.CreateSession(ctx, db.CreateSessionParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return SessionResponse{}, fmt.Errorf("error beginning create session transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	session, err := qtx.CreateSession(ctx, db.CreateSessionParams{
 		CampID:          campUUID,
 		SeasonID:        seasonUUID,
 		SessionName:     req.Name,
@@ -92,6 +99,26 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateSession
 	})
 	if err != nil {
 		return SessionResponse{}, fmt.Errorf("error creating session: %w", err)
+	}
+
+	// Bootstrap the session counselor roster with all currently enabled counselors.
+	// Admins curate it from there; the solver and preference filtering both read this roster.
+	enabled, err := qtx.ListEnabledCounselors(ctx, campUUID)
+	if err != nil {
+		return SessionResponse{}, fmt.Errorf("error loading enabled counselors for new session roster: %w", err)
+	}
+	for _, c := range enabled {
+		if _, err := qtx.AddSessionCounselor(ctx, db.AddSessionCounselorParams{
+			CampID:      campUUID,
+			SessionID:   session.ID,
+			CounselorID: c.ID,
+		}); err != nil {
+			return SessionResponse{}, fmt.Errorf("error seeding session counselor roster: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return SessionResponse{}, fmt.Errorf("error committing create session transaction: %w", err)
 	}
 
 	return toSessionResponse(session), nil
@@ -377,6 +404,25 @@ func (svc *Service) Copy(ctx context.Context, campID, sourceID string, req CopyS
 			RequiredCounselors: sa.RequiredCounselors,
 		}); err != nil {
 			return SessionResponse{}, fmt.Errorf("error copying session activity: %w", err)
+		}
+	}
+
+	// Copy the session counselor roster from the source session so the new
+	// session inherits the same staffing pool.
+	sourceCounselors, err := qtx.ListSessionCounselorIDs(ctx, db.ListSessionCounselorIDsParams{
+		SessionID: sourceUUID,
+		CampID:    campUUID,
+	})
+	if err != nil {
+		return SessionResponse{}, fmt.Errorf("error listing source session counselors: %w", err)
+	}
+	for _, counselorID := range sourceCounselors {
+		if _, err := qtx.AddSessionCounselor(ctx, db.AddSessionCounselorParams{
+			CampID:      campUUID,
+			SessionID:   newSession.ID,
+			CounselorID: counselorID,
+		}); err != nil {
+			return SessionResponse{}, fmt.Errorf("error copying session counselor: %w", err)
 		}
 	}
 

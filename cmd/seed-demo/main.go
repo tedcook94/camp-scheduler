@@ -621,9 +621,9 @@ func setCounselorPreferences(ctx context.Context, q *db.Queries, campID pgtype.U
 		{"James Wilson", "Bears", 1},
 		{"Lisa Rodriguez", "Eagles", 1},
 		{"David Brown", "Wolves", 1},
-		{"Rachel Kim", "Bears", 2},
-		{"Tom Anderson", "Eagles", 2},
-		{"Karen Martinez", "Wolves", 2},
+		{"Rachel Kim", "Bears", 1},
+		{"Tom Anderson", "Eagles", 1},
+		{"Karen Martinez", "Wolves", 1},
 	}
 	s2AGPrefs := []agPref{
 		{"Sarah Johnson", "Bears", 1},
@@ -668,11 +668,11 @@ func setCounselorPreferences(ctx context.Context, q *db.Queries, campID pgtype.U
 		{"Mike Chen", "Archery", 1},
 		{"Emily Davis", "Swimming", 1},
 		{"Emily Davis", "Nature Hiking", 2},
-		{"James Wilson", "Canoeing", 2},
+		{"James Wilson", "Canoeing", 1},
 		{"Lisa Rodriguez", "Canoeing", 1},
 		{"David Brown", "Archery", 1},
 		{"Rachel Kim", "Arts & Crafts", 1},
-		{"Tom Anderson", "Nature Hiking", 2},
+		{"Tom Anderson", "Nature Hiking", 1},
 		{"Karen Martinez", "Campfire Cooking", 1},
 	}
 	s2ActPrefs := []actPref{

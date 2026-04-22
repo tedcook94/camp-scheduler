@@ -117,8 +117,38 @@ func (s *activitySearchState) searchCounselorSlots(counselors []ActivityCounselo
 	tsID := s.timeSlotOrder[tsIndex]
 	eligible := s.eligibleByTimeSlot[counselorID][tsID]
 
+	// Order eligible slots so that preferred activities (by rank) are tried
+	// first. Ties break by highest remaining-capacity fraction so the search
+	// naturally lands on balanced, preference-respecting solutions early.
+	ordered := make([]string, len(eligible))
+	copy(ordered, eligible)
+	prefs := s.snapshot.ActivityPreferences[counselorID]
+	rankByActivity := make(map[string]int, len(prefs))
+	for _, p := range prefs {
+		if p.Rank > 0 {
+			rankByActivity[p.TargetID] = p.Rank
+		}
+	}
+	sort.SliceStable(ordered, func(i, j int) bool {
+		si := s.slotsByID[ordered[i]]
+		sj := s.slotsByID[ordered[j]]
+		ri, iPref := rankByActivity[si.ActivityID]
+		rj, jPref := rankByActivity[sj.ActivityID]
+		if iPref != jPref {
+			return iPref
+		}
+		if iPref && jPref && ri != rj {
+			return ri < rj
+		}
+		remI := si.Capacity - len(s.assignment[ordered[i]])
+		remJ := sj.Capacity - len(s.assignment[ordered[j]])
+		fi := float64(remI) / float64(si.Capacity)
+		fj := float64(remJ) / float64(sj.Capacity)
+		return fi > fj
+	})
+
 	// Try each eligible slot in this time slot.
-	for _, slotID := range eligible {
+	for _, slotID := range ordered {
 		slot := s.slotsByID[slotID]
 		if len(s.assignment[slotID]) >= slot.Capacity {
 			continue
@@ -165,6 +195,7 @@ func (s *activitySearchState) feasible(remaining []ActivityCounselor) bool {
 
 func (s *activitySearchState) evaluateSolution() {
 	assignment := s.cloneAssignment()
+	assignment = fillRemainingActivity(s.snapshot, assignment, s.eligibleByTimeSlot, s.timeSlotOrder, s.slotsByID)
 
 	violations := CheckActivityHardConstraints(s.snapshot, assignment)
 	if len(violations) > 0 {
@@ -266,4 +297,116 @@ func orderedTimeSlots(snapshot ActivitySnapshot) []string {
 		}
 	}
 	return order
+}
+
+// fillRemainingActivity places any counselor not yet assigned in a time slot
+// into an eligible slot within that time slot. Preference is given to the
+// counselor's ranked activity preferences; otherwise it picks the slot with
+// the highest remaining-capacity fraction (round-robin balancing).
+func fillRemainingActivity(
+	snapshot ActivitySnapshot,
+	assignment ActivityAssignment,
+	eligibleByTimeSlot map[string]map[string][]string,
+	timeSlotOrder []string,
+	slotsByID map[string]ActivitySlot,
+) ActivityAssignment {
+	result := make(map[string][]string, len(assignment.SlotCounselors))
+	counts := make(map[string]int)
+	for slotID, counselorIDs := range assignment.SlotCounselors {
+		cp := make([]string, len(counselorIDs))
+		copy(cp, counselorIDs)
+		result[slotID] = cp
+		counts[slotID] = len(cp)
+	}
+
+	// Build counselor -> set of time slots already served.
+	counselorTimeSlots := make(map[string]map[string]bool)
+	for slotID, counselorIDs := range result {
+		tsID := slotsByID[slotID].TimeSlotID
+		for _, cID := range counselorIDs {
+			if counselorTimeSlots[cID] == nil {
+				counselorTimeSlots[cID] = make(map[string]bool)
+			}
+			counselorTimeSlots[cID][tsID] = true
+		}
+	}
+
+	// Build counselor -> activityID -> rank for quick preference lookup.
+	prefRank := make(map[string]map[string]int)
+	for cID, prefs := range snapshot.ActivityPreferences {
+		m := make(map[string]int, len(prefs))
+		for _, p := range prefs {
+			if p.Rank > 0 {
+				m[p.TargetID] = p.Rank
+			}
+		}
+		prefRank[cID] = m
+	}
+
+	pickSlot := func(cID, tsID string) string {
+		eligible := eligibleByTimeSlot[cID][tsID]
+		if len(eligible) == 0 {
+			return ""
+		}
+
+		// First try: pick the preferred eligible slot with lowest rank (best).
+		prefs := prefRank[cID]
+		bestPrefSlot := ""
+		bestPrefRank := 0
+		for _, slotID := range eligible {
+			slot := slotsByID[slotID]
+			if counts[slotID] >= slot.Capacity {
+				continue
+			}
+			rank, ok := prefs[slot.ActivityID]
+			if !ok {
+				continue
+			}
+			if bestPrefSlot == "" || rank < bestPrefRank {
+				bestPrefSlot = slotID
+				bestPrefRank = rank
+			}
+		}
+		if bestPrefSlot != "" {
+			return bestPrefSlot
+		}
+
+		// Fallback: pick slot with highest remaining-capacity fraction
+		// so counselors spread evenly across activities.
+		bestSlot := ""
+		bestFraction := 0.0
+		for _, slotID := range eligible {
+			slot := slotsByID[slotID]
+			remaining := slot.Capacity - counts[slotID]
+			if remaining <= 0 {
+				continue
+			}
+			fraction := float64(remaining) / float64(slot.Capacity)
+			if bestSlot == "" || fraction > bestFraction {
+				bestSlot = slotID
+				bestFraction = fraction
+			}
+		}
+		return bestSlot
+	}
+
+	for _, c := range snapshot.Counselors {
+		for _, tsID := range timeSlotOrder {
+			if counselorTimeSlots[c.ID][tsID] {
+				continue
+			}
+			slotID := pickSlot(c.ID, tsID)
+			if slotID == "" {
+				continue
+			}
+			result[slotID] = append(result[slotID], c.ID)
+			counts[slotID]++
+			if counselorTimeSlots[c.ID] == nil {
+				counselorTimeSlots[c.ID] = make(map[string]bool)
+			}
+			counselorTimeSlots[c.ID][tsID] = true
+		}
+	}
+
+	return ActivityAssignment{SlotCounselors: result}
 }

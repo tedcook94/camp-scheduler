@@ -626,6 +626,12 @@ func testActivityScheduling(t *testing.T) {
 	if len(assignments) == 0 {
 		t.Fatal("expected assignments in activity solution detail")
 	}
+	// Regression guard against the placeholder-reason bug that dropped
+	// counselors from the persisted assignments — the solver places at
+	// least 5 slot assignments here even with constrained capacity.
+	if len(assignments) < 5 {
+		t.Fatalf("expected at least 5 activity assignments, got %d", len(assignments))
+	}
 
 	// Verify each assignment has counselor_id and session_activity_id.
 	for _, a := range assignments {
@@ -893,6 +899,11 @@ func testSimpleCamp(t *testing.T) {
 	assignments := list(solDetail, "assignments")
 	if len(assignments) == 0 {
 		t.Fatal("expected assignments in solution detail")
+	}
+	// All 6 enabled counselors should be assigned to a cabin (no orphans
+	// from the placeholder-reason regression).
+	if len(assignments) != 6 {
+		t.Fatalf("expected 6 counselor assignments (one per enabled counselor), got %d", len(assignments))
 	}
 
 	cabinCounselors := make(map[string][]string)

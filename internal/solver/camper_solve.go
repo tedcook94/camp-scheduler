@@ -96,7 +96,17 @@ func (s *camperSearchState) search(campers []Camper, index int) {
 	camper := campers[index]
 	eligibleCabins := s.cabinsByAgeGroup[camper.AgeGroupID]
 
-	for _, cabin := range eligibleCabins {
+	// Order cabins by most-remaining-capacity first so backtracking
+	// explores balanced placements before lopsided ones.
+	ordered := make([]CamperCabin, len(eligibleCabins))
+	copy(ordered, eligibleCabins)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		ri := ordered[i].Capacity - s.cabinCount[ordered[i].ID]
+		rj := ordered[j].Capacity - s.cabinCount[ordered[j].ID]
+		return ri > rj
+	})
+
+	for _, cabin := range ordered {
 		if s.cabinCount[cabin.ID] >= cabin.Capacity {
 			continue
 		}

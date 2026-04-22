@@ -75,7 +75,7 @@ func storeCamperSolution(ctx context.Context, qtx *db.Queries, campID, runID pgt
 
 	explanation := ExplainCamper(snapshot, solution)
 
-	if err := storeCamperAssignments(ctx, qtx, campID, sol.ID, explanation); err != nil {
+	if err := storeCamperAssignments(ctx, qtx, campID, sol.ID, solution); err != nil {
 		return err
 	}
 
@@ -86,26 +86,27 @@ func storeCamperSolution(ctx context.Context, qtx *db.Queries, campID, runID pgt
 	return nil
 }
 
-func storeCamperAssignments(ctx context.Context, qtx *db.Queries, campID, solutionID pgtype.UUID, explanation CamperExplanation) error {
-	for _, ae := range explanation.Assignments {
-		camperUUID, err := api.ParseUUID(ae.CamperID)
+func storeCamperAssignments(ctx context.Context, qtx *db.Queries, campID, solutionID pgtype.UUID, solution CamperSolution) error {
+	for cabinID, camperIDs := range solution.Assignment.CabinCampers {
+		cabinUUID, err := api.ParseUUID(cabinID)
 		if err != nil {
 			return err
 		}
+		for _, camperID := range camperIDs {
+			camperUUID, err := api.ParseUUID(camperID)
+			if err != nil {
+				return err
+			}
 
-		cabinUUID, err := api.ParseUUID(ae.CabinID)
-		if err != nil {
-			return err
-		}
-
-		_, err = qtx.CreateCamperCabinAssignment(ctx, db.CreateCamperCabinAssignmentParams{
-			CampID:     campID,
-			SolutionID: solutionID,
-			CamperID:   camperUUID,
-			CabinID:    cabinUUID,
-		})
-		if err != nil {
-			return fmt.Errorf("error creating camper assignment for camper %s: %w", ae.CamperID, err)
+			_, err = qtx.CreateCamperCabinAssignment(ctx, db.CreateCamperCabinAssignmentParams{
+				CampID:     campID,
+				SolutionID: solutionID,
+				CamperID:   camperUUID,
+				CabinID:    cabinUUID,
+			})
+			if err != nil {
+				return fmt.Errorf("error creating camper assignment for camper %s: %w", camperID, err)
+			}
 		}
 	}
 	return nil

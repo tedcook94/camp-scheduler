@@ -277,6 +277,13 @@ type SessionAgeGroupCabin struct {
 	RequiredCounselors int32
 }
 
+type SessionCounselor struct {
+	ID          pgtype.UUID
+	CampID      pgtype.UUID
+	SessionID   pgtype.UUID
+	CounselorID pgtype.UUID
+}
+
 type SessionTimeSlot struct {
 	ID         pgtype.UUID
 	CampID     pgtype.UUID

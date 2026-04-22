@@ -7,16 +7,19 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var ErrNotFound = errors.New("counselor not found")
 
 type Service struct {
 	queries *db.Queries
+	pool    *pgxpool.Pool
 }
 
-func NewService(queries *db.Queries) *Service {
-	return &Service{queries: queries}
+func NewService(queries *db.Queries, pool *pgxpool.Pool) *Service {
+	return &Service{queries: queries, pool: pool}
 }
 
 func (svc *Service) List(ctx context.Context, campID string) ([]CounselorResponse, error) {
@@ -65,13 +68,41 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCounsel
 		return CounselorResponse{}, err
 	}
 
-	counselor, err := svc.queries.CreateCounselor(ctx, db.CreateCounselorParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return CounselorResponse{}, fmt.Errorf("error beginning create counselor transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	counselor, err := qtx.CreateCounselor(ctx, db.CreateCounselorParams{
 		CampID:          uid,
 		CounselorName:   req.Name,
 		JuniorCounselor: req.JuniorCounselor,
 	})
 	if err != nil {
 		return CounselorResponse{}, fmt.Errorf("error creating counselor: %w", err)
+	}
+
+	// Roster the new counselor onto every existing session in the camp so
+	// they're available to the solver and to preference filtering. Admins can
+	// trim the roster per-session as needed.
+	sessions, err := qtx.ListSessions(ctx, uid)
+	if err != nil {
+		return CounselorResponse{}, fmt.Errorf("error listing sessions for counselor roster: %w", err)
+	}
+	for _, s := range sessions {
+		if _, err := qtx.AddSessionCounselor(ctx, db.AddSessionCounselorParams{
+			CampID:      uid,
+			SessionID:   s.ID,
+			CounselorID: counselor.ID,
+		}); err != nil {
+			return CounselorResponse{}, fmt.Errorf("error rostering new counselor onto session: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return CounselorResponse{}, fmt.Errorf("error committing create counselor transaction: %w", err)
 	}
 
 	return toCounselorResponse(counselor), nil

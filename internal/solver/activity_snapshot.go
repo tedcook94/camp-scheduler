@@ -36,9 +36,13 @@ func BuildActivitySnapshot(ctx context.Context, queries *db.Queries, campID, ses
 		return ActivitySnapshot{}, err
 	}
 
-	counselors, err := loadActivityCounselors(ctx, queries, campUUID)
+	counselors, err := loadActivityCounselors(ctx, queries, sessionUUID, campUUID)
 	if err != nil {
 		return ActivitySnapshot{}, err
+	}
+	rosterSet := make(map[string]bool, len(counselors))
+	for _, c := range counselors {
+		rosterSet[c.ID] = true
 	}
 
 	prefs, err := loadActivityPreferences(ctx, queries, sessionUUID, campUUID)
@@ -50,6 +54,11 @@ func BuildActivitySnapshot(ctx context.Context, queries *db.Queries, campID, ses
 	if err != nil {
 		return ActivitySnapshot{}, err
 	}
+
+	// Prune counselor-keyed maps so the solver and explainer only consider
+	// counselors on the session roster.
+	prefs = filterMapByRoster(prefs, rosterSet)
+	unmetPrefs = filterMapByRoster(unmetPrefs, rosterSet)
 
 	return ActivitySnapshot{
 		SessionID:                sessionID,
@@ -104,10 +113,10 @@ func loadActivitySlots(ctx context.Context, queries *db.Queries, sessionID, camp
 	return slots, certNames, nil
 }
 
-func loadActivityCounselors(ctx context.Context, queries *db.Queries, campID pgtype.UUID) ([]ActivityCounselor, error) {
-	rows, err := queries.ListEnabledCounselors(ctx, campID)
+func loadActivityCounselors(ctx context.Context, queries *db.Queries, sessionID, campID pgtype.UUID) ([]ActivityCounselor, error) {
+	rows, err := loadSessionRoster(ctx, queries, sessionID, campID)
 	if err != nil {
-		return nil, fmt.Errorf("error listing enabled counselors: %w", err)
+		return nil, err
 	}
 
 	certRows, err := queries.ListSessionCounselorCertifications(ctx, campID)
@@ -126,7 +135,7 @@ func loadActivityCounselors(ctx context.Context, queries *db.Queries, campID pgt
 
 	counselors := make([]ActivityCounselor, len(rows))
 	for i, r := range rows {
-		cID := api.UUIDToString(r.ID)
+		cID := api.UUIDToString(r.CounselorID)
 		certs := certsByCounselor[cID]
 		if certs == nil {
 			certs = make(map[string]bool)

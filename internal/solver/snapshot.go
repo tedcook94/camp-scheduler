@@ -36,10 +36,11 @@ func BuildSnapshot(ctx context.Context, queries *db.Queries, campID, sessionID s
 		return SessionSnapshot{}, err
 	}
 
-	counselors, err := loadCounselors(ctx, queries, campUUID)
+	counselors, err := loadCounselors(ctx, queries, sessionUUID, campUUID)
 	if err != nil {
 		return SessionSnapshot{}, err
 	}
+	rosterSet := buildRosterSet(counselors)
 
 	ageGroupPrefs, err := loadAgeGroupPreferences(ctx, queries, sessionUUID, campUUID)
 	if err != nil {
@@ -60,6 +61,15 @@ func BuildSnapshot(ctx context.Context, queries *db.Queries, campID, sessionID s
 	if err != nil {
 		return SessionSnapshot{}, err
 	}
+
+	// Prune all counselor-keyed maps to only counselors on the session roster.
+	// This means a counselor removed from the roster (or with stale prefs from
+	// a prior roster membership) is invisible to the solver and explainer.
+	ageGroupPrefs = filterMapByRoster(ageGroupPrefs, rosterSet)
+	cocounselorPrefs = filterCocounselorPrefsByRoster(cocounselorPrefs, rosterSet)
+	placements = filterMapByRoster(placements, rosterSet)
+	unmetAG = filterMapByRoster(unmetAG, rosterSet)
+	unmetCo = filterCocounselorUnmetByRoster(unmetCo, rosterSet)
 
 	return SessionSnapshot{
 		SessionID:                   sessionID,
@@ -96,16 +106,106 @@ func loadCabins(ctx context.Context, queries *db.Queries, sessionID, campID pgty
 	return cabins, nil
 }
 
-func loadCounselors(ctx context.Context, queries *db.Queries, campID pgtype.UUID) ([]Counselor, error) {
-	rows, err := queries.ListEnabledCounselors(ctx, campID)
+// loadSessionRoster returns the rows from the session counselor roster,
+// filtered to only currently-enabled counselors. Disabled counselors left on
+// the roster are skipped as a safety net so they never reach a solver.
+func loadSessionRoster(ctx context.Context, queries *db.Queries, sessionID, campID pgtype.UUID) ([]db.ListSessionCounselorsRow, error) {
+	rows, err := queries.ListSessionCounselors(ctx, db.ListSessionCounselorsParams{
+		SessionID: sessionID,
+		CampID:    campID,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("error listing enabled counselors: %w", err)
+		return nil, fmt.Errorf("error listing session counselors: %w", err)
+	}
+	enabled := rows[:0]
+	for _, r := range rows {
+		if r.CounselorEnabled {
+			enabled = append(enabled, r)
+		}
+	}
+	return enabled, nil
+}
+
+// buildRosterSet turns a roster slice into a lookup set keyed by counselor ID.
+func buildRosterSet(counselors []Counselor) map[string]bool {
+	set := make(map[string]bool, len(counselors))
+	for _, c := range counselors {
+		set[c.ID] = true
+	}
+	return set
+}
+
+// filterMapByRoster drops keys not present in the roster set. Used for any
+// counselor-keyed map whose values do not themselves reference counselor IDs.
+func filterMapByRoster[V any](m map[string]V, roster map[string]bool) map[string]V {
+	if len(m) == 0 {
+		return m
+	}
+	out := make(map[string]V, len(m))
+	for k, v := range m {
+		if roster[k] {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+// filterCocounselorPrefsByRoster drops both keys and target IDs that are not
+// on the roster. The values of the cocounselor preference map are themselves
+// references to other counselors, so off-roster targets must also be pruned.
+func filterCocounselorPrefsByRoster(m map[string][]RankedPreference, roster map[string]bool) map[string][]RankedPreference {
+	if len(m) == 0 {
+		return m
+	}
+	out := make(map[string][]RankedPreference, len(m))
+	for k, prefs := range m {
+		if !roster[k] {
+			continue
+		}
+		kept := prefs[:0:0]
+		for _, p := range prefs {
+			if roster[p.TargetID] {
+				kept = append(kept, p)
+			}
+		}
+		out[k] = kept
+	}
+	return out
+}
+
+// filterCocounselorUnmetByRoster drops outer and inner keys that are not on
+// the roster. The unmet-cocounselor map is keyed by counselor ID with values
+// that are sets of preferred-counselor IDs.
+func filterCocounselorUnmetByRoster(m map[string]map[string]bool, roster map[string]bool) map[string]map[string]bool {
+	if len(m) == 0 {
+		return m
+	}
+	out := make(map[string]map[string]bool, len(m))
+	for k, inner := range m {
+		if !roster[k] {
+			continue
+		}
+		keptInner := make(map[string]bool, len(inner))
+		for tID := range inner {
+			if roster[tID] {
+				keptInner[tID] = true
+			}
+		}
+		out[k] = keptInner
+	}
+	return out
+}
+
+func loadCounselors(ctx context.Context, queries *db.Queries, sessionID, campID pgtype.UUID) ([]Counselor, error) {
+	rows, err := loadSessionRoster(ctx, queries, sessionID, campID)
+	if err != nil {
+		return nil, err
 	}
 
 	counselors := make([]Counselor, len(rows))
 	for i, r := range rows {
 		counselors[i] = Counselor{
-			ID:       api.UUIDToString(r.ID),
+			ID:       api.UUIDToString(r.CounselorID),
 			Name:     r.CounselorName,
 			IsJunior: r.JuniorCounselor,
 		}

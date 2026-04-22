@@ -132,7 +132,7 @@ func (s *Server) routes() {
 	sessionController := session.NewController(sessionService)
 	sessionController.RegisterRoutes(protected)
 
-	counselorService := counselor.NewService(queries)
+	counselorService := counselor.NewService(queries, s.pool)
 	counselorController := counselor.NewController(counselorService)
 	counselorController.RegisterRoutes(protected)
 

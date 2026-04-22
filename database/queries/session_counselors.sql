@@ -29,6 +29,10 @@ WHERE session_id = $1 AND camp_id = $2 AND counselor_id = $3;
 DELETE FROM session_counselors
 WHERE session_id = $1 AND camp_id = $2;
 
+-- name: RemoveCounselorFromAllSessions :exec
+DELETE FROM session_counselors
+WHERE camp_id = $1 AND counselor_id = $2;
+
 -- name: IsCounselorInSession :one
 SELECT EXISTS (
     SELECT 1 FROM session_counselors

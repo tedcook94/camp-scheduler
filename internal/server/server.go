@@ -168,6 +168,10 @@ func (s *Server) routes() {
 	activityConfigController := sessionconfig.NewActivityController(activityConfigService)
 	activityConfigController.RegisterRoutes(protected)
 
+	sessionCounselorService := sessionconfig.NewCounselorService(queries)
+	sessionCounselorController := sessionconfig.NewCounselorController(sessionCounselorService)
+	sessionCounselorController.RegisterRoutes(protected)
+
 	camperService := camper.NewService(queries)
 	camperController := camper.NewController(camperService)
 	camperController.RegisterRoutes(protected)

@@ -177,6 +177,21 @@ func (q *Queries) ListSessionCounselors(ctx context.Context, arg ListSessionCoun
 	return items, nil
 }
 
+const removeCounselorFromAllSessions = `-- name: RemoveCounselorFromAllSessions :exec
+DELETE FROM session_counselors
+WHERE camp_id = $1 AND counselor_id = $2
+`
+
+type RemoveCounselorFromAllSessionsParams struct {
+	CampID      pgtype.UUID
+	CounselorID pgtype.UUID
+}
+
+func (q *Queries) RemoveCounselorFromAllSessions(ctx context.Context, arg RemoveCounselorFromAllSessionsParams) error {
+	_, err := q.db.Exec(ctx, removeCounselorFromAllSessions, arg.CampID, arg.CounselorID)
+	return err
+}
+
 const removeSessionCounselor = `-- name: RemoveSessionCounselor :execrows
 DELETE FROM session_counselors
 WHERE session_id = $1 AND camp_id = $2 AND counselor_id = $3

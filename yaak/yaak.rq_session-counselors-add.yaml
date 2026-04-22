@@ -1,0 +1,19 @@
+type: http_request
+model: http_request
+id: rq_session-counselors-add
+createdAt: "2026-04-22T00:00:00.000000"
+updatedAt: "2026-04-22T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_session-counselors
+name: Add
+description: ""
+url: "${[ base_url ]}/sessions/${[ test-session-id ]}/counselors"
+urlParameters: []
+method: POST
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"counselor_id": "${[ test-counselor-id ]}"}'
+bodyType: application/json
+sortPriority: 1.0

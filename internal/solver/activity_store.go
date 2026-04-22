@@ -120,13 +120,23 @@ func storeActivityExplanations(ctx context.Context, qtx *db.Queries, campID, sol
 		}
 
 		for _, reason := range ae.Reasons {
+			var slotUUID pgtype.UUID
+			if reason.SlotID != "" {
+				parsed, err := api.ParseUUID(reason.SlotID)
+				if err != nil {
+					return err
+				}
+				slotUUID = parsed
+			}
+
 			_, err := qtx.CreateActivityExplanation(ctx, db.CreateActivityExplanationParams{
-				CampID:          campID,
-				SolutionID:      solutionID,
-				CounselorID:     counselorUUID,
-				ExplanationType: "reason",
-				ConstraintName:  pgtype.Text{String: reason.Constraint, Valid: reason.Constraint != ""},
-				Rank:            pgtype.Int4{Int32: int32(reason.Rank), Valid: reason.Rank > 0},
+				CampID:            campID,
+				SolutionID:        solutionID,
+				CounselorID:       counselorUUID,
+				SessionActivityID: slotUUID,
+				ExplanationType:   "reason",
+				ConstraintName:    pgtype.Text{String: reason.Constraint, Valid: reason.Constraint != ""},
+				Rank:              pgtype.Int4{Int32: int32(reason.Rank), Valid: reason.Rank > 0},
 				Message:           reason.Message,
 			})
 			if err != nil {

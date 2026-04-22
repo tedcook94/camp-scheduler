@@ -121,6 +121,7 @@ type AssignmentExplanation struct {
 type AssignmentReason struct {
 	Constraint string
 	Rank       int
+	SlotID     string
 	Message    string
 }
 

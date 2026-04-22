@@ -30,14 +30,15 @@ type ActivityCertification struct {
 }
 
 type ActivityExplanation struct {
-	ID              pgtype.UUID
-	CampID          pgtype.UUID
-	SolutionID      pgtype.UUID
-	CounselorID     pgtype.UUID
-	ExplanationType string
-	ConstraintName  pgtype.Text
-	Message         string
-	Rank            pgtype.Int4
+	ID                pgtype.UUID
+	CampID            pgtype.UUID
+	SolutionID        pgtype.UUID
+	CounselorID       pgtype.UUID
+	ExplanationType   string
+	ConstraintName    pgtype.Text
+	Message           string
+	Rank              pgtype.Int4
+	SessionActivityID pgtype.UUID
 }
 
 type ActivitySolution struct {

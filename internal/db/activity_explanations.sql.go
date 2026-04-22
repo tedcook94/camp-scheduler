@@ -12,30 +12,32 @@ import (
 )
 
 const createActivityExplanation = `-- name: CreateActivityExplanation :one
-INSERT INTO activity_explanations (camp_id, solution_id, counselor_id, explanation_type, constraint_name, rank, message)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, camp_id, solution_id, counselor_id, explanation_type, constraint_name, rank, message
+INSERT INTO activity_explanations (camp_id, solution_id, counselor_id, session_activity_id, explanation_type, constraint_name, rank, message)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, camp_id, solution_id, counselor_id, session_activity_id, explanation_type, constraint_name, rank, message
 `
 
 type CreateActivityExplanationParams struct {
-	CampID          pgtype.UUID
-	SolutionID      pgtype.UUID
-	CounselorID     pgtype.UUID
-	ExplanationType string
-	ConstraintName  pgtype.Text
-	Rank            pgtype.Int4
-	Message         string
+	CampID            pgtype.UUID
+	SolutionID        pgtype.UUID
+	CounselorID       pgtype.UUID
+	SessionActivityID pgtype.UUID
+	ExplanationType   string
+	ConstraintName    pgtype.Text
+	Rank              pgtype.Int4
+	Message           string
 }
 
 type CreateActivityExplanationRow struct {
-	ID              pgtype.UUID
-	CampID          pgtype.UUID
-	SolutionID      pgtype.UUID
-	CounselorID     pgtype.UUID
-	ExplanationType string
-	ConstraintName  pgtype.Text
-	Rank            pgtype.Int4
-	Message         string
+	ID                pgtype.UUID
+	CampID            pgtype.UUID
+	SolutionID        pgtype.UUID
+	CounselorID       pgtype.UUID
+	SessionActivityID pgtype.UUID
+	ExplanationType   string
+	ConstraintName    pgtype.Text
+	Rank              pgtype.Int4
+	Message           string
 }
 
 func (q *Queries) CreateActivityExplanation(ctx context.Context, arg CreateActivityExplanationParams) (CreateActivityExplanationRow, error) {
@@ -43,6 +45,7 @@ func (q *Queries) CreateActivityExplanation(ctx context.Context, arg CreateActiv
 		arg.CampID,
 		arg.SolutionID,
 		arg.CounselorID,
+		arg.SessionActivityID,
 		arg.ExplanationType,
 		arg.ConstraintName,
 		arg.Rank,
@@ -54,6 +57,7 @@ func (q *Queries) CreateActivityExplanation(ctx context.Context, arg CreateActiv
 		&i.CampID,
 		&i.SolutionID,
 		&i.CounselorID,
+		&i.SessionActivityID,
 		&i.ExplanationType,
 		&i.ConstraintName,
 		&i.Rank,
@@ -63,12 +67,15 @@ func (q *Queries) CreateActivityExplanation(ctx context.Context, arg CreateActiv
 }
 
 const listActivityExplanationsBySolution = `-- name: ListActivityExplanationsBySolution :many
-SELECT e.id, e.camp_id, e.solution_id, e.counselor_id, e.explanation_type, e.constraint_name, e.rank, e.message,
-       co.counselor_name AS counselor_name
+SELECT e.id, e.camp_id, e.solution_id, e.counselor_id, e.session_activity_id, e.explanation_type, e.constraint_name, e.rank, e.message,
+       co.counselor_name AS counselor_name,
+       sts.sort_order AS time_slot_sort_order
 FROM activity_explanations e
 JOIN counselors co ON co.id = e.counselor_id
+LEFT JOIN session_activities sa ON sa.id = e.session_activity_id
+LEFT JOIN session_time_slots sts ON sts.id = sa.session_time_slot_id
 WHERE e.solution_id = $1 AND e.camp_id = $2
-ORDER BY co.counselor_name, e.explanation_type, COALESCE(e.constraint_name, ''), COALESCE(e.rank, 0), e.message
+ORDER BY co.counselor_name, e.explanation_type, COALESCE(e.constraint_name, ''), COALESCE(e.rank, 0), COALESCE(sts.sort_order, 0), e.message
 `
 
 type ListActivityExplanationsBySolutionParams struct {
@@ -77,15 +84,17 @@ type ListActivityExplanationsBySolutionParams struct {
 }
 
 type ListActivityExplanationsBySolutionRow struct {
-	ID              pgtype.UUID
-	CampID          pgtype.UUID
-	SolutionID      pgtype.UUID
-	CounselorID     pgtype.UUID
-	ExplanationType string
-	ConstraintName  pgtype.Text
-	Rank            pgtype.Int4
-	Message         string
-	CounselorName   string
+	ID                pgtype.UUID
+	CampID            pgtype.UUID
+	SolutionID        pgtype.UUID
+	CounselorID       pgtype.UUID
+	SessionActivityID pgtype.UUID
+	ExplanationType   string
+	ConstraintName    pgtype.Text
+	Rank              pgtype.Int4
+	Message           string
+	CounselorName     string
+	TimeSlotSortOrder pgtype.Int4
 }
 
 func (q *Queries) ListActivityExplanationsBySolution(ctx context.Context, arg ListActivityExplanationsBySolutionParams) ([]ListActivityExplanationsBySolutionRow, error) {
@@ -102,11 +111,13 @@ func (q *Queries) ListActivityExplanationsBySolution(ctx context.Context, arg Li
 			&i.CampID,
 			&i.SolutionID,
 			&i.CounselorID,
+			&i.SessionActivityID,
 			&i.ExplanationType,
 			&i.ConstraintName,
 			&i.Rank,
 			&i.Message,
 			&i.CounselorName,
+			&i.TimeSlotSortOrder,
 		); err != nil {
 			return nil, err
 		}

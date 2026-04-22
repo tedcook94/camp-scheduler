@@ -1,10 +1,11 @@
 package solver
 
 type CamperCabin struct {
-	ID         string
-	Name       string
-	AgeGroupID string
-	Capacity   int
+	ID                     string
+	Name                   string
+	AgeGroupID             string
+	SessionAgeGroupCabinID string
+	Capacity               int
 }
 
 type Camper struct {

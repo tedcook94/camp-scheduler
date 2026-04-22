@@ -178,6 +178,7 @@ SELECT
     c.cabin_name,
     sag.age_group_id,
     ag.age_group_name,
+    sagc.id AS session_age_group_cabin_id,
     sagc.required_counselors
 FROM session_age_groups sag
 JOIN session_age_group_cabins sagc ON sagc.session_age_group_id = sag.id
@@ -193,11 +194,12 @@ type ListSessionCabinsParams struct {
 }
 
 type ListSessionCabinsRow struct {
-	ID                 pgtype.UUID
-	CabinName          string
-	AgeGroupID         pgtype.UUID
-	AgeGroupName       string
-	RequiredCounselors int32
+	ID                     pgtype.UUID
+	CabinName              string
+	AgeGroupID             pgtype.UUID
+	AgeGroupName           string
+	SessionAgeGroupCabinID pgtype.UUID
+	RequiredCounselors     int32
 }
 
 func (q *Queries) ListSessionCabins(ctx context.Context, arg ListSessionCabinsParams) ([]ListSessionCabinsRow, error) {
@@ -214,6 +216,7 @@ func (q *Queries) ListSessionCabins(ctx context.Context, arg ListSessionCabinsPa
 			&i.CabinName,
 			&i.AgeGroupID,
 			&i.AgeGroupName,
+			&i.SessionAgeGroupCabinID,
 			&i.RequiredCounselors,
 		); err != nil {
 			return nil, err
@@ -231,6 +234,7 @@ SELECT
     c.id,
     c.cabin_name,
     sag.age_group_id,
+    sagc.id AS session_age_group_cabin_id,
     sagc.group_size,
     sagc.required_counselors
 FROM session_age_groups sag
@@ -246,11 +250,12 @@ type ListSessionCabinsWithCapacityParams struct {
 }
 
 type ListSessionCabinsWithCapacityRow struct {
-	ID                 pgtype.UUID
-	CabinName          string
-	AgeGroupID         pgtype.UUID
-	GroupSize          int32
-	RequiredCounselors int32
+	ID                     pgtype.UUID
+	CabinName              string
+	AgeGroupID             pgtype.UUID
+	SessionAgeGroupCabinID pgtype.UUID
+	GroupSize              int32
+	RequiredCounselors     int32
 }
 
 func (q *Queries) ListSessionCabinsWithCapacity(ctx context.Context, arg ListSessionCabinsWithCapacityParams) ([]ListSessionCabinsWithCapacityRow, error) {
@@ -266,6 +271,7 @@ func (q *Queries) ListSessionCabinsWithCapacity(ctx context.Context, arg ListSes
 			&i.ID,
 			&i.CabinName,
 			&i.AgeGroupID,
+			&i.SessionAgeGroupCabinID,
 			&i.GroupSize,
 			&i.RequiredCounselors,
 		); err != nil {

@@ -75,7 +75,7 @@ func storeSolution(ctx context.Context, qtx *db.Queries, campID, runID pgtype.UU
 
 	explanation := Explain(snapshot, solution)
 
-	if err := storeAssignments(ctx, qtx, campID, sol.ID, solution); err != nil {
+	if err := storeAssignments(ctx, qtx, campID, sol.ID, snapshot, solution); err != nil {
 		return err
 	}
 
@@ -86,9 +86,18 @@ func storeSolution(ctx context.Context, qtx *db.Queries, campID, runID pgtype.UU
 	return nil
 }
 
-func storeAssignments(ctx context.Context, qtx *db.Queries, campID, solutionID pgtype.UUID, solution Solution) error {
+func storeAssignments(ctx context.Context, qtx *db.Queries, campID, solutionID pgtype.UUID, snapshot SessionSnapshot, solution Solution) error {
+	sagcByCabinID := make(map[string]string, len(snapshot.Cabins))
+	for _, c := range snapshot.Cabins {
+		sagcByCabinID[c.ID] = c.SessionAgeGroupCabinID
+	}
+
 	for cabinID, counselorIDs := range solution.Assignment.CabinCounselors {
-		cabinUUID, err := api.ParseUUID(cabinID)
+		sagcID, ok := sagcByCabinID[cabinID]
+		if !ok || sagcID == "" {
+			return fmt.Errorf("error resolving session_age_group_cabin_id for cabin %s", cabinID)
+		}
+		sagcUUID, err := api.ParseUUID(sagcID)
 		if err != nil {
 			return err
 		}
@@ -99,10 +108,10 @@ func storeAssignments(ctx context.Context, qtx *db.Queries, campID, solutionID p
 			}
 
 			_, err = qtx.CreateCounselorCabinAssignment(ctx, db.CreateCounselorCabinAssignmentParams{
-				CampID:      campID,
-				SolutionID:  solutionID,
-				CounselorID: counselorUUID,
-				CabinID:     cabinUUID,
+				CampID:                 campID,
+				SolutionID:             solutionID,
+				CounselorID:            counselorUUID,
+				SessionAgeGroupCabinID: sagcUUID,
 			})
 			if err != nil {
 				return fmt.Errorf("error creating assignment for counselor %s: %w", counselorID, err)

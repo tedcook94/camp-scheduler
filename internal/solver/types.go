@@ -1,11 +1,12 @@
 package solver
 
 type Cabin struct {
-	ID                 string
-	Name               string
-	AgeGroupID         string
-	AgeGroupName       string
-	RequiredCounselors int
+	ID                     string
+	Name                   string
+	AgeGroupID             string
+	AgeGroupName           string
+	SessionAgeGroupCabinID string
+	RequiredCounselors     int
 }
 
 type Counselor struct {

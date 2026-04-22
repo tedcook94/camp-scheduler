@@ -4,6 +4,7 @@ SELECT
     c.cabin_name,
     sag.age_group_id,
     ag.age_group_name,
+    sagc.id AS session_age_group_cabin_id,
     sagc.required_counselors
 FROM session_age_groups sag
 JOIN session_age_group_cabins sagc ON sagc.session_age_group_id = sag.id
@@ -57,6 +58,7 @@ SELECT
     c.id,
     c.cabin_name,
     sag.age_group_id,
+    sagc.id AS session_age_group_cabin_id,
     sagc.group_size,
     sagc.required_counselors
 FROM session_age_groups sag

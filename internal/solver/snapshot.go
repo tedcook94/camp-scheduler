@@ -85,11 +85,12 @@ func loadCabins(ctx context.Context, queries *db.Queries, sessionID, campID pgty
 	cabins := make([]Cabin, len(rows))
 	for i, r := range rows {
 		cabins[i] = Cabin{
-			ID:                 api.UUIDToString(r.ID),
-			Name:               r.CabinName,
-			AgeGroupID:         api.UUIDToString(r.AgeGroupID),
-			AgeGroupName:       r.AgeGroupName,
-			RequiredCounselors: int(r.RequiredCounselors),
+			ID:                     api.UUIDToString(r.ID),
+			Name:                   r.CabinName,
+			AgeGroupID:             api.UUIDToString(r.AgeGroupID),
+			AgeGroupName:           r.AgeGroupName,
+			SessionAgeGroupCabinID: api.UUIDToString(r.SessionAgeGroupCabinID),
+			RequiredCounselors:     int(r.RequiredCounselors),
 		}
 	}
 	return cabins, nil

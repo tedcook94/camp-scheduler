@@ -96,11 +96,11 @@ type Camper struct {
 }
 
 type CamperCabinAssignment struct {
-	ID         pgtype.UUID
-	CampID     pgtype.UUID
-	SolutionID pgtype.UUID
-	CamperID   pgtype.UUID
-	CabinID    pgtype.UUID
+	ID                     pgtype.UUID
+	CampID                 pgtype.UUID
+	SolutionID             pgtype.UUID
+	CamperID               pgtype.UUID
+	SessionAgeGroupCabinID pgtype.UUID
 }
 
 type CamperCabinExplanation struct {
@@ -173,11 +173,11 @@ type CounselorAgeGroupPreference struct {
 }
 
 type CounselorCabinAssignment struct {
-	ID          pgtype.UUID
-	CampID      pgtype.UUID
-	SolutionID  pgtype.UUID
-	CounselorID pgtype.UUID
-	CabinID     pgtype.UUID
+	ID                     pgtype.UUID
+	CampID                 pgtype.UUID
+	SolutionID             pgtype.UUID
+	CounselorID            pgtype.UUID
+	SessionAgeGroupCabinID pgtype.UUID
 }
 
 type CounselorCabinExplanation struct {

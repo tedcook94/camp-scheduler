@@ -412,7 +412,7 @@ export interface ExplanationDetail {
 	counselor_name?: string;
 	camper_id?: string;
 	camper_name?: string;
-	explanation_type: "reason" | "unmet_preference";
+	explanation_type: "reason" | "unmet_preference" | "ineligible_preference";
 	constraint_name: string | null;
 	message: string;
 }

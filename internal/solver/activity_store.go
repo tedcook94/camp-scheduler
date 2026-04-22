@@ -152,5 +152,24 @@ func storeActivityExplanations(ctx context.Context, qtx *db.Queries, campID, sol
 		}
 	}
 
+	for _, ip := range explanation.IneligiblePreferences {
+		counselorUUID, err := api.ParseUUID(ip.CounselorID)
+		if err != nil {
+			return err
+		}
+
+		_, err = qtx.CreateActivityExplanation(ctx, db.CreateActivityExplanationParams{
+			CampID:          campID,
+			SolutionID:      solutionID,
+			CounselorID:     counselorUUID,
+			ExplanationType: "ineligible_preference",
+			ConstraintName:  pgtype.Text{String: ip.Constraint, Valid: true},
+			Message:         ip.Message,
+		})
+		if err != nil {
+			return fmt.Errorf("error creating ineligible preference explanation for counselor %s: %w", ip.CounselorID, err)
+		}
+	}
+
 	return nil
 }

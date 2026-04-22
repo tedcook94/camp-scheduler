@@ -31,7 +31,7 @@ func BuildActivitySnapshot(ctx context.Context, queries *db.Queries, campID, ses
 		return ActivitySnapshot{}, fmt.Errorf("error getting session: %w", err)
 	}
 
-	slots, err := loadActivitySlots(ctx, queries, sessionUUID, campUUID)
+	slots, certNames, err := loadActivitySlots(ctx, queries, sessionUUID, campUUID)
 	if err != nil {
 		return ActivitySnapshot{}, err
 	}
@@ -57,16 +57,17 @@ func BuildActivitySnapshot(ctx context.Context, queries *db.Queries, campID, ses
 		Counselors:               counselors,
 		ActivityPreferences:      prefs,
 		UnmetActivityPreferences: unmetPrefs,
+		CertificationNames:       certNames,
 	}, nil
 }
 
-func loadActivitySlots(ctx context.Context, queries *db.Queries, sessionID, campID pgtype.UUID) ([]ActivitySlot, error) {
+func loadActivitySlots(ctx context.Context, queries *db.Queries, sessionID, campID pgtype.UUID) ([]ActivitySlot, map[string]string, error) {
 	rows, err := queries.ListSessionActivitiesWithDetails(ctx, db.ListSessionActivitiesWithDetailsParams{
 		SessionID: sessionID,
 		CampID:    campID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error listing session activities with details: %w", err)
+		return nil, nil, fmt.Errorf("error listing session activities with details: %w", err)
 	}
 
 	certRows, err := queries.ListActivityCertificationsBySession(ctx, db.ListActivityCertificationsBySessionParams{
@@ -74,14 +75,16 @@ func loadActivitySlots(ctx context.Context, queries *db.Queries, sessionID, camp
 		CampID:    campID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error listing activity certifications by session: %w", err)
+		return nil, nil, fmt.Errorf("error listing activity certifications by session: %w", err)
 	}
 
 	certsBySlot := make(map[string][]string)
+	certNames := make(map[string]string)
 	for _, r := range certRows {
 		slotID := api.UUIDToString(r.SessionActivityID)
 		certID := api.UUIDToString(r.CertificationID)
 		certsBySlot[slotID] = append(certsBySlot[slotID], certID)
+		certNames[certID] = r.CertificationName
 	}
 
 	slots := make([]ActivitySlot, len(rows))
@@ -98,7 +101,7 @@ func loadActivitySlots(ctx context.Context, queries *db.Queries, sessionID, camp
 			RequiredCertifications: certsBySlot[slotID],
 		}
 	}
-	return slots, nil
+	return slots, certNames, nil
 }
 
 func loadActivityCounselors(ctx context.Context, queries *db.Queries, campID pgtype.UUID) ([]ActivityCounselor, error) {
@@ -191,7 +194,7 @@ func loadPreviouslyUnmetActivityPreferences(ctx context.Context, queries *db.Que
 		return nil, fmt.Errorf("error listing previous activity solution assignments: %w", err)
 	}
 
-	prevSlots, err := loadActivitySlots(ctx, queries, session.PreviousSession, campID)
+	prevSlots, _, err := loadActivitySlots(ctx, queries, session.PreviousSession, campID)
 	if err != nil {
 		return nil, err
 	}

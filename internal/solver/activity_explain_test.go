@@ -302,3 +302,139 @@ func TestExplainActivityIneligibility(t *testing.T) {
 		}
 	})
 }
+
+// TestExplainActivityBestMetRank covers the rule that a preference is only
+// reported as unmet when no equal-or-higher-rank preference was satisfied.
+// Lower-ranked unmet preferences are suppressed when a higher-ranked one
+// was met, since the counselor got something at least as good.
+func TestExplainActivityBestMetRank(t *testing.T) {
+	swimMorning := ActivitySlot{
+		ID: "slot-swim", ActivityID: "act-swim", ActivityName: "Swimming",
+		TimeSlotID: "ts-morning", TimeSlotName: "Morning",
+		RequiredCounselors: 1, Capacity: 2,
+	}
+	hikeMorning := ActivitySlot{
+		ID: "slot-hike", ActivityID: "act-hike", ActivityName: "Nature Hiking",
+		TimeSlotID: "ts-morning", TimeSlotName: "Morning",
+		RequiredCounselors: 1, Capacity: 2,
+	}
+	artsMorning := ActivitySlot{
+		ID: "slot-arts", ActivityID: "act-arts", ActivityName: "Arts",
+		TimeSlotID: "ts-morning", TimeSlotName: "Morning",
+		RequiredCounselors: 1, Capacity: 2,
+	}
+
+	t.Run("lower unmet suppressed when higher met", func(t *testing.T) {
+		snapshot := ActivitySnapshot{
+			Slots: []ActivitySlot{swimMorning, hikeMorning},
+			Counselors: []ActivityCounselor{
+				{ID: "c1", Name: "Emily", Certifications: map[string]bool{}},
+			},
+			ActivityPreferences: map[string][]RankedPreference{
+				"c1": {
+					{TargetID: "act-swim", Rank: 1},
+					{TargetID: "act-hike", Rank: 2},
+				},
+			},
+		}
+		// Emily got her rank-1 (Swimming). Rank-2 should NOT be reported.
+		solution := ActivitySolution{
+			Assignment: ActivityAssignment{SlotCounselors: map[string][]string{
+				"slot-swim": {"c1"},
+			}},
+		}
+
+		exp := ExplainActivity(snapshot, solution)
+
+		for _, u := range exp.UnmetPreferences {
+			if u.Constraint == "activity_preference" {
+				t.Errorf("did not expect any activity_preference unmet entry, got %q", u.Message)
+			}
+		}
+	})
+
+	t.Run("higher unmet reported when only lower met", func(t *testing.T) {
+		snapshot := ActivitySnapshot{
+			Slots: []ActivitySlot{swimMorning, hikeMorning},
+			Counselors: []ActivityCounselor{
+				{ID: "c1", Name: "Emily", Certifications: map[string]bool{}},
+			},
+			ActivityPreferences: map[string][]RankedPreference{
+				"c1": {
+					{TargetID: "act-swim", Rank: 1},
+					{TargetID: "act-hike", Rank: 2},
+				},
+			},
+		}
+		// Emily got her rank-2 (Hiking). Rank-1 (Swimming) is still a real miss.
+		solution := ActivitySolution{
+			Assignment: ActivityAssignment{SlotCounselors: map[string][]string{
+				"slot-hike": {"c1"},
+			}},
+		}
+
+		exp := ExplainActivity(snapshot, solution)
+
+		var swimUnmet *ActivityUnmetPreference
+		for i := range exp.UnmetPreferences {
+			u := &exp.UnmetPreferences[i]
+			if u.Constraint == "activity_preference" && strings.Contains(u.Message, "Swimming") {
+				swimUnmet = u
+				break
+			}
+		}
+		if swimUnmet == nil {
+			t.Fatalf("expected Swimming reported as unmet, got %v", exp.UnmetPreferences)
+		}
+		// Hiking (the met one) must not appear as unmet.
+		for _, u := range exp.UnmetPreferences {
+			if u.Constraint == "activity_preference" && strings.Contains(u.Message, "Hiking") {
+				t.Errorf("did not expect Hiking in unmet preferences: %q", u.Message)
+			}
+		}
+	})
+
+	t.Run("aggregation uses candidates above met", func(t *testing.T) {
+		// Three preferences: Swim (1), Hike (2), Arts (3). Emily got Arts
+		// (rank 3). Both Swim and Hike are real misses. Since they cover
+		// ALL prefs above the met rank, the eligible bucket aggregates.
+		snapshot := ActivitySnapshot{
+			Slots: []ActivitySlot{swimMorning, hikeMorning, artsMorning},
+			Counselors: []ActivityCounselor{
+				{ID: "c1", Name: "Emily", Certifications: map[string]bool{}},
+			},
+			ActivityPreferences: map[string][]RankedPreference{
+				"c1": {
+					{TargetID: "act-swim", Rank: 1},
+					{TargetID: "act-hike", Rank: 2},
+					{TargetID: "act-arts", Rank: 3},
+				},
+			},
+		}
+		solution := ActivitySolution{
+			Assignment: ActivityAssignment{SlotCounselors: map[string][]string{
+				"slot-arts": {"c1"},
+			}},
+		}
+
+		exp := ExplainActivity(snapshot, solution)
+
+		var aggregated *ActivityUnmetPreference
+		for i := range exp.UnmetPreferences {
+			u := &exp.UnmetPreferences[i]
+			if u.Constraint == "activity_preference" && strings.Contains(u.Message, "any preferred activity") {
+				aggregated = u
+				break
+			}
+		}
+		if aggregated == nil {
+			t.Fatalf("expected aggregated 'any preferred activity' row, got %v", exp.UnmetPreferences)
+		}
+		if !strings.Contains(aggregated.Message, "Swimming") || !strings.Contains(aggregated.Message, "Nature Hiking") {
+			t.Errorf("expected both Swimming and Nature Hiking in aggregated message, got %q", aggregated.Message)
+		}
+		if strings.Contains(aggregated.Message, "Arts") {
+			t.Errorf("did not expect Arts (the met preference) in aggregated message, got %q", aggregated.Message)
+		}
+	})
+}

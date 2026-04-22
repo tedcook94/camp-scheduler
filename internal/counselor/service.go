@@ -88,7 +88,19 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCou
 		return CounselorResponse{}, err
 	}
 
-	counselor, err := svc.queries.UpdateCounselor(ctx, db.UpdateCounselorParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return CounselorResponse{}, fmt.Errorf("error beginning update counselor transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	existing, err := qtx.GetCounselor(ctx, db.GetCounselorParams{ID: uid, CampID: campUUID})
+	if err != nil {
+		return CounselorResponse{}, fmt.Errorf("error loading counselor %s: %w", id, err)
+	}
+
+	counselor, err := qtx.UpdateCounselor(ctx, db.UpdateCounselorParams{
 		ID:               uid,
 		CampID:           campUUID,
 		CounselorName:    req.Name,
@@ -97,6 +109,22 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCou
 	})
 	if err != nil {
 		return CounselorResponse{}, fmt.Errorf("error updating counselor %s: %w", id, err)
+	}
+
+	// When a counselor transitions from enabled to disabled, remove them from
+	// every session roster. This keeps the roster aligned with assignability;
+	// re-enabling does not auto-restore prior memberships.
+	if existing.CounselorEnabled && !req.Enabled {
+		if err := qtx.RemoveCounselorFromAllSessions(ctx, db.RemoveCounselorFromAllSessionsParams{
+			CampID:      campUUID,
+			CounselorID: uid,
+		}); err != nil {
+			return CounselorResponse{}, fmt.Errorf("error removing disabled counselor from session rosters: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return CounselorResponse{}, fmt.Errorf("error committing update counselor transaction: %w", err)
 	}
 
 	return toCounselorResponse(counselor), nil

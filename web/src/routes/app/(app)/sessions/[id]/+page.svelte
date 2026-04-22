@@ -9,10 +9,12 @@
 		sessionActivityApi,
 		sessionAgeGroupApi,
 		sessionCabinApi,
+		sessionCounselorApi,
 		timeSlotApi,
 		activityApi,
 		ageGroupApi,
 		cabinApi,
+		counselorApi,
 	} from "$lib/api";
 	import type {
 		Session,
@@ -20,10 +22,12 @@
 		SessionActivity,
 		SessionAgeGroup,
 		SessionCabin,
+		SessionCounselor,
 		TimeSlot,
 		Activity,
 		AgeGroup,
 		Cabin,
+		Counselor,
 	} from "$lib/api/types";
 	import { toast } from "svelte-sonner";
 	import { Button } from "$lib/components/ui/button";
@@ -50,7 +54,7 @@
 
 	const sessionId = page.params.id!;
 
-	const TAB_VALUES = ["cabins", "activities"] as const;
+	const TAB_VALUES = ["cabins", "activities", "counselors"] as const;
 	type TabValue = (typeof TAB_VALUES)[number];
 
 	let activeTab = $derived.by<TabValue>(() => {
@@ -78,6 +82,8 @@
 	let sessionCabins = $state<SessionCabin[]>([]);
 	let allAgeGroups = $state<AgeGroup[]>([]);
 	let allCabins = $state<Cabin[]>([]);
+	let sessionCounselors = $state<SessionCounselor[]>([]);
+	let allCounselors = $state<Counselor[]>([]);
 	let loading = $state(true);
 	let loadError = $state(false);
 
@@ -334,7 +340,7 @@
 
 	onMount(async () => {
 		try {
-			const [s, stSlots, ts, acts, allSessionActs, sAgeGroups, sCabins, ags, cbs] =
+			const [s, stSlots, ts, acts, allSessionActs, sAgeGroups, sCabins, ags, cbs, sCouns, cns] =
 				await Promise.all([
 					sessionApi.get(sessionId),
 					sessionTimeSlotApi.list(sessionId),
@@ -345,6 +351,8 @@
 					sessionCabinApi.list(sessionId),
 					ageGroupApi.list(),
 					cabinApi.list(),
+					sessionCounselorApi.list(sessionId),
+					counselorApi.list(),
 				]);
 			session = s;
 			sessionTimeSlots = stSlots;
@@ -354,6 +362,8 @@
 			sessionCabins = sCabins;
 			allAgeGroups = ags;
 			allCabins = cbs;
+			sessionCounselors = sCouns;
+			allCounselors = cns;
 
 			// Group activities by session time slot
 			const activitiesByTimeSlotMap = new Map<string, SessionActivity[]>();
@@ -902,6 +912,74 @@
 			removingCabin = false;
 		}
 	}
+	// --- Counselors state ---
+
+	let sortedSessionCounselors = $derived(
+		[...sessionCounselors].sort((a, b) =>
+			a.counselor_name.localeCompare(b.counselor_name)
+		)
+	);
+
+	let availableCounselorsForSession = $derived.by(() => {
+		const rostered = new Set(sessionCounselors.map((sc) => sc.counselor_id));
+		return allCounselors
+			.filter((c) => !rostered.has(c.id))
+			.sort((a, b) => a.name.localeCompare(b.name));
+	});
+
+	let addCounselorOpen = $state(false);
+	let addCounselorId = $state("");
+	let addingCounselor = $state(false);
+
+	let removeCounselorOpen = $state(false);
+	let removeCounselorTarget = $state<SessionCounselor | null>(null);
+	let removingCounselor = $state(false);
+
+	function openAddCounselor() {
+		addCounselorId = "";
+		addCounselorOpen = true;
+	}
+
+	async function handleAddCounselor() {
+		if (!addCounselorId) return;
+		addingCounselor = true;
+		try {
+			const created = await sessionCounselorApi.add(sessionId, addCounselorId);
+			sessionCounselors = [...sessionCounselors, created];
+			toast.success("Counselor added to session");
+			addCounselorOpen = false;
+		} catch (err) {
+			const message =
+				err instanceof ApiClientError ? err.message : "Failed to add counselor";
+			toast.error(message);
+		} finally {
+			addingCounselor = false;
+		}
+	}
+
+	function openRemoveCounselor(target: SessionCounselor) {
+		removeCounselorTarget = target;
+		removeCounselorOpen = true;
+	}
+
+	async function handleRemoveCounselor() {
+		const target = removeCounselorTarget;
+		if (!target) return;
+		removingCounselor = true;
+		try {
+			await sessionCounselorApi.remove(sessionId, target.counselor_id);
+			sessionCounselors = sessionCounselors.filter((sc) => sc.id !== target.id);
+			toast.success("Counselor removed from session");
+			removeCounselorOpen = false;
+			removeCounselorTarget = null;
+		} catch (err) {
+			const message =
+				err instanceof ApiClientError ? err.message : "Failed to remove counselor";
+			toast.error(message);
+		} finally {
+			removingCounselor = false;
+		}
+	}
 </script>
 
 <div class="grid gap-6">
@@ -934,6 +1012,7 @@
 			<Tabs.TabsList>
 				<Tabs.TabsTrigger value="cabins">Cabins</Tabs.TabsTrigger>
 				<Tabs.TabsTrigger value="activities">Activities</Tabs.TabsTrigger>
+				<Tabs.TabsTrigger value="counselors">Counselors</Tabs.TabsTrigger>
 			</Tabs.TabsList>
 
 			<!-- Cabins Tab -->
@@ -1245,6 +1324,78 @@
 				{/each}
 			{/if}
 		</div>
+			</Tabs.TabsContent>
+
+			<!-- Counselors Tab -->
+			<Tabs.TabsContent value="counselors">
+				<div class="grid gap-4">
+					<div class="flex items-center justify-between">
+						<div>
+							<h2 class="text-lg font-semibold">Counselors</h2>
+							<p class="text-muted-foreground text-sm">
+								The pool of counselors available to be assigned in this session.
+								Used by the solver and to scope counselor preferences.
+							</p>
+						</div>
+						<Button
+							size="sm"
+							disabled={disabled || availableCounselorsForSession.length === 0}
+							onclick={openAddCounselor}
+						>
+							<PlusIcon class="mr-2 size-4" />
+							Add Counselor
+						</Button>
+					</div>
+
+					{#if sortedSessionCounselors.length === 0}
+						<div class="text-muted-foreground rounded-md border p-6 text-center text-sm">
+							No counselors are on this session yet.
+						</div>
+					{:else}
+						<div class="rounded-md border">
+							<Table.Table>
+								<Table.TableHeader>
+									<Table.TableRow>
+										<Table.TableHead>Name</Table.TableHead>
+										<Table.TableHead>Role</Table.TableHead>
+										<Table.TableHead>Status</Table.TableHead>
+										<Table.TableHead class="w-[1%]"></Table.TableHead>
+									</Table.TableRow>
+								</Table.TableHeader>
+								<Table.TableBody>
+									{#each sortedSessionCounselors as sc (sc.id)}
+										<Table.TableRow>
+											<Table.TableCell class="font-medium">
+												{sc.counselor_name}
+											</Table.TableCell>
+											<Table.TableCell>
+												{sc.junior_counselor ? "Junior" : "Senior"}
+											</Table.TableCell>
+											<Table.TableCell>
+												{#if !sc.counselor_enabled}
+													<span class="text-muted-foreground">Disabled</span>
+												{:else}
+													Enabled
+												{/if}
+											</Table.TableCell>
+											<Table.TableCell>
+												<Button
+													variant="ghost"
+													size="icon-sm"
+													disabled={disabled}
+													onclick={() => openRemoveCounselor(sc)}
+												>
+													<TrashIcon class="size-4" />
+													<span class="sr-only">Remove</span>
+												</Button>
+											</Table.TableCell>
+										</Table.TableRow>
+									{/each}
+								</Table.TableBody>
+							</Table.Table>
+						</div>
+					{/if}
+				</div>
 			</Tabs.TabsContent>
 		</Tabs.Tabs>
 	{/if}
@@ -1780,6 +1931,86 @@
 				onclick={handleRemoveCabin}
 			>
 				{#if removingCabin}
+					<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+				{/if}
+				Remove
+			</AlertDialog.AlertDialogAction>
+		</AlertDialog.AlertDialogFooter>
+	</AlertDialog.AlertDialogContent>
+</AlertDialog.AlertDialog>
+
+<!-- Add Counselor Dialog -->
+<Dialog.Dialog bind:open={addCounselorOpen}>
+	<Dialog.DialogContent>
+		<Dialog.DialogHeader>
+			<Dialog.DialogTitle>Add Counselor</Dialog.DialogTitle>
+			<Dialog.DialogDescription>
+				Add a counselor to this session's roster.
+			</Dialog.DialogDescription>
+		</Dialog.DialogHeader>
+		<div class="grid gap-4">
+			<div class="grid gap-2">
+				<Label for="counselor-select">Counselor</Label>
+				<Select.Select
+					type="single"
+					value={addCounselorId}
+					onValueChange={(v) => (addCounselorId = v)}
+				>
+					<Select.SelectTrigger id="counselor-select" class="w-full">
+						{#if addCounselorId}
+							{availableCounselorsForSession.find((c) => c.id === addCounselorId)?.name ?? "Select counselor"}
+						{:else}
+							<span class="text-muted-foreground">Select counselor</span>
+						{/if}
+					</Select.SelectTrigger>
+					<Select.SelectContent>
+						{#each availableCounselorsForSession as c (c.id)}
+							<Select.SelectItem value={c.id}>{c.name}</Select.SelectItem>
+						{/each}
+					</Select.SelectContent>
+				</Select.Select>
+			</div>
+		</div>
+		<Dialog.DialogFooter>
+			<Button
+				variant="outline"
+				disabled={addingCounselor}
+				onclick={() => (addCounselorOpen = false)}
+			>
+				Cancel
+			</Button>
+			<Button
+				disabled={addingCounselor || !addCounselorId}
+				onclick={handleAddCounselor}
+			>
+				{#if addingCounselor}
+					<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+				{/if}
+				Add
+			</Button>
+		</Dialog.DialogFooter>
+	</Dialog.DialogContent>
+</Dialog.Dialog>
+
+<!-- Remove Counselor Confirmation -->
+<AlertDialog.AlertDialog bind:open={removeCounselorOpen}>
+	<AlertDialog.AlertDialogContent>
+		<AlertDialog.AlertDialogHeader>
+			<AlertDialog.AlertDialogTitle>Remove Counselor</AlertDialog.AlertDialogTitle>
+			<AlertDialog.AlertDialogDescription>
+				Remove "{removeCounselorTarget?.counselor_name ?? "this counselor"}" from the session?
+				Existing preferences referencing this counselor will be flagged as no longer in the session.
+			</AlertDialog.AlertDialogDescription>
+		</AlertDialog.AlertDialogHeader>
+		<AlertDialog.AlertDialogFooter>
+			<AlertDialog.AlertDialogCancel disabled={removingCounselor}>
+				Cancel
+			</AlertDialog.AlertDialogCancel>
+			<AlertDialog.AlertDialogAction
+				disabled={removingCounselor}
+				onclick={handleRemoveCounselor}
+			>
+				{#if removingCounselor}
 					<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
 				{/if}
 				Remove

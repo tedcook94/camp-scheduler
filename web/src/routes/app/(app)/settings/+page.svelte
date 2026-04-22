@@ -16,7 +16,9 @@
 	let camp = $state<Camp | null>(getCamp());
 	let saving = $state(false);
 
+	// svelte-ignore state_referenced_locally
 	let formName = $state(camp?.name ?? "");
+	// svelte-ignore state_referenced_locally
 	let formLocation = $state(camp?.location ?? "");
 
 	let disabled = $derived.by(() => getCampDisabled());

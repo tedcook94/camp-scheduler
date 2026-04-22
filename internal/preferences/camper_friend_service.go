@@ -72,11 +72,41 @@ func (svc *CamperFriendService) ReplaceAll(ctx context.Context, campID, sessionI
 	}
 
 	seen := make(map[string]bool, len(items))
-	for _, item := range items {
-		if seen[item.PreferredCamperID] {
+	canonicalIDs := make([]string, len(items))
+	canonicalCamperID := api.UUIDToString(camperUUID)
+	for i, item := range items {
+		parsed, err := api.ParseUUID(item.PreferredCamperID)
+		if err != nil {
+			return nil, err
+		}
+		canonical := api.UUIDToString(parsed)
+		if canonical == canonicalCamperID {
+			return nil, api.BadInput("a camper cannot prefer themselves")
+		}
+		if seen[canonical] {
 			return nil, api.BadInput(fmt.Sprintf("duplicate preferred_camper_id: %s", item.PreferredCamperID))
 		}
-		seen[item.PreferredCamperID] = true
+		seen[canonical] = true
+		canonicalIDs[i] = canonical
+	}
+
+	if len(items) > 0 {
+		enrollments, err := svc.queries.ListSessionEnrollments(ctx, db.ListSessionEnrollmentsParams{
+			SessionID: sessionUUID,
+			CampID:    campUUID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error loading session enrollments for validation: %w", err)
+		}
+		allowed := make(map[string]bool, len(enrollments))
+		for _, e := range enrollments {
+			allowed[api.UUIDToString(e.CamperID)] = true
+		}
+		for i, canonical := range canonicalIDs {
+			if !allowed[canonical] {
+				return nil, api.BadInput(fmt.Sprintf("preferred_camper_id %s is not enrolled in this session", items[i].PreferredCamperID))
+			}
+		}
 	}
 
 	tx, err := svc.pool.Begin(ctx)

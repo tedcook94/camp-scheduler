@@ -37,6 +37,7 @@ type ActivityExplanation struct {
 	ExplanationType string
 	ConstraintName  pgtype.Text
 	Message         string
+	Rank            pgtype.Int4
 }
 
 type ActivitySolution struct {
@@ -108,6 +109,7 @@ type CamperCabinExplanation struct {
 	ExplanationType string
 	ConstraintName  pgtype.Text
 	Message         string
+	Rank            pgtype.Int4
 }
 
 type CamperCabinSolution struct {
@@ -184,6 +186,7 @@ type CounselorCabinExplanation struct {
 	ExplanationType string
 	ConstraintName  pgtype.Text
 	Message         string
+	Rank            pgtype.Int4
 }
 
 type CounselorCabinSolution struct {

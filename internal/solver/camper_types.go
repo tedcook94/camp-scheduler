@@ -61,11 +61,12 @@ type CamperExplanation struct {
 type CamperAssignmentExplanation struct {
 	CamperID string
 	CabinID  string
-	Reasons  []string
+	Reasons  []AssignmentReason
 }
 
 type CamperUnmetPreference struct {
 	CamperID   string
 	Constraint string
+	Rank       int
 	Message    string
 }

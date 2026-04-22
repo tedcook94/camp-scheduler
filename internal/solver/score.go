@@ -144,6 +144,7 @@ func scoreCocounselorPreference(snapshot SessionSnapshot, assignment Assignment,
 				components = append(components, ScoreComponent{
 					Constraint:  "cocounselor_preference",
 					Score:       score,
+					Rank:        pref.Rank,
 					CounselorID: counselorID,
 					CabinID:     cabinID,
 					Message:     msg,
@@ -187,6 +188,7 @@ func scoreAgeGroupPreference(snapshot SessionSnapshot, assignment Assignment, we
 				components = append(components, ScoreComponent{
 					Constraint:  "age_group_preference",
 					Score:       score,
+					Rank:        pref.Rank,
 					CounselorID: counselorID,
 					CabinID:     cabinID,
 					Message:     msg,

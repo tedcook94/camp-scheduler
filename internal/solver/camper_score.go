@@ -67,6 +67,7 @@ func scoreFriendPreference(snapshot CamperCabinSnapshot, assignment CamperAssign
 				components = append(components, ScoreComponent{
 					Constraint: "friend_preference",
 					Score:      score,
+					Rank:       pref.Rank,
 					CamperID:   camperID,
 					CabinID:    cabinID,
 					Message: fmt.Sprintf(

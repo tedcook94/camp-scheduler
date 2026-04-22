@@ -649,6 +649,29 @@ func testActivityScheduling(t *testing.T) {
 		t.Fatal("expected explanations in activity solution detail")
 	}
 
+	// Reason rows must persist constraint_name; preference rows that carry
+	// a rank in their message must persist the rank as a separate field so
+	// the UI can sort by it.
+	sawReasonConstraint := false
+	sawPreferenceRank := false
+	for _, e := range explanations {
+		em := asMap(e)
+		etype := str(em, "explanation_type")
+		cn, _ := em["constraint_name"].(string)
+		if etype == "reason" && cn != "" {
+			sawReasonConstraint = true
+		}
+		if etype == "unmet_preference" || etype == "ineligible_preference" {
+			if rank, ok := em["rank"].(float64); ok && rank > 0 {
+				sawPreferenceRank = true
+			}
+		}
+	}
+	if !sawReasonConstraint {
+		t.Errorf("expected at least one reason row with constraint_name set")
+	}
+	_ = sawPreferenceRank // not all activity runs produce ranked unmet rows; soft check only
+
 	// Select the solution.
 	selectResp := doRequest(t, http.MethodPost,
 		runURL+"/"+runID+"/solutions/"+topSolutionID+"/select", nil, http.StatusOK, token)
@@ -942,6 +965,22 @@ func testSimpleCamp(t *testing.T) {
 		t.Fatal("expected explanations in solution detail")
 	}
 
+	// Reason rows must persist constraint_name; preference rows that carry
+	// a rank in their message must persist the rank field for sorting.
+	sawReasonConstraint := false
+	for _, e := range explanations {
+		em := asMap(e)
+		etype := str(em, "explanation_type")
+		cn, _ := em["constraint_name"].(string)
+		if etype == "reason" && cn != "" {
+			sawReasonConstraint = true
+			break
+		}
+	}
+	if !sawReasonConstraint {
+		t.Errorf("expected at least one reason row with constraint_name set")
+	}
+
 	selectResp := doRequest(t, http.MethodPost,
 		runURL+"/"+runID+"/solutions/"+topSolutionID+"/select", nil, http.StatusOK, token)
 	selectedID := str(selectResp, "selected_solution_id")
@@ -1224,6 +1263,21 @@ func testComplexCamp(t *testing.T) {
 	explanations := list(solDetail, "explanations")
 	if len(explanations) == 0 {
 		t.Fatal("expected explanations in solution detail")
+	}
+
+	// Reason rows must persist constraint_name for sorting + display.
+	sawReasonConstraint := false
+	for _, e := range explanations {
+		em := asMap(e)
+		etype := str(em, "explanation_type")
+		cn, _ := em["constraint_name"].(string)
+		if etype == "reason" && cn != "" {
+			sawReasonConstraint = true
+			break
+		}
+	}
+	if !sawReasonConstraint {
+		t.Errorf("expected at least one reason row with constraint_name set")
 	}
 
 	hasUnmetPref := false

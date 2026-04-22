@@ -47,8 +47,8 @@ func TestExplain(t *testing.T) {
 				t.Errorf("counselor %s has no reasons", ae.CounselorID)
 			}
 			for _, r := range ae.Reasons {
-				if !strings.Contains(r, "+") {
-					t.Errorf("reason missing score: %q", r)
+				if !strings.Contains(r.Message, "+") {
+					t.Errorf("reason missing score: %q", r.Message)
 				}
 			}
 		}

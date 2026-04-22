@@ -71,11 +71,12 @@ type ActivityExplanation struct {
 type ActivityAssignmentExplanation struct {
 	CounselorID string
 	SlotID      string
-	Reasons     []string
+	Reasons     []AssignmentReason
 }
 
 type ActivityUnmetPreference struct {
 	CounselorID string
 	Constraint  string
+	Rank        int
 	Message     string
 }

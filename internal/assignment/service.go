@@ -443,12 +443,17 @@ func (svc *Service) getCamperSolution(ctx context.Context, campUUID, runUUID pgt
 		if e.ConstraintName.Valid {
 			constraintName = &e.ConstraintName.String
 		}
+		var rank *int32
+		if e.Rank.Valid {
+			rank = &e.Rank.Int32
+		}
 		explanationResponses[i] = ExplanationResponse{
 			ID:              api.UUIDToString(e.ID),
 			CamperID:        api.UUIDToString(e.CamperID),
 			CamperName:      e.CamperName,
 			ExplanationType: e.ExplanationType,
 			ConstraintName:  constraintName,
+			Rank:            rank,
 			Message:         e.Message,
 		}
 	}
@@ -625,6 +630,10 @@ func toExplanationResponse(e db.ListCounselorCabinExplanationsBySolutionRow) Exp
 	if e.ConstraintName.Valid {
 		constraintName = &e.ConstraintName.String
 	}
+	var rank *int32
+	if e.Rank.Valid {
+		rank = &e.Rank.Int32
+	}
 
 	return ExplanationResponse{
 		ID:              api.UUIDToString(e.ID),
@@ -632,6 +641,7 @@ func toExplanationResponse(e db.ListCounselorCabinExplanationsBySolutionRow) Exp
 		CounselorName:   e.CounselorName,
 		ExplanationType: e.ExplanationType,
 		ConstraintName:  constraintName,
+		Rank:            rank,
 		Message:         e.Message,
 	}
 }
@@ -709,12 +719,17 @@ func (svc *Service) getActivitySolution(ctx context.Context, campUUID, runUUID p
 		if e.ConstraintName.Valid {
 			constraintName = &e.ConstraintName.String
 		}
+		var rank *int32
+		if e.Rank.Valid {
+			rank = &e.Rank.Int32
+		}
 		explanationResponses[i] = ExplanationResponse{
 			ID:              api.UUIDToString(e.ID),
 			CounselorID:     api.UUIDToString(e.CounselorID),
 			CounselorName:   e.CounselorName,
 			ExplanationType: e.ExplanationType,
 			ConstraintName:  constraintName,
+			Rank:            rank,
 			Message:         e.Message,
 		}
 	}

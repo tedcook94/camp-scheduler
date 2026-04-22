@@ -77,6 +77,7 @@ type ScoreComponent struct {
 	Constraint  string
 	Score       float64
 	Message     string
+	Rank        int
 	CabinID     string
 	CounselorID string
 	CamperID    string
@@ -110,11 +111,22 @@ type Explanation struct {
 type AssignmentExplanation struct {
 	CounselorID string
 	CabinID     string
-	Reasons     []string
+	Reasons     []AssignmentReason
+}
+
+// AssignmentReason is one scoring reason for an assignment, carrying the
+// constraint type, preference rank (0 when not applicable), the slot it
+// applies to (only used by the activity-schedule solver), and the
+// human-readable message (already formatted with the "(+N.N)" score suffix).
+type AssignmentReason struct {
+	Constraint string
+	Rank       int
+	Message    string
 }
 
 type UnmetPreference struct {
 	CounselorID string
 	Constraint  string
+	Rank        int
 	Message     string
 }

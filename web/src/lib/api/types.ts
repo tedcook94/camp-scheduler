@@ -414,6 +414,7 @@ export interface ExplanationDetail {
 	camper_name?: string;
 	explanation_type: "reason" | "unmet_preference" | "ineligible_preference";
 	constraint_name: string | null;
+	rank?: number | null;
 	message: string;
 }
 

@@ -270,7 +270,7 @@
 					<Table.TableRow
 						class="cursor-pointer hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 						role="link"
-						tabindex="0"
+						tabindex={0}
 						onclick={() => goto(`/app/assignment-runs/${run.id}`)}
 						onkeydown={(e: KeyboardEvent) => {
 							if (e.key === "Enter" || e.key === " ") {

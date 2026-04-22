@@ -1105,6 +1105,8 @@
 					{@const isExpanded = expandedTimeSlots.has(st.id)}
 				<div
 					class="border-border relative rounded-lg border transition-opacity {draggedId === st.id ? 'opacity-50' : ''}"
+					role="region"
+					aria-label={`${timeSlotMap.get(st.time_slot_id) ?? "Unknown time slot"} drop zone`}
 					ondragover={(e) => handleDragOver(e, st.id)}
 					ondragleave={(e) => handleDragLeave(e)}
 					ondrop={(e) => handleDrop(e, st.id)}

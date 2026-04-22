@@ -30,7 +30,7 @@ func (q *Queries) DeselectSolution(ctx context.Context, arg DeselectSolutionPara
 }
 
 const getSelectedSolution = `-- name: GetSelectedSolution :one
-SELECT camp_id, run_id, solution_id, solution_type
+SELECT camp_id, session_id, run_id, solution_id, solution_type
 FROM assignment_run_selected_solutions
 WHERE run_id = $1 AND camp_id = $2
 `
@@ -40,11 +40,20 @@ type GetSelectedSolutionParams struct {
 	CampID pgtype.UUID
 }
 
-func (q *Queries) GetSelectedSolution(ctx context.Context, arg GetSelectedSolutionParams) (AssignmentRunSelectedSolution, error) {
+type GetSelectedSolutionRow struct {
+	CampID       pgtype.UUID
+	SessionID    pgtype.UUID
+	RunID        pgtype.UUID
+	SolutionID   pgtype.UUID
+	SolutionType string
+}
+
+func (q *Queries) GetSelectedSolution(ctx context.Context, arg GetSelectedSolutionParams) (GetSelectedSolutionRow, error) {
 	row := q.db.QueryRow(ctx, getSelectedSolution, arg.RunID, arg.CampID)
-	var i AssignmentRunSelectedSolution
+	var i GetSelectedSolutionRow
 	err := row.Scan(
 		&i.CampID,
+		&i.SessionID,
 		&i.RunID,
 		&i.SolutionID,
 		&i.SolutionType,
@@ -52,31 +61,85 @@ func (q *Queries) GetSelectedSolution(ctx context.Context, arg GetSelectedSoluti
 	return i, err
 }
 
+const listConflictingSelectedRuns = `-- name: ListConflictingSelectedRuns :many
+SELECT ar.id
+FROM assignment_runs ar
+JOIN assignment_run_selected_solutions arss
+    ON arss.run_id = ar.id AND arss.camp_id = ar.camp_id
+WHERE ar.camp_id = $1
+    AND ar.session_id = $2
+    AND ar.run_type = $3
+    AND ar.id <> $4
+`
+
+type ListConflictingSelectedRunsParams struct {
+	CampID    pgtype.UUID
+	SessionID pgtype.UUID
+	RunType   string
+	ID        pgtype.UUID
+}
+
+func (q *Queries) ListConflictingSelectedRuns(ctx context.Context, arg ListConflictingSelectedRunsParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, listConflictingSelectedRuns,
+		arg.CampID,
+		arg.SessionID,
+		arg.RunType,
+		arg.ID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const selectSolution = `-- name: SelectSolution :one
-INSERT INTO assignment_run_selected_solutions (camp_id, run_id, solution_id, solution_type)
-VALUES ($1, $2, $3, $4)
+INSERT INTO assignment_run_selected_solutions (camp_id, session_id, run_id, solution_id, solution_type)
+VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (camp_id, run_id) DO UPDATE
 SET solution_id = EXCLUDED.solution_id, solution_type = EXCLUDED.solution_type
-RETURNING camp_id, run_id, solution_id, solution_type
+RETURNING camp_id, session_id, run_id, solution_id, solution_type
 `
 
 type SelectSolutionParams struct {
 	CampID       pgtype.UUID
+	SessionID    pgtype.UUID
 	RunID        pgtype.UUID
 	SolutionID   pgtype.UUID
 	SolutionType string
 }
 
-func (q *Queries) SelectSolution(ctx context.Context, arg SelectSolutionParams) (AssignmentRunSelectedSolution, error) {
+type SelectSolutionRow struct {
+	CampID       pgtype.UUID
+	SessionID    pgtype.UUID
+	RunID        pgtype.UUID
+	SolutionID   pgtype.UUID
+	SolutionType string
+}
+
+func (q *Queries) SelectSolution(ctx context.Context, arg SelectSolutionParams) (SelectSolutionRow, error) {
 	row := q.db.QueryRow(ctx, selectSolution,
 		arg.CampID,
+		arg.SessionID,
 		arg.RunID,
 		arg.SolutionID,
 		arg.SolutionType,
 	)
-	var i AssignmentRunSelectedSolution
+	var i SelectSolutionRow
 	err := row.Scan(
 		&i.CampID,
+		&i.SessionID,
 		&i.RunID,
 		&i.SolutionID,
 		&i.SolutionType,

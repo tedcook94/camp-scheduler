@@ -70,6 +70,7 @@ type AssignmentRunSelectedSolution struct {
 	RunID        pgtype.UUID
 	SolutionID   pgtype.UUID
 	SolutionType string
+	SessionID    pgtype.UUID
 }
 
 type Cabin struct {

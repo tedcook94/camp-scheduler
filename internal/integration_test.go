@@ -221,6 +221,7 @@ func TestReviewFixes(t *testing.T) {
 	t.Run("get_solution_run_ownership", testGetSolutionRunOwnership)
 	t.Run("get_solution_run_not_found", testGetSolutionRunNotFound)
 	t.Run("select_solution_camper_run", testSelectSolutionCamperRun)
+	t.Run("select_solution_replaces_prior_run_selection", testSelectSolutionReplacesPriorRunSelection)
 	t.Run("camper_run_invalid_session", testCamperRunInvalidSession)
 	t.Run("session_cross_season_previous", testSessionCrossSeasonPrevious)
 	t.Run("session_season_change_with_dependents", testSessionSeasonChangeWithDependents)
@@ -1894,6 +1895,101 @@ func testSelectSolutionCamperRun(t *testing.T) {
 
 	// Clean up.
 	mustDelete(t, runURL+"/"+runID, token)
+}
+
+// testSelectSolutionReplacesPriorRunSelection verifies that selecting a
+// solution from a new run of the same type within the same session clears
+// the prior run's selection (the unique constraint on (camp,session,type)
+// allows only one selected run per type).
+func testSelectSolutionReplacesPriorRunSelection(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Replace").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	ag := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Teens"}, token)
+	agID := str(ag, "id")
+
+	cabin := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name": "Hawk", "default_age_group_id": agID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
+	}, token)
+	cabinID := str(cabin, "id")
+
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31"}, token)
+	seasonID := str(season, "id")
+
+	session := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	}, token)
+	sessionID := str(session, "id")
+	sessionBase := "/sessions/" + sessionID
+
+	sag := mustPost(t, apiURL(ts, sessionBase+"/age-groups"), map[string]any{
+		"age_group_id": agID,
+	}, token)
+	sagID := str(sag, "id")
+
+	mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
+		"session_age_group_id": sagID, "cabin_id": cabinID,
+		"group_size": 4, "required_counselors": 1,
+	}, token)
+
+	for _, name := range []string{"Alice", "Bob"} {
+		c := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": name}, token)
+		mustPost(t, apiURL(ts, sessionBase+"/enrollments"), map[string]any{
+			"camper_id": str(c, "id"), "session_age_group_id": sagID,
+		}, token)
+	}
+
+	runURL := apiURL(ts, sessionBase+"/assignment-runs")
+
+	// Trigger run A and select its top solution.
+	runA := mustPost(t, runURL, map[string]any{"run_type": "camper_cabin"}, token)
+	runAID := str(runA, "id")
+	runASol := str(asMap(list(runA, "solutions")[0]), "id")
+	doRequest(t, http.MethodPost, runURL+"/"+runAID+"/solutions/"+runASol+"/select", nil, http.StatusOK, token)
+
+	// Trigger run B (same session, same type) and select its top solution.
+	runB := mustPost(t, runURL, map[string]any{"run_type": "camper_cabin"}, token)
+	runBID := str(runB, "id")
+	runBSol := str(asMap(list(runB, "solutions")[0]), "id")
+	selectB := doRequest(t, http.MethodPost, runURL+"/"+runBID+"/solutions/"+runBSol+"/select", nil, http.StatusOK, token)
+	if str(selectB, "status") != "selected" {
+		t.Fatalf("expected run B to be selected, got status %q", str(selectB, "status"))
+	}
+
+	// Run A should now report status "completed" with no selected solution.
+	runAUpdated := mustGet(t, runURL+"/"+runAID, token)
+	if str(runAUpdated, "status") != "completed" {
+		t.Fatalf("expected run A status 'completed', got %q", str(runAUpdated, "status"))
+	}
+	if sel := str(runAUpdated, "selected_solution_id"); sel != "" {
+		t.Fatalf("expected run A selected_solution_id to be cleared, got %q", sel)
+	}
+
+	// Exactly one row should exist in assignment_run_selected_solutions for
+	// (camp,session,solution_type='camper_cabin').
+	var count int
+	err = pool.QueryRow(context.Background(),
+		`SELECT COUNT(*) FROM assignment_run_selected_solutions
+		 WHERE camp_id = $1 AND session_id = $2 AND solution_type = 'camper_cabin'`,
+		campID, sessionID).Scan(&count)
+	if err != nil {
+		t.Fatalf("counting selections: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected exactly 1 selection row, got %d", count)
+	}
+
+	mustDelete(t, runURL+"/"+runAID, token)
+	mustDelete(t, runURL+"/"+runBID, token)
 }
 
 func testCamperRunInvalidSession(t *testing.T) {

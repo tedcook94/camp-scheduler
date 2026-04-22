@@ -550,8 +550,49 @@ func (svc *Service) SelectSolution(ctx context.Context, campID, runID, solutionI
 
 	qtx := db.New(tx)
 
+	// Lock all assignment_runs rows for this (camp, session, run_type) so a
+	// concurrent SelectSolution on a sibling run can't race past the
+	// conflict check below and trip the unique constraint on insert.
+	if _, err := qtx.LockAssignmentRunsBySessionAndType(ctx, db.LockAssignmentRunsBySessionAndTypeParams{
+		CampID:    campUUID,
+		SessionID: run.SessionID,
+		RunType:   run.RunType,
+	}); err != nil {
+		return RunResponse{}, fmt.Errorf("error locking assignment runs for selection: %w", err)
+	}
+
+	// Clear any other selected run of the same type in this session, so that
+	// each (session, solution_type) has at most one selected run.
+	conflictingRunIDs, err := qtx.ListConflictingSelectedRuns(ctx, db.ListConflictingSelectedRunsParams{
+		CampID:    campUUID,
+		SessionID: run.SessionID,
+		RunType:   run.RunType,
+		ID:        runUUID,
+	})
+	if err != nil {
+		return RunResponse{}, fmt.Errorf("error listing conflicting selected runs: %w", err)
+	}
+	for _, conflictRunID := range conflictingRunIDs {
+		if _, err := qtx.DeselectSolution(ctx, db.DeselectSolutionParams{
+			RunID:  conflictRunID,
+			CampID: campUUID,
+		}); err != nil {
+			return RunResponse{}, fmt.Errorf("error clearing conflicting selection on run %s: %w",
+				api.UUIDToString(conflictRunID), err)
+		}
+		if _, err := qtx.UpdateAssignmentRunStatus(ctx, db.UpdateAssignmentRunStatusParams{
+			ID:     conflictRunID,
+			CampID: campUUID,
+			Status: "completed",
+		}); err != nil {
+			return RunResponse{}, fmt.Errorf("error reverting status on run %s: %w",
+				api.UUIDToString(conflictRunID), err)
+		}
+	}
+
 	_, err = qtx.SelectSolution(ctx, db.SelectSolutionParams{
 		CampID:       campUUID,
+		SessionID:    run.SessionID,
 		RunID:        runUUID,
 		SolutionID:   solUUID,
 		SolutionType: run.RunType,

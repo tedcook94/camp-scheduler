@@ -144,6 +144,40 @@ func (q *Queries) ListAssignmentRunsBySession(ctx context.Context, arg ListAssig
 	return items, nil
 }
 
+const lockAssignmentRunsBySessionAndType = `-- name: LockAssignmentRunsBySessionAndType :many
+SELECT id
+FROM assignment_runs
+WHERE camp_id = $1 AND session_id = $2 AND run_type = $3
+ORDER BY id
+FOR UPDATE
+`
+
+type LockAssignmentRunsBySessionAndTypeParams struct {
+	CampID    pgtype.UUID
+	SessionID pgtype.UUID
+	RunType   string
+}
+
+func (q *Queries) LockAssignmentRunsBySessionAndType(ctx context.Context, arg LockAssignmentRunsBySessionAndTypeParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, lockAssignmentRunsBySessionAndType, arg.CampID, arg.SessionID, arg.RunType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateAssignmentRunStatus = `-- name: UpdateAssignmentRunStatus :one
 UPDATE assignment_runs
 SET status = $3

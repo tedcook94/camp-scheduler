@@ -75,7 +75,7 @@ func storeSolution(ctx context.Context, qtx *db.Queries, campID, runID pgtype.UU
 
 	explanation := Explain(snapshot, solution)
 
-	if err := storeAssignments(ctx, qtx, campID, sol.ID, explanation, solution); err != nil {
+	if err := storeAssignments(ctx, qtx, campID, sol.ID, solution); err != nil {
 		return err
 	}
 
@@ -86,26 +86,27 @@ func storeSolution(ctx context.Context, qtx *db.Queries, campID, runID pgtype.UU
 	return nil
 }
 
-func storeAssignments(ctx context.Context, qtx *db.Queries, campID, solutionID pgtype.UUID, explanation Explanation, solution Solution) error {
-	for _, ae := range explanation.Assignments {
-		counselorUUID, err := api.ParseUUID(ae.CounselorID)
+func storeAssignments(ctx context.Context, qtx *db.Queries, campID, solutionID pgtype.UUID, solution Solution) error {
+	for cabinID, counselorIDs := range solution.Assignment.CabinCounselors {
+		cabinUUID, err := api.ParseUUID(cabinID)
 		if err != nil {
 			return err
 		}
+		for _, counselorID := range counselorIDs {
+			counselorUUID, err := api.ParseUUID(counselorID)
+			if err != nil {
+				return err
+			}
 
-		cabinUUID, err := api.ParseUUID(ae.CabinID)
-		if err != nil {
-			return err
-		}
-
-		_, err = qtx.CreateCounselorCabinAssignment(ctx, db.CreateCounselorCabinAssignmentParams{
-			CampID:      campID,
-			SolutionID:  solutionID,
-			CounselorID: counselorUUID,
-			CabinID:     cabinUUID,
-		})
-		if err != nil {
-			return fmt.Errorf("error creating assignment for counselor %s: %w", ae.CounselorID, err)
+			_, err = qtx.CreateCounselorCabinAssignment(ctx, db.CreateCounselorCabinAssignmentParams{
+				CampID:      campID,
+				SolutionID:  solutionID,
+				CounselorID: counselorUUID,
+				CabinID:     cabinUUID,
+			})
+			if err != nil {
+				return fmt.Errorf("error creating assignment for counselor %s: %w", counselorID, err)
+			}
 		}
 	}
 	return nil

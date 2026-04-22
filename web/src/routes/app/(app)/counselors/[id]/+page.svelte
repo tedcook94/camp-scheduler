@@ -855,7 +855,14 @@
 										{#each ageGroupPrefs as pref, i (pref.id)}
 											<Table.TableRow>
 												<Table.TableCell class="text-muted-foreground">{pref.rank}</Table.TableCell>
-												<Table.TableCell>{getAgeGroupName(pref.age_group_id)}</Table.TableCell>
+												<Table.TableCell>
+													<div class="flex items-center gap-2">
+														<span>{getAgeGroupName(pref.age_group_id)}</span>
+														{#if !sessionAgeGroupIds.has(pref.age_group_id)}
+															<Badge variant="outline" class="text-muted-foreground" title="This age group is no longer configured for the selected session and will be ignored by the solver.">no longer in session</Badge>
+														{/if}
+													</div>
+												</Table.TableCell>
 												<Table.TableCell>
 													<div class="flex justify-end gap-1">
 														<Button variant="ghost" size="icon-sm" title="Move up" disabled={disabled || prefSaving || i === 0} onclick={() => moveAgeGroupPref(i, -1)}>
@@ -929,7 +936,14 @@
 										{#each cocounselorPrefs as pref, i (pref.id)}
 											<Table.TableRow>
 												<Table.TableCell class="text-muted-foreground">{pref.rank}</Table.TableCell>
-												<Table.TableCell>{getCounselorName(pref.preferred_counselor_id)}</Table.TableCell>
+												<Table.TableCell>
+													<div class="flex items-center gap-2">
+														<span>{getCounselorName(pref.preferred_counselor_id)}</span>
+														{#if !sessionCounselorIds.has(pref.preferred_counselor_id)}
+															<Badge variant="outline" class="text-muted-foreground" title="This counselor is no longer on the selected session's roster and will be ignored by the solver.">no longer in session</Badge>
+														{/if}
+													</div>
+												</Table.TableCell>
 												<Table.TableCell>
 													<div class="flex justify-end gap-1">
 														<Button variant="ghost" size="icon-sm" title="Move up" disabled={disabled || prefSaving || i === 0} onclick={() => moveCocounselorPref(i, -1)}>
@@ -1003,7 +1017,14 @@
 										{#each activityPrefs as pref, i (pref.id)}
 											<Table.TableRow>
 												<Table.TableCell class="text-muted-foreground">{pref.rank}</Table.TableCell>
-												<Table.TableCell>{getActivityName(pref.activity_id)}</Table.TableCell>
+												<Table.TableCell>
+													<div class="flex items-center gap-2">
+														<span>{getActivityName(pref.activity_id)}</span>
+														{#if !sessionActivityIds.has(pref.activity_id)}
+															<Badge variant="outline" class="text-muted-foreground" title="This activity is no longer configured for the selected session and will be ignored by the solver.">no longer in session</Badge>
+														{/if}
+													</div>
+												</Table.TableCell>
 												<Table.TableCell>
 													<div class="flex justify-end gap-1">
 														<Button variant="ghost" size="icon-sm" title="Move up" disabled={disabled || prefSaving || i === 0} onclick={() => moveActivityPref(i, -1)}>

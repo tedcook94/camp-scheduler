@@ -27,13 +27,14 @@ integration) is in progress.
 ### Schema
 
 Tables are organized by domain. See `database/migrations/` for the complete
-schema (24 migrations). Key groups:
+schema (31 migrations). Key groups:
 
 - **Core:** camps, age_groups, cabins, seasons, sessions, counselors
 - **Preferences:** counselor_age_group_preferences, counselor_cocounselor_preferences, counselor_activity_preferences, camper_friend_preferences
 - **History:** counselor_session_history
 - **Campers:** campers, camper_session_enrollments
 - **Activities:** activities, time_slots, counselor_certifications, session_time_slots, session_activities
+- **Session config:** session_age_groups, session_cabins, session_counselors (per-session counselor roster)
 - **Assignments:** assignment_runs, assignment_run_selected_solutions, counselor_cabin_solutions/assignments/explanations, camper_cabin_solutions/assignments/explanations, activity_solutions/assignments/explanations
 
 ## Constraints
@@ -148,8 +149,8 @@ viable configurations and understand trade-offs.
   - [x] Assignment runs: trigger solver, view run history, compare ranked solutions, select a solution
 - [x] Demo camp seeding tool
 - [x] Add dedicated camper enrollments endpoint to eliminate N+1 loading on camper detail page
-- [ ] Filter counselor preference options to session-configured age groups and activities
-- [ ] Filter camper preference options to session-enrolled campers
+- [x] Filter counselor preference options to session-configured age groups and activities
+- [x] Filter camper preference options to session-enrolled campers
 - [ ] Enforce gender for cabins
 - [ ] Assign counselors and campers to cabin at once (respect max cabin size of campers + counselors)
 - [ ] Assign all counselors for cabins/activities

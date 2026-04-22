@@ -4,6 +4,7 @@ type Cabin struct {
 	ID                 string
 	Name               string
 	AgeGroupID         string
+	AgeGroupName       string
 	RequiredCounselors int
 }
 

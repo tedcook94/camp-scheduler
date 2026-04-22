@@ -20,7 +20,7 @@ func ExplainCamper(snapshot CamperCabinSnapshot, solution CamperSolution) Camper
 
 		reasons := reasonsByCamper[camper.ID]
 		if len(reasons) == 0 {
-			reasons = []string{"assigned to fill cabin"}
+			continue
 		}
 
 		assignments = append(assignments, CamperAssignmentExplanation{

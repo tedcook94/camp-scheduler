@@ -3,6 +3,7 @@ package solver
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 func ExplainActivity(snapshot ActivitySnapshot, solution ActivitySolution) ActivityExplanation {
@@ -24,8 +25,7 @@ func ExplainActivity(snapshot ActivitySnapshot, solution ActivitySolution) Activ
 			key := cID + "|" + slotID
 			reasons := reasonsByAssignment[key]
 			if len(reasons) == 0 {
-				slot := slotsByID[slotID]
-				reasons = []string{fmt.Sprintf("assigned to %s (%s) to fill requirement", slot.ActivityName, slot.TimeSlotName)}
+				continue
 			}
 
 			assignments = append(assignments, ActivityAssignmentExplanation{
@@ -91,17 +91,58 @@ func findUnmetActivityPreferences(snapshot ActivitySnapshot, counselorSlots map[
 		}
 	}
 
+	// Build activityID -> activityName lookup from slots.
+	activityNames := make(map[string]string)
+	for _, slot := range snapshot.Slots {
+		activityNames[slot.ActivityID] = slot.ActivityName
+	}
+	activityLabel := func(id string) string {
+		if name, ok := activityNames[id]; ok && name != "" {
+			return name
+		}
+		return id
+	}
+
 	var unmet []ActivityUnmetPreference
 	for counselorID, prefs := range snapshot.ActivityPreferences {
-		activities := counselorActivities[counselorID]
+		assigned := counselorActivities[counselorID]
+		var unmetPrefs []RankedPreference
 		for _, pref := range prefs {
-			if !activities[pref.TargetID] {
+			if !assigned[pref.TargetID] {
+				unmetPrefs = append(unmetPrefs, pref)
+			}
+		}
+		if len(unmetPrefs) == 0 {
+			continue
+		}
+
+		sort.Slice(unmetPrefs, func(i, j int) bool {
+			return unmetPrefs[i].Rank < unmetPrefs[j].Rank
+		})
+
+		// Hybrid aggregation: single row when ALL prefs unmet, individual
+		// rows otherwise.
+		if len(unmetPrefs) == len(prefs) {
+			parts := make([]string, len(unmetPrefs))
+			for i, p := range unmetPrefs {
+				parts[i] = fmt.Sprintf("%s (rank %d)", activityLabel(p.TargetID), p.Rank)
+			}
+			unmet = append(unmet, ActivityUnmetPreference{
+				CounselorID: counselorID,
+				Constraint:  "activity_preference",
+				Message: fmt.Sprintf(
+					"not assigned to any preferred activity (%s)",
+					strings.Join(parts, ", "),
+				),
+			})
+		} else {
+			for _, pref := range unmetPrefs {
 				unmet = append(unmet, ActivityUnmetPreference{
 					CounselorID: counselorID,
 					Constraint:  "activity_preference",
 					Message: fmt.Sprintf(
-						"preferred activity (rank %d) but not assigned to it",
-						pref.Rank,
+						"not assigned to preferred activity %s (rank %d)",
+						activityLabel(pref.TargetID), pref.Rank,
 					),
 				})
 			}

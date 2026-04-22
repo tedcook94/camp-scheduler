@@ -54,7 +54,7 @@ func TestExplain(t *testing.T) {
 		}
 	})
 
-	t.Run("no preferences gives default reason", func(t *testing.T) {
+	t.Run("no preferences produces no assignment explanation", func(t *testing.T) {
 		snapshot := SessionSnapshot{
 			Cabins: []Cabin{
 				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1},
@@ -74,11 +74,8 @@ func TestExplain(t *testing.T) {
 
 		explanation := Explain(snapshot, solution)
 
-		if len(explanation.Assignments) != 1 {
-			t.Fatalf("expected 1 assignment explanation, got %d", len(explanation.Assignments))
-		}
-		if explanation.Assignments[0].Reasons[0] != "assigned to fill cabin requirement" {
-			t.Errorf("expected default reason, got %q", explanation.Assignments[0].Reasons[0])
+		if len(explanation.Assignments) != 0 {
+			t.Errorf("expected no assignment explanations when there are no scoring reasons, got %d", len(explanation.Assignments))
 		}
 	})
 
@@ -317,8 +314,8 @@ func TestExplain(t *testing.T) {
 
 		explanation := Explain(snapshot, solution)
 
-		if len(explanation.Assignments) != 1 {
-			t.Errorf("expected 1 assignment explanation, got %d", len(explanation.Assignments))
+		if len(explanation.Assignments) != 0 {
+			t.Errorf("expected 0 assignment explanations (sr1 has no scoring reasons), got %d", len(explanation.Assignments))
 		}
 		found := false
 		for _, u := range explanation.UnmetPreferences {

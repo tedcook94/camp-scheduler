@@ -177,10 +177,12 @@ SELECT
     c.id,
     c.cabin_name,
     sag.age_group_id,
+    ag.age_group_name,
     sagc.required_counselors
 FROM session_age_groups sag
 JOIN session_age_group_cabins sagc ON sagc.session_age_group_id = sag.id
 JOIN cabins c ON c.id = sagc.cabin_id
+JOIN age_groups ag ON ag.id = sag.age_group_id
 WHERE sag.session_id = $1 AND sag.camp_id = $2
 ORDER BY c.cabin_name
 `
@@ -194,6 +196,7 @@ type ListSessionCabinsRow struct {
 	ID                 pgtype.UUID
 	CabinName          string
 	AgeGroupID         pgtype.UUID
+	AgeGroupName       string
 	RequiredCounselors int32
 }
 
@@ -210,6 +213,7 @@ func (q *Queries) ListSessionCabins(ctx context.Context, arg ListSessionCabinsPa
 			&i.ID,
 			&i.CabinName,
 			&i.AgeGroupID,
+			&i.AgeGroupName,
 			&i.RequiredCounselors,
 		); err != nil {
 			return nil, err

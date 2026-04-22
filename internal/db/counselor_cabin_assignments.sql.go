@@ -43,10 +43,16 @@ func (q *Queries) CreateCounselorCabinAssignment(ctx context.Context, arg Create
 }
 
 const listCounselorCabinAssignmentsBySolution = `-- name: ListCounselorCabinAssignmentsBySolution :many
-SELECT id, camp_id, solution_id, counselor_id, cabin_id
-FROM counselor_cabin_assignments
-WHERE solution_id = $1 AND camp_id = $2
-ORDER BY cabin_id, counselor_id
+SELECT a.id, a.camp_id, a.solution_id, a.counselor_id, a.cabin_id,
+       co.counselor_name AS counselor_name,
+       cb.cabin_name AS cabin_name,
+       ag.age_group_name AS age_group_name
+FROM counselor_cabin_assignments a
+JOIN counselors co ON co.id = a.counselor_id
+JOIN cabins cb ON cb.id = a.cabin_id
+JOIN age_groups ag ON ag.id = cb.default_age_group_id
+WHERE a.solution_id = $1 AND a.camp_id = $2
+ORDER BY ag.age_group_name, cb.cabin_name, co.counselor_name
 `
 
 type ListCounselorCabinAssignmentsBySolutionParams struct {
@@ -54,21 +60,35 @@ type ListCounselorCabinAssignmentsBySolutionParams struct {
 	CampID     pgtype.UUID
 }
 
-func (q *Queries) ListCounselorCabinAssignmentsBySolution(ctx context.Context, arg ListCounselorCabinAssignmentsBySolutionParams) ([]CounselorCabinAssignment, error) {
+type ListCounselorCabinAssignmentsBySolutionRow struct {
+	ID            pgtype.UUID
+	CampID        pgtype.UUID
+	SolutionID    pgtype.UUID
+	CounselorID   pgtype.UUID
+	CabinID       pgtype.UUID
+	CounselorName string
+	CabinName     string
+	AgeGroupName  string
+}
+
+func (q *Queries) ListCounselorCabinAssignmentsBySolution(ctx context.Context, arg ListCounselorCabinAssignmentsBySolutionParams) ([]ListCounselorCabinAssignmentsBySolutionRow, error) {
 	rows, err := q.db.Query(ctx, listCounselorCabinAssignmentsBySolution, arg.SolutionID, arg.CampID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []CounselorCabinAssignment
+	var items []ListCounselorCabinAssignmentsBySolutionRow
 	for rows.Next() {
-		var i CounselorCabinAssignment
+		var i ListCounselorCabinAssignmentsBySolutionRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.CampID,
 			&i.SolutionID,
 			&i.CounselorID,
 			&i.CabinID,
+			&i.CounselorName,
+			&i.CabinName,
+			&i.AgeGroupName,
 		); err != nil {
 			return nil, err
 		}

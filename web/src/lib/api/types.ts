@@ -394,15 +394,24 @@ export interface ScoreBreakdown {
 export interface AssignmentDetail {
 	id: string;
 	counselor_id?: string;
+	counselor_name?: string;
 	camper_id?: string;
+	camper_name?: string;
 	cabin_id?: string;
+	cabin_name?: string;
+	age_group_name?: string;
 	session_activity_id?: string;
+	activity_name?: string;
+	time_slot_name?: string;
+	sort_order?: number;
 }
 
 export interface ExplanationDetail {
 	id: string;
 	counselor_id?: string;
+	counselor_name?: string;
 	camper_id?: string;
+	camper_name?: string;
 	explanation_type: "reason" | "unmet_preference";
 	constraint_name: string | null;
 	message: string;

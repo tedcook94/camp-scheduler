@@ -43,10 +43,16 @@ func (q *Queries) CreateCamperCabinAssignment(ctx context.Context, arg CreateCam
 }
 
 const listCamperCabinAssignmentsBySolution = `-- name: ListCamperCabinAssignmentsBySolution :many
-SELECT id, camp_id, solution_id, camper_id, cabin_id
-FROM camper_cabin_assignments
-WHERE solution_id = $1 AND camp_id = $2
-ORDER BY cabin_id, camper_id
+SELECT a.id, a.camp_id, a.solution_id, a.camper_id, a.cabin_id,
+       cm.camper_name AS camper_name,
+       cb.cabin_name AS cabin_name,
+       ag.age_group_name AS age_group_name
+FROM camper_cabin_assignments a
+JOIN campers cm ON cm.id = a.camper_id
+JOIN cabins cb ON cb.id = a.cabin_id
+JOIN age_groups ag ON ag.id = cb.default_age_group_id
+WHERE a.solution_id = $1 AND a.camp_id = $2
+ORDER BY ag.age_group_name, cb.cabin_name, cm.camper_name
 `
 
 type ListCamperCabinAssignmentsBySolutionParams struct {
@@ -54,21 +60,35 @@ type ListCamperCabinAssignmentsBySolutionParams struct {
 	CampID     pgtype.UUID
 }
 
-func (q *Queries) ListCamperCabinAssignmentsBySolution(ctx context.Context, arg ListCamperCabinAssignmentsBySolutionParams) ([]CamperCabinAssignment, error) {
+type ListCamperCabinAssignmentsBySolutionRow struct {
+	ID           pgtype.UUID
+	CampID       pgtype.UUID
+	SolutionID   pgtype.UUID
+	CamperID     pgtype.UUID
+	CabinID      pgtype.UUID
+	CamperName   string
+	CabinName    string
+	AgeGroupName string
+}
+
+func (q *Queries) ListCamperCabinAssignmentsBySolution(ctx context.Context, arg ListCamperCabinAssignmentsBySolutionParams) ([]ListCamperCabinAssignmentsBySolutionRow, error) {
 	rows, err := q.db.Query(ctx, listCamperCabinAssignmentsBySolution, arg.SolutionID, arg.CampID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []CamperCabinAssignment
+	var items []ListCamperCabinAssignmentsBySolutionRow
 	for rows.Next() {
-		var i CamperCabinAssignment
+		var i ListCamperCabinAssignmentsBySolutionRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.CampID,
 			&i.SolutionID,
 			&i.CamperID,
 			&i.CabinID,
+			&i.CamperName,
+			&i.CabinName,
+			&i.AgeGroupName,
 		); err != nil {
 			return nil, err
 		}

@@ -31,3 +31,10 @@ RETURNING id, camp_id, session_id, run_type, status, created_at;
 -- name: DeleteAssignmentRun :execrows
 DELETE FROM assignment_runs
 WHERE id = $1 AND camp_id = $2;
+
+-- name: LockAssignmentRunsBySessionAndType :many
+SELECT id
+FROM assignment_runs
+WHERE camp_id = $1 AND session_id = $2 AND run_type = $3
+ORDER BY id
+FOR UPDATE;

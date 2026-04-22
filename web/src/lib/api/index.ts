@@ -29,6 +29,7 @@ import type {
 	Season,
 	Session,
 	SessionActivity,
+	SessionCounselor,
 	SessionHistory,
 	SessionTimeSlot,
 	TimeSlot,
@@ -273,4 +274,13 @@ export const activityPreferenceApi = {
 		api.get<ActivityPreference[]>(`/api/v1/sessions/${sessionId}/counselors/${counselorId}/activity-preferences`, { signal }),
 	replaceAll: (sessionId: string, counselorId: string, data: ActivityPreferenceItem[]) =>
 		api.put<ActivityPreference[]>(`/api/v1/sessions/${sessionId}/counselors/${counselorId}/activity-preferences`, data),
+};
+
+export const sessionCounselorApi = {
+	list: (sessionId: string) =>
+		api.get<SessionCounselor[]>(`/api/v1/sessions/${sessionId}/counselors`),
+	add: (sessionId: string, counselorId: string) =>
+		api.post<SessionCounselor>(`/api/v1/sessions/${sessionId}/counselors`, { counselor_id: counselorId }),
+	remove: (sessionId: string, counselorId: string) =>
+		api.delete<void>(`/api/v1/sessions/${sessionId}/counselors/${counselorId}`),
 };

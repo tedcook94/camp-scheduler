@@ -325,6 +325,20 @@ export interface SessionAgeGroup {
 	age_group_id: string;
 }
 
+export interface SessionCounselor {
+	id: string;
+	camp_id: string;
+	session_id: string;
+	counselor_id: string;
+	counselor_name: string;
+	junior_counselor: boolean;
+	counselor_enabled: boolean;
+}
+
+export interface AddSessionCounselorRequest {
+	counselor_id: string;
+}
+
 export interface CreateSessionAgeGroupRequest {
 	age_group_id: string;
 }

@@ -84,6 +84,7 @@ func buildActivityReasonMap(breakdown []ScoreComponent) map[string][]AssignmentR
 		reasons[key] = append(reasons[key], AssignmentReason{
 			Constraint: c.Constraint,
 			Rank:       c.Rank,
+			SlotID:     c.SlotID,
 			Message:    fmt.Sprintf("%s (+%.1f)", c.Message, c.Score),
 		})
 	}

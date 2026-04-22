@@ -591,8 +591,17 @@
 		<AlertDialog.AlertDialogHeader>
 			<AlertDialog.AlertDialogTitle>Delete Run</AlertDialog.AlertDialogTitle>
 			<AlertDialog.AlertDialogDescription>
-				Are you sure you want to delete this assignment run? This action cannot be
-				undone.
+				{#if run?.status === "selected"}
+					<span class="block font-medium text-amber-600 dark:text-amber-400">
+						This is the currently selected solution. Deleting it will clear that selection.
+					</span>
+					<span class="mt-2 block">
+						Are you sure you want to delete this assignment run? This action cannot be undone.
+					</span>
+				{:else}
+					Are you sure you want to delete this assignment run? This action cannot be
+					undone.
+				{/if}
 			</AlertDialog.AlertDialogDescription>
 		</AlertDialog.AlertDialogHeader>
 		<AlertDialog.AlertDialogFooter>

@@ -30,8 +30,8 @@
 	type RunType = "counselor_cabin" | "camper_cabin" | "activity_schedule";
 
 	const RUN_TYPE_LABELS: Record<RunType, string> = {
-		counselor_cabin: "Counselor-to-Cabin",
-		camper_cabin: "Camper-to-Cabin",
+		counselor_cabin: "Counselor Cabin",
+		camper_cabin: "Camper Cabin",
 		activity_schedule: "Activity Schedule",
 	};
 
@@ -50,6 +50,7 @@
 	let deleteOpen = $state(false);
 	let deleting = $state(false);
 	let runToDelete = $state<string | null>(null);
+	let runToDeleteIsSelected = $state(false);
 
 	let errorDialogOpen = $state(false);
 	let errorDialogMessage = $state("");
@@ -175,8 +176,9 @@
 		}
 	}
 
-	function confirmDelete(runId: string) {
-		runToDelete = runId;
+	function confirmDelete(run: RunResponse) {
+		runToDelete = run.id;
+		runToDeleteIsSelected = run.status === "selected";
 		deleteOpen = true;
 	}
 
@@ -189,6 +191,7 @@
 			runs = runs.filter((r) => r.id !== runToDelete);
 			deleteOpen = false;
 			runToDelete = null;
+			runToDeleteIsSelected = false;
 			toast.success("Run deleted");
 		} catch (err) {
 			const message =
@@ -311,20 +314,20 @@
 									<ChevronRightIcon class="size-4" />
 									<span class="sr-only">View</span>
 								</a>
-								{#if run.status !== "selected"}
-									<Button
-										variant="ghost"
-										size="icon-sm"
-										title="Delete"
-										onclick={(e: MouseEvent) => {
-											e.stopPropagation();
-											confirmDelete(run.id);
-										}}
-									>
-										<TrashIcon class="size-4" />
-										<span class="sr-only">Delete</span>
-									</Button>
-								{/if}
+								<Button
+									variant="ghost"
+									size="icon-sm"
+									title={run.status === "selected"
+										? "Delete (selected solution)"
+										: "Delete"}
+									onclick={(e: MouseEvent) => {
+										e.stopPropagation();
+										confirmDelete(run);
+									}}
+								>
+									<TrashIcon class="size-4" />
+									<span class="sr-only">Delete</span>
+								</Button>
 							</div>
 						</Table.TableCell>
 					</Table.TableRow>
@@ -358,19 +361,19 @@
 				>
 					<Select.SelectTrigger id="run-type" class="w-full">
 						{#if triggerRunType === "counselor_cabin"}
-							Counselor-to-Cabin
+							Counselor Cabin
 						{:else if triggerRunType === "camper_cabin"}
-							Camper-to-Cabin
+							Camper Cabin
 						{:else}
 							Activity Schedule
 						{/if}
 					</Select.SelectTrigger>
 					<Select.SelectContent>
 						<Select.SelectItem value="counselor_cabin">
-							Counselor-to-Cabin
+							Counselor Cabin
 						</Select.SelectItem>
 						<Select.SelectItem value="camper_cabin">
-							Camper-to-Cabin
+							Camper Cabin
 						</Select.SelectItem>
 						<Select.SelectItem value="activity_schedule">
 							Activity Schedule
@@ -422,8 +425,17 @@
 		<AlertDialog.AlertDialogHeader>
 			<AlertDialog.AlertDialogTitle>Delete Run</AlertDialog.AlertDialogTitle>
 			<AlertDialog.AlertDialogDescription>
-				Are you sure you want to delete this assignment run? This action cannot be
-				undone.
+				{#if runToDeleteIsSelected}
+					<span class="block font-medium text-amber-600 dark:text-amber-400">
+						This is the currently selected solution. Deleting it will clear that selection.
+					</span>
+					<span class="mt-2 block">
+						Are you sure you want to delete this assignment run? This action cannot be undone.
+					</span>
+				{:else}
+					Are you sure you want to delete this assignment run? This action cannot be
+					undone.
+				{/if}
 			</AlertDialog.AlertDialogDescription>
 		</AlertDialog.AlertDialogHeader>
 		<AlertDialog.AlertDialogFooter>

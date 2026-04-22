@@ -195,6 +195,20 @@ func findUnmetActivityPreferences(snapshot ActivitySnapshot, counselorSlots map[
 	for counselorID, prefs := range snapshot.ActivityPreferences {
 		assigned := counselorActivities[counselorID]
 
+		// Determine the best (lowest numeric) rank the counselor actually
+		// got among their preferences. Preferences at or above that rank
+		// are considered met; only strictly higher-ranked (lower numeric
+		// rank) preferences count as real misses.
+		bestMetRank := 0 // 0 = none met
+		for _, pref := range prefs {
+			if pref.Rank <= 0 {
+				continue
+			}
+			if assigned[pref.TargetID] && (bestMetRank == 0 || pref.Rank < bestMetRank) {
+				bestMetRank = pref.Rank
+			}
+		}
+
 		counselor, hasCounselor := counselorsByID[counselorID]
 
 		type prefWithMiss struct {
@@ -207,6 +221,11 @@ func findUnmetActivityPreferences(snapshot ActivitySnapshot, counselorSlots map[
 
 		for _, pref := range prefs {
 			if pref.Rank <= 0 {
+				continue
+			}
+			// A preference counts as unmet only if no equal-or-higher-rank
+			// preference was met.
+			if bestMetRank != 0 && pref.Rank >= bestMetRank {
 				continue
 			}
 			if assigned[pref.TargetID] {
@@ -228,6 +247,20 @@ func findUnmetActivityPreferences(snapshot ActivitySnapshot, counselorSlots map[
 			continue
 		}
 
+		// Count the preferences that were *candidates* for being unmet
+		// (rank strictly better than any met preference). Aggregation
+		// collapses to a single row only when a bucket covers all of them.
+		candidateCount := 0
+		for _, pref := range prefs {
+			if pref.Rank <= 0 {
+				continue
+			}
+			if bestMetRank != 0 && pref.Rank >= bestMetRank {
+				continue
+			}
+			candidateCount++
+		}
+
 		sort.Slice(eligibleBucket, func(i, j int) bool {
 			return eligibleBucket[i].Rank < eligibleBucket[j].Rank
 		})
@@ -236,9 +269,8 @@ func findUnmetActivityPreferences(snapshot ActivitySnapshot, counselorSlots map[
 		})
 
 		// Eligible-unmet aggregation: single row when this bucket covers
-		// ALL of the counselor's preferences (no eligible-but-assigned, no
-		// ineligible). Otherwise individual rows.
-		aggregateEligible := len(eligibleBucket) > 0 && len(eligibleBucket) == len(prefs)
+		// ALL candidate preferences. Otherwise individual rows.
+		aggregateEligible := len(eligibleBucket) > 0 && len(eligibleBucket) == candidateCount
 		if aggregateEligible {
 			parts := make([]string, len(eligibleBucket))
 			for i, p := range eligibleBucket {
@@ -266,7 +298,7 @@ func findUnmetActivityPreferences(snapshot ActivitySnapshot, counselorSlots map[
 		}
 
 		// Ineligible aggregation mirrors the same rule.
-		aggregateIneligible := len(ineligibleBucket) > 0 && len(ineligibleBucket) == len(prefs)
+		aggregateIneligible := len(ineligibleBucket) > 0 && len(ineligibleBucket) == candidateCount
 		if aggregateIneligible {
 			parts := make([]string, len(ineligibleBucket))
 			for i, pm := range ineligibleBucket {

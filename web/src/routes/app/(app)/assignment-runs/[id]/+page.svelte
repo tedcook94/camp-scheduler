@@ -7,11 +7,12 @@
 	import type {
 		RunDetailResponse,
 		SolutionDetailResponse,
+		ExplanationDetail,
+		AssignmentDetail,
 	} from "$lib/api/types";
 	import { Button } from "$lib/components/ui/button";
 	import * as Card from "$lib/components/ui/card";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog";
-	import * as Table from "$lib/components/ui/table";
 	import { Badge } from "$lib/components/ui/badge";
 	import { Separator } from "$lib/components/ui/separator";
 	import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
@@ -28,10 +29,97 @@
 	type RunType = "counselor_cabin" | "camper_cabin" | "activity_schedule";
 
 	const RUN_TYPE_LABELS: Record<RunType, string> = {
-		counselor_cabin: "Counselor-to-Cabin",
-		camper_cabin: "Camper-to-Cabin",
+		counselor_cabin: "Counselor Cabin",
+		camper_cabin: "Camper Cabin",
 		activity_schedule: "Activity Schedule",
 	};
+
+	const constraintNameOverrides: Record<string, string> = {
+		cocounselor_preference: "Co-counselor Preference",
+	};
+
+	function formatConstraintName(name: string | null): string {
+		if (!name) return "";
+		if (constraintNameOverrides[name]) return constraintNameOverrides[name];
+		return name
+			.split("_")
+			.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+			.join(" ");
+	}
+
+	function entityLabel(explanation: ExplanationDetail, runType: RunType): string {
+		if (runType === "camper_cabin") {
+			return explanation.camper_name || explanation.camper_id?.slice(0, 8) || "";
+		}
+		return explanation.counselor_name || explanation.counselor_id?.slice(0, 8) || "";
+	}
+
+	interface ActivityGroup {
+		timeSlotName: string;
+		activities: { activityName: string; counselors: string[] }[];
+	}
+
+	interface CabinGroup {
+		ageGroupName: string;
+		cabins: { cabinName: string; people: string[] }[];
+	}
+
+	function groupByTimeSlotActivity(assignments: AssignmentDetail[]): ActivityGroup[] {
+		const groups: ActivityGroup[] = [];
+		let currentSlot: ActivityGroup | null = null;
+		let currentActivity: { activityName: string; counselors: string[] } | null = null;
+
+		for (const a of assignments) {
+			const slotName = a.time_slot_name || "Unknown";
+			const actName = a.activity_name || "Unknown";
+			const person = a.counselor_name || a.counselor_id?.slice(0, 8) || "Unknown";
+
+			if (!currentSlot || currentSlot.timeSlotName !== slotName) {
+				currentSlot = { timeSlotName: slotName, activities: [] };
+				currentActivity = null;
+				groups.push(currentSlot);
+			}
+
+			if (!currentActivity || currentActivity.activityName !== actName) {
+				currentActivity = { activityName: actName, counselors: [] };
+				currentSlot.activities.push(currentActivity);
+			}
+
+			currentActivity.counselors.push(person);
+		}
+
+		return groups;
+	}
+
+	function groupByAgeGroupCabin(assignments: AssignmentDetail[]): CabinGroup[] {
+		const groups: CabinGroup[] = [];
+		let currentGroup: CabinGroup | null = null;
+		let currentCabin: { cabinName: string; people: string[] } | null = null;
+
+		for (const a of assignments) {
+			const groupName = a.age_group_name || "Unknown";
+			const cabName = a.cabin_name || "Unknown";
+			const person =
+				a.camper_name || a.counselor_name ||
+				a.camper_id?.slice(0, 8) || a.counselor_id?.slice(0, 8) ||
+				"Unknown";
+
+			if (!currentGroup || currentGroup.ageGroupName !== groupName) {
+				currentGroup = { ageGroupName: groupName, cabins: [] };
+				currentCabin = null;
+				groups.push(currentGroup);
+			}
+
+			if (!currentCabin || currentCabin.cabinName !== cabName) {
+				currentCabin = { cabinName: cabName, people: [] };
+				currentGroup.cabins.push(currentCabin);
+			}
+
+			currentCabin.people.push(person);
+		}
+
+		return groups;
+	}
 
 	const runId = $derived($page.params.id);
 
@@ -43,6 +131,23 @@
 	let expandedSolutions = $state<Set<string>>(new Set());
 	let solutionDetails = $state<Map<string, SolutionDetailResponse>>(new Map());
 	let loadingSolution = $state<string | null>(null);
+
+	let expandedMet = $state<Set<string>>(new Set());
+	let expandedUnmet = $state<Set<string>>(new Set());
+
+	function toggleMet(solutionId: string) {
+		const next = new Set(expandedMet);
+		if (next.has(solutionId)) next.delete(solutionId);
+		else next.add(solutionId);
+		expandedMet = next;
+	}
+
+	function toggleUnmet(solutionId: string) {
+		const next = new Set(expandedUnmet);
+		if (next.has(solutionId)) next.delete(solutionId);
+		else next.add(solutionId);
+		expandedUnmet = next;
+	}
 
 	let deleteOpen = $state(false);
 	let deleting = $state(false);
@@ -131,7 +236,7 @@
 				run.id,
 				solutionId,
 			);
-			run = { ...run, status: "selected", selected_solution_id: solutionId };
+			await loadRun();
 			toast.success("Solution selected");
 		} catch (err) {
 			const message =
@@ -203,7 +308,18 @@
 			</div>
 
 			<div class="grid gap-4">
-				<h2 class="text-lg font-semibold">Solutions</h2>
+				<div class="flex items-center justify-between">
+					<h2 class="text-lg font-semibold">Solutions</h2>
+					<Button
+						variant="destructive"
+						size="sm"
+						onclick={confirmDelete}
+						disabled={deleting}
+					>
+						<TrashIcon class="mr-2 size-4" />
+						Delete Run
+					</Button>
+				</div>
 				{#each run.solutions as solution, index}
 					<Card.Card>
 						<div
@@ -241,9 +357,14 @@
 								</div>
 							</div>
 							<div class="flex items-center gap-2">
-								{#if run.status !== "selected"}
+								{#if run.selected_solution_id === solution.id}
+									<Badge variant="default" class="bg-green-600">
+										<CheckIcon class="mr-1 size-3" />
+										Selected
+									</Badge>
+								{:else}
 									<Button
-										variant={run.selected_solution_id === solution.id ? "default" : "outline"}
+										variant="outline"
 										size="sm"
 										disabled={selecting !== null}
 										onclick={(e) => {
@@ -253,10 +374,8 @@
 									>
 										{#if selecting === solution.id}
 											<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
-										{:else if run.selected_solution_id === solution.id}
-											<CheckIcon class="mr-2 size-4" />
 										{/if}
-										{run.selected_solution_id === solution.id ? "Selected" : "Select"}
+										Select
 									</Button>
 								{/if}
 							</div>
@@ -274,87 +393,133 @@
 									{#if details}
 										<div class="grid gap-6">
 											<div>
-												<h3 class="mb-2 text-sm font-medium">Score Breakdown</h3>
-												<div class="grid gap-1">
-													{#each details.score_breakdown as breakdown}
-														<div class="flex justify-between text-sm">
-															<span class="text-muted-foreground">{breakdown.Constraint}</span>
-															<span class="font-medium">+{breakdown.Score}</span>
-														</div>
-													{/each}
-												</div>
-											</div>
-
-											<div>
-												<h3 class="mb-2 text-sm font-medium">Assignments</h3>
-												<Table.Table>
-													<Table.TableHeader>
-														<Table.TableRow>
-															<Table.TableHead>
-																{#if run.run_type === "counselor_cabin"}
-																	Counselor
-																{:else if run.run_type === "camper_cabin"}
-																	Camper
-																{:else}
-																	Counselor
-																{/if}
-															</Table.TableHead>
-															<Table.TableHead>
-																{#if run.run_type === "activity_schedule"}
-																	Activity
-																{:else}
-																	Cabin
-																{/if}
-															</Table.TableHead>
-														</Table.TableRow>
-													</Table.TableHeader>
-													<Table.TableBody>
-														{#each details.assignments as assignment}
-															<Table.TableRow>
-																<Table.TableCell>
-																	{#if run.run_type === "counselor_cabin"}
-																		{assignment.counselor_id ?? "Unknown"}
-																	{:else if run.run_type === "camper_cabin"}
-																		{assignment.camper_id ?? "Unknown"}
-																	{:else}
-																		{assignment.counselor_id ?? "Unknown"}
-																	{/if}
-																</Table.TableCell>
-																<Table.TableCell>
-																	{#if run.run_type === "activity_schedule"}
-																		{assignment.session_activity_id ?? "Unknown"}
-																	{:else}
-																		{assignment.cabin_id ?? "Unknown"}
-																	{/if}
-																</Table.TableCell>
-															</Table.TableRow>
-														{/each}
-													</Table.TableBody>
-												</Table.Table>
-											</div>
-
-											{#if details.explanations.length > 0}
-												<div>
-													<h3 class="mb-2 text-sm font-medium">Explanations</h3>
-													<div class="grid gap-2">
-														{#each details.explanations as explanation}
-															<div
-																class="rounded-lg border p-3 {explanation.explanation_type === 'unmet_preference'
-																	? 'bg-amber-50 dark:bg-amber-950/20'
-																	: 'bg-muted'}"
-															>
-																<div class="flex items-center gap-2">
-																	{#if explanation.explanation_type === "reason"}
-																		<CheckIcon class="text-green-600 size-4" />
-																	{:else}
-																		<TriangleAlertIcon class="text-amber-600 size-4" />
-																	{/if}
-																	<span class="text-sm">{explanation.message}</span>
+												<h3 class="mb-3 text-sm font-medium">Assignments</h3>
+												{#if run.run_type === "activity_schedule"}
+													{@const activityGroups = groupByTimeSlotActivity(details.assignments)}
+													<div class="grid gap-4">
+														{#each activityGroups as slotGroup}
+															<div>
+																<h4 class="mb-2 border-b pb-1 text-sm font-semibold">{slotGroup.timeSlotName}</h4>
+																<div class="grid grid-cols-1 gap-3 pl-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+																	{#each slotGroup.activities as actGroup}
+																		<div class="rounded-lg border bg-muted/30 p-3">
+																			<h5 class="mb-1 text-sm font-medium text-muted-foreground">{actGroup.activityName}</h5>
+																			<div class="grid gap-0.5">
+																				{#each actGroup.counselors as counselor}
+																					<div class="text-sm">{counselor}</div>
+																				{/each}
+																			</div>
+																		</div>
+																	{/each}
 																</div>
 															</div>
 														{/each}
 													</div>
-												</div>
+												{:else}
+													{@const cabinGroups = groupByAgeGroupCabin(details.assignments)}
+													<div class="grid gap-4">
+														{#each cabinGroups as ageGroup}
+															<div>
+																<h4 class="mb-2 border-b pb-1 text-sm font-semibold">{ageGroup.ageGroupName}</h4>
+																<div class="grid grid-cols-1 gap-3 pl-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+																	{#each ageGroup.cabins as cabin}
+																		<div class="rounded-lg border bg-muted/30 p-3">
+																			<h5 class="mb-1 text-sm font-medium text-muted-foreground">{cabin.cabinName}</h5>
+																			<div class="grid gap-0.5">
+																				{#each cabin.people as person}
+																					<div class="text-sm">{person}</div>
+																				{/each}
+																			</div>
+																		</div>
+																	{/each}
+																</div>
+															</div>
+														{/each}
+													</div>
+												{/if}
+											</div>
+
+											{#if details.explanations.length > 0}
+												{@const metPreferences = details.explanations.filter((e) => e.explanation_type === "reason")}
+												{@const unmetPreferences = details.explanations.filter((e) => e.explanation_type === "unmet_preference")}
+
+												{#if metPreferences.length > 0}
+													<div>
+														<button
+															type="button"
+															class="mb-2 flex w-full items-center gap-2 text-left text-sm font-medium text-green-700 hover:opacity-80 dark:text-green-400"
+															aria-expanded={expandedMet.has(solution.id)}
+															onclick={() => toggleMet(solution.id)}
+														>
+															{#if expandedMet.has(solution.id)}
+																<ChevronDownIcon class="size-4" />
+															{:else}
+																<ChevronRightIcon class="size-4" />
+															{/if}
+															Met Preferences ({metPreferences.length})
+														</button>
+														{#if expandedMet.has(solution.id)}
+															<div class="grid gap-2">
+																{#each metPreferences as explanation}
+																	<div class="rounded-lg border bg-muted p-3">
+																		<div class="flex items-start gap-2">
+																			<CheckIcon class="mt-0.5 size-4 shrink-0 text-green-600" />
+																			<div>
+																				{#if entityLabel(explanation, run.run_type)}
+																					<span class="font-medium">{entityLabel(explanation, run.run_type)}</span>
+																					{#if explanation.constraint_name}
+																						<span class="text-muted-foreground"> — {formatConstraintName(explanation.constraint_name)}</span>
+																					{/if}
+																					<br />
+																				{/if}
+																				<span class="text-sm">{explanation.message}</span>
+																			</div>
+																		</div>
+																	</div>
+																{/each}
+															</div>
+														{/if}
+													</div>
+												{/if}
+
+												{#if unmetPreferences.length > 0}
+													<div>
+														<button
+															type="button"
+															class="mb-2 flex w-full items-center gap-2 text-left text-sm font-medium text-amber-700 hover:opacity-80 dark:text-amber-400"
+															aria-expanded={expandedUnmet.has(solution.id)}
+															onclick={() => toggleUnmet(solution.id)}
+														>
+															{#if expandedUnmet.has(solution.id)}
+																<ChevronDownIcon class="size-4" />
+															{:else}
+																<ChevronRightIcon class="size-4" />
+															{/if}
+															Unmet Preferences ({unmetPreferences.length})
+														</button>
+														{#if expandedUnmet.has(solution.id)}
+															<div class="grid gap-2">
+																{#each unmetPreferences as explanation}
+																	<div class="rounded-lg border bg-amber-50 p-3 dark:bg-amber-950/20">
+																		<div class="flex items-start gap-2">
+																			<TriangleAlertIcon class="mt-0.5 size-4 shrink-0 text-amber-600" />
+																			<div>
+																				{#if entityLabel(explanation, run.run_type)}
+																					<span class="font-medium">{entityLabel(explanation, run.run_type)}</span>
+																					{#if explanation.constraint_name}
+																						<span class="text-muted-foreground"> — {formatConstraintName(explanation.constraint_name)}</span>
+																					{/if}
+																					<br />
+																				{/if}
+																				<span class="text-sm">{explanation.message}</span>
+																			</div>
+																		</div>
+																	</div>
+																{/each}
+															</div>
+														{/if}
+													</div>
+												{/if}
 											{/if}
 										</div>
 									{:else}
@@ -368,19 +533,6 @@
 					</Card.Card>
 				{/each}
 			</div>
-
-			{#if run.status !== "selected"}
-			<div class="flex justify-end">
-				<Button
-					variant="destructive"
-					size="sm"
-					onclick={confirmDelete}
-				>
-					<TrashIcon class="mr-2 size-4" />
-					Delete Run
-				</Button>
-			</div>
-			{/if}
 		</div>
 	{/if}
 </div>

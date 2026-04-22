@@ -49,10 +49,12 @@ func (q *Queries) CreateActivityExplanation(ctx context.Context, arg CreateActiv
 }
 
 const listActivityExplanationsBySolution = `-- name: ListActivityExplanationsBySolution :many
-SELECT id, camp_id, solution_id, counselor_id, explanation_type, constraint_name, message
-FROM activity_explanations
-WHERE solution_id = $1 AND camp_id = $2
-ORDER BY counselor_id, explanation_type, message
+SELECT e.id, e.camp_id, e.solution_id, e.counselor_id, e.explanation_type, e.constraint_name, e.message,
+       co.counselor_name AS counselor_name
+FROM activity_explanations e
+JOIN counselors co ON co.id = e.counselor_id
+WHERE e.solution_id = $1 AND e.camp_id = $2
+ORDER BY co.counselor_name, e.explanation_type, e.message
 `
 
 type ListActivityExplanationsBySolutionParams struct {
@@ -60,15 +62,26 @@ type ListActivityExplanationsBySolutionParams struct {
 	CampID     pgtype.UUID
 }
 
-func (q *Queries) ListActivityExplanationsBySolution(ctx context.Context, arg ListActivityExplanationsBySolutionParams) ([]ActivityExplanation, error) {
+type ListActivityExplanationsBySolutionRow struct {
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	SolutionID      pgtype.UUID
+	CounselorID     pgtype.UUID
+	ExplanationType string
+	ConstraintName  pgtype.Text
+	Message         string
+	CounselorName   string
+}
+
+func (q *Queries) ListActivityExplanationsBySolution(ctx context.Context, arg ListActivityExplanationsBySolutionParams) ([]ListActivityExplanationsBySolutionRow, error) {
 	rows, err := q.db.Query(ctx, listActivityExplanationsBySolution, arg.SolutionID, arg.CampID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ActivityExplanation
+	var items []ListActivityExplanationsBySolutionRow
 	for rows.Next() {
-		var i ActivityExplanation
+		var i ListActivityExplanationsBySolutionRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.CampID,
@@ -77,6 +90,7 @@ func (q *Queries) ListActivityExplanationsBySolution(ctx context.Context, arg Li
 			&i.ExplanationType,
 			&i.ConstraintName,
 			&i.Message,
+			&i.CounselorName,
 		); err != nil {
 			return nil, err
 		}

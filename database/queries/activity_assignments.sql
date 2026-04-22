@@ -4,7 +4,16 @@ VALUES ($1, $2, $3, $4)
 RETURNING id, camp_id, solution_id, counselor_id, session_activity_id;
 
 -- name: ListActivityAssignmentsBySolution :many
-SELECT id, camp_id, solution_id, counselor_id, session_activity_id
-FROM activity_assignments
-WHERE solution_id = $1 AND camp_id = $2
-ORDER BY session_activity_id, counselor_id;
+SELECT a.id, a.camp_id, a.solution_id, a.counselor_id, a.session_activity_id,
+       co.counselor_name AS counselor_name,
+       act.activity_name AS activity_name,
+       ts.time_slot_name AS time_slot_name,
+       sts.sort_order AS sort_order
+FROM activity_assignments a
+JOIN counselors co ON co.id = a.counselor_id
+JOIN session_activities sa ON sa.id = a.session_activity_id
+JOIN activities act ON act.id = sa.activity_id
+JOIN session_time_slots sts ON sts.id = sa.session_time_slot_id
+JOIN time_slots ts ON ts.id = sts.time_slot_id
+WHERE a.solution_id = $1 AND a.camp_id = $2
+ORDER BY sts.sort_order, sts.id, act.activity_name, co.counselor_name;

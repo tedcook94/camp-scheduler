@@ -49,10 +49,12 @@ func (q *Queries) CreateCamperCabinExplanation(ctx context.Context, arg CreateCa
 }
 
 const listCamperCabinExplanationsBySolution = `-- name: ListCamperCabinExplanationsBySolution :many
-SELECT id, camp_id, solution_id, camper_id, explanation_type, constraint_name, message
-FROM camper_cabin_explanations
-WHERE solution_id = $1 AND camp_id = $2
-ORDER BY camper_id, explanation_type
+SELECT e.id, e.camp_id, e.solution_id, e.camper_id, e.explanation_type, e.constraint_name, e.message,
+       cm.camper_name AS camper_name
+FROM camper_cabin_explanations e
+JOIN campers cm ON cm.id = e.camper_id
+WHERE e.solution_id = $1 AND e.camp_id = $2
+ORDER BY cm.camper_name, e.explanation_type, e.message
 `
 
 type ListCamperCabinExplanationsBySolutionParams struct {
@@ -60,15 +62,26 @@ type ListCamperCabinExplanationsBySolutionParams struct {
 	CampID     pgtype.UUID
 }
 
-func (q *Queries) ListCamperCabinExplanationsBySolution(ctx context.Context, arg ListCamperCabinExplanationsBySolutionParams) ([]CamperCabinExplanation, error) {
+type ListCamperCabinExplanationsBySolutionRow struct {
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	SolutionID      pgtype.UUID
+	CamperID        pgtype.UUID
+	ExplanationType string
+	ConstraintName  pgtype.Text
+	Message         string
+	CamperName      string
+}
+
+func (q *Queries) ListCamperCabinExplanationsBySolution(ctx context.Context, arg ListCamperCabinExplanationsBySolutionParams) ([]ListCamperCabinExplanationsBySolutionRow, error) {
 	rows, err := q.db.Query(ctx, listCamperCabinExplanationsBySolution, arg.SolutionID, arg.CampID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []CamperCabinExplanation
+	var items []ListCamperCabinExplanationsBySolutionRow
 	for rows.Next() {
-		var i CamperCabinExplanation
+		var i ListCamperCabinExplanationsBySolutionRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.CampID,
@@ -77,6 +90,7 @@ func (q *Queries) ListCamperCabinExplanationsBySolution(ctx context.Context, arg
 			&i.ExplanationType,
 			&i.ConstraintName,
 			&i.Message,
+			&i.CamperName,
 		); err != nil {
 			return nil, err
 		}

@@ -428,9 +428,12 @@ func (svc *Service) getCamperSolution(ctx context.Context, campUUID, runUUID pgt
 	assignmentResponses := make([]AssignmentResponse, len(assignments))
 	for i, a := range assignments {
 		assignmentResponses[i] = AssignmentResponse{
-			ID:       api.UUIDToString(a.ID),
-			CamperID: api.UUIDToString(a.CamperID),
-			CabinID:  api.UUIDToString(a.CabinID),
+			ID:           api.UUIDToString(a.ID),
+			CamperID:     api.UUIDToString(a.CamperID),
+			CamperName:   a.CamperName,
+			CabinID:      api.UUIDToString(a.CabinID),
+			CabinName:    a.CabinName,
+			AgeGroupName: a.AgeGroupName,
 		}
 	}
 
@@ -443,6 +446,7 @@ func (svc *Service) getCamperSolution(ctx context.Context, campUUID, runUUID pgt
 		explanationResponses[i] = ExplanationResponse{
 			ID:              api.UUIDToString(e.ID),
 			CamperID:        api.UUIDToString(e.CamperID),
+			CamperName:      e.CamperName,
 			ExplanationType: e.ExplanationType,
 			ConstraintName:  constraintName,
 			Message:         e.Message,
@@ -605,15 +609,18 @@ func toSolutionSummaryResponse(s db.CounselorCabinSolution) SolutionSummaryRespo
 	}
 }
 
-func toAssignmentResponse(a db.CounselorCabinAssignment) AssignmentResponse {
+func toAssignmentResponse(a db.ListCounselorCabinAssignmentsBySolutionRow) AssignmentResponse {
 	return AssignmentResponse{
-		ID:          api.UUIDToString(a.ID),
-		CounselorID: api.UUIDToString(a.CounselorID),
-		CabinID:     api.UUIDToString(a.CabinID),
+		ID:            api.UUIDToString(a.ID),
+		CounselorID:   api.UUIDToString(a.CounselorID),
+		CounselorName: a.CounselorName,
+		CabinID:       api.UUIDToString(a.CabinID),
+		CabinName:     a.CabinName,
+		AgeGroupName:  a.AgeGroupName,
 	}
 }
 
-func toExplanationResponse(e db.CounselorCabinExplanation) ExplanationResponse {
+func toExplanationResponse(e db.ListCounselorCabinExplanationsBySolutionRow) ExplanationResponse {
 	var constraintName *string
 	if e.ConstraintName.Valid {
 		constraintName = &e.ConstraintName.String
@@ -622,6 +629,7 @@ func toExplanationResponse(e db.CounselorCabinExplanation) ExplanationResponse {
 	return ExplanationResponse{
 		ID:              api.UUIDToString(e.ID),
 		CounselorID:     api.UUIDToString(e.CounselorID),
+		CounselorName:   e.CounselorName,
 		ExplanationType: e.ExplanationType,
 		ConstraintName:  constraintName,
 		Message:         e.Message,
@@ -687,7 +695,11 @@ func (svc *Service) getActivitySolution(ctx context.Context, campUUID, runUUID p
 		assignmentResponses[i] = AssignmentResponse{
 			ID:                api.UUIDToString(a.ID),
 			CounselorID:       api.UUIDToString(a.CounselorID),
+			CounselorName:     a.CounselorName,
 			SessionActivityID: api.UUIDToString(a.SessionActivityID),
+			ActivityName:      a.ActivityName,
+			TimeSlotName:      a.TimeSlotName,
+			SortOrder:         a.SortOrder,
 		}
 	}
 
@@ -700,6 +712,7 @@ func (svc *Service) getActivitySolution(ctx context.Context, campUUID, runUUID p
 		explanationResponses[i] = ExplanationResponse{
 			ID:              api.UUIDToString(e.ID),
 			CounselorID:     api.UUIDToString(e.CounselorID),
+			CounselorName:   e.CounselorName,
 			ExplanationType: e.ExplanationType,
 			ConstraintName:  constraintName,
 			Message:         e.Message,

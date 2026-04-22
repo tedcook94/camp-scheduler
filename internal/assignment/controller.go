@@ -94,15 +94,24 @@ type SolutionDetailResponse struct {
 type AssignmentResponse struct {
 	ID                string `json:"id"`
 	CounselorID       string `json:"counselor_id,omitempty"`
+	CounselorName     string `json:"counselor_name,omitempty"`
 	CamperID          string `json:"camper_id,omitempty"`
+	CamperName        string `json:"camper_name,omitempty"`
 	CabinID           string `json:"cabin_id,omitempty"`
+	CabinName         string `json:"cabin_name,omitempty"`
+	AgeGroupName      string `json:"age_group_name,omitempty"`
 	SessionActivityID string `json:"session_activity_id,omitempty"`
+	ActivityName      string `json:"activity_name,omitempty"`
+	TimeSlotName      string `json:"time_slot_name,omitempty"`
+	SortOrder         int32  `json:"sort_order,omitempty"`
 }
 
 type ExplanationResponse struct {
 	ID              string  `json:"id"`
 	CounselorID     string  `json:"counselor_id,omitempty"`
+	CounselorName   string  `json:"counselor_name,omitempty"`
 	CamperID        string  `json:"camper_id,omitempty"`
+	CamperName      string  `json:"camper_name,omitempty"`
 	ExplanationType string  `json:"explanation_type"`
 	ConstraintName  *string `json:"constraint_name"`
 	Message         string  `json:"message"`

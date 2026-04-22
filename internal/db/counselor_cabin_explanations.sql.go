@@ -49,10 +49,12 @@ func (q *Queries) CreateCounselorCabinExplanation(ctx context.Context, arg Creat
 }
 
 const listCounselorCabinExplanationsBySolution = `-- name: ListCounselorCabinExplanationsBySolution :many
-SELECT id, camp_id, solution_id, counselor_id, explanation_type, constraint_name, message
-FROM counselor_cabin_explanations
-WHERE solution_id = $1 AND camp_id = $2
-ORDER BY counselor_id, explanation_type
+SELECT e.id, e.camp_id, e.solution_id, e.counselor_id, e.explanation_type, e.constraint_name, e.message,
+       co.counselor_name AS counselor_name
+FROM counselor_cabin_explanations e
+JOIN counselors co ON co.id = e.counselor_id
+WHERE e.solution_id = $1 AND e.camp_id = $2
+ORDER BY co.counselor_name, e.explanation_type, e.message
 `
 
 type ListCounselorCabinExplanationsBySolutionParams struct {
@@ -60,15 +62,26 @@ type ListCounselorCabinExplanationsBySolutionParams struct {
 	CampID     pgtype.UUID
 }
 
-func (q *Queries) ListCounselorCabinExplanationsBySolution(ctx context.Context, arg ListCounselorCabinExplanationsBySolutionParams) ([]CounselorCabinExplanation, error) {
+type ListCounselorCabinExplanationsBySolutionRow struct {
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	SolutionID      pgtype.UUID
+	CounselorID     pgtype.UUID
+	ExplanationType string
+	ConstraintName  pgtype.Text
+	Message         string
+	CounselorName   string
+}
+
+func (q *Queries) ListCounselorCabinExplanationsBySolution(ctx context.Context, arg ListCounselorCabinExplanationsBySolutionParams) ([]ListCounselorCabinExplanationsBySolutionRow, error) {
 	rows, err := q.db.Query(ctx, listCounselorCabinExplanationsBySolution, arg.SolutionID, arg.CampID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []CounselorCabinExplanation
+	var items []ListCounselorCabinExplanationsBySolutionRow
 	for rows.Next() {
-		var i CounselorCabinExplanation
+		var i ListCounselorCabinExplanationsBySolutionRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.CampID,
@@ -77,6 +90,7 @@ func (q *Queries) ListCounselorCabinExplanationsBySolution(ctx context.Context, 
 			&i.ExplanationType,
 			&i.ConstraintName,
 			&i.Message,
+			&i.CounselorName,
 		); err != nil {
 			return nil, err
 		}

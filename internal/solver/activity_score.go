@@ -71,8 +71,8 @@ func scoreActivityPreference(snapshot ActivitySnapshot, assignment ActivityAssig
 					slot := slotsByID[sa.SlotID]
 					score := weights.ActivityPreference / float64(pref.Rank)
 					msg := fmt.Sprintf(
-						"assigned to preferred activity %s (rank %d)",
-						slot.ActivityName, pref.Rank,
+						"assigned to preferred activity %s (rank %d) in %s",
+						slot.ActivityName, pref.Rank, slot.TimeSlotName,
 					)
 					if snapshot.UnmetActivityPreferences[counselorID][pref.TargetID] {
 						score *= boost

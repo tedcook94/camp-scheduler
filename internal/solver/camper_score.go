@@ -37,6 +37,8 @@ func scoreFriendPreference(snapshot CamperCabinSnapshot, assignment CamperAssign
 	}
 
 	camperCabin := invertCamperAssignment(assignment)
+	cabinsByID := indexCamperCabins(snapshot)
+	campersByID := indexCampersByID(snapshot)
 
 	var components []ScoreComponent
 	for camperID, prefs := range snapshot.FriendPreferences {
@@ -54,14 +56,22 @@ func scoreFriendPreference(snapshot CamperCabinSnapshot, assignment CamperAssign
 			}
 			if cabinID == prefCabinID {
 				score := weights.FriendPreference / float64(pref.Rank)
+				friendName := pref.TargetID
+				if c, ok := campersByID[pref.TargetID]; ok {
+					friendName = c.Name
+				}
+				cabinName := cabinID
+				if cb, ok := cabinsByID[cabinID]; ok {
+					cabinName = cb.Name
+				}
 				components = append(components, ScoreComponent{
 					Constraint: "friend_preference",
 					Score:      score,
 					CamperID:   camperID,
 					CabinID:    cabinID,
 					Message: fmt.Sprintf(
-						"placed with preferred friend (rank %d)",
-						pref.Rank,
+						"placed with preferred friend %s (rank %d) in cabin %q",
+						friendName, pref.Rank, cabinName,
 					),
 				})
 			}

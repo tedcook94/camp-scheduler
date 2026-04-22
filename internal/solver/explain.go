@@ -7,6 +7,7 @@ import (
 
 func Explain(snapshot SessionSnapshot, solution Solution) Explanation {
 	cabinsByID := indexCabins(snapshot)
+	ageGroupNames := indexAgeGroupNames(snapshot)
 	counselorCabin := invertAssignment(solution.Assignment)
 	counselorsByID := indexCounselors(snapshot)
 
@@ -21,7 +22,7 @@ func Explain(snapshot SessionSnapshot, solution Solution) Explanation {
 
 		reasons := reasonsByCounselor[counselor.ID]
 		if len(reasons) == 0 {
-			reasons = []string{"assigned to fill cabin requirement"}
+			continue
 		}
 
 		assignments = append(assignments, AssignmentExplanation{
@@ -32,8 +33,8 @@ func Explain(snapshot SessionSnapshot, solution Solution) Explanation {
 	}
 
 	var unmet []UnmetPreference
-	unmet = append(unmet, findUnmetAgeGroupPreferences(snapshot, counselorCabin, cabinsByID)...)
-	unmet = append(unmet, findUnmetReturningAgeGroup(snapshot, counselorCabin, cabinsByID)...)
+	unmet = append(unmet, findUnmetAgeGroupPreferences(snapshot, counselorCabin, cabinsByID, ageGroupNames)...)
+	unmet = append(unmet, findUnmetReturningAgeGroup(snapshot, counselorCabin, cabinsByID, ageGroupNames)...)
 	unmet = append(unmet, findUnmetReturningCabin(snapshot, counselorCabin, cabinsByID)...)
 	unmet = append(unmet, findUnmetCocounselorPreferences(snapshot, counselorCabin, counselorsByID)...)
 
@@ -53,6 +54,23 @@ func Explain(snapshot SessionSnapshot, solution Solution) Explanation {
 	}
 }
 
+func indexAgeGroupNames(snapshot SessionSnapshot) map[string]string {
+	names := make(map[string]string)
+	for _, c := range snapshot.Cabins {
+		if c.AgeGroupID != "" && c.AgeGroupName != "" {
+			names[c.AgeGroupID] = c.AgeGroupName
+		}
+	}
+	return names
+}
+
+func ageGroupLabel(id string, names map[string]string) string {
+	if name, ok := names[id]; ok {
+		return name
+	}
+	return id
+}
+
 func buildReasonMap(breakdown []ScoreComponent) map[string][]string {
 	reasons := make(map[string][]string)
 	for _, c := range breakdown {
@@ -65,7 +83,7 @@ func buildReasonMap(breakdown []ScoreComponent) map[string][]string {
 	return reasons
 }
 
-func findUnmetAgeGroupPreferences(snapshot SessionSnapshot, counselorCabin map[string]string, cabinsByID map[string]Cabin) []UnmetPreference {
+func findUnmetAgeGroupPreferences(snapshot SessionSnapshot, counselorCabin map[string]string, cabinsByID map[string]Cabin, ageGroupNames map[string]string) []UnmetPreference {
 	var unmet []UnmetPreference
 	for counselorID, prefs := range snapshot.AgeGroupPreferences {
 		cabinID, assigned := counselorCabin[counselorID]
@@ -101,7 +119,7 @@ func findUnmetAgeGroupPreferences(snapshot SessionSnapshot, counselorCabin map[s
 			if rankMsg == "" {
 				rankMsg = "not ranked"
 			}
-			detail = fmt.Sprintf("assigned to age group %q (%s)", assignedAgeGroup, rankMsg)
+			detail = fmt.Sprintf("assigned to age group %q (%s)", ageGroupLabel(assignedAgeGroup, ageGroupNames), rankMsg)
 		}
 
 		unmet = append(unmet, UnmetPreference{
@@ -109,14 +127,14 @@ func findUnmetAgeGroupPreferences(snapshot SessionSnapshot, counselorCabin map[s
 			Constraint:  "age_group_preference",
 			Message: fmt.Sprintf(
 				"preferred age group %q but %s",
-				topPrefAgeGroup, detail,
+				ageGroupLabel(topPrefAgeGroup, ageGroupNames), detail,
 			),
 		})
 	}
 	return unmet
 }
 
-func findUnmetReturningAgeGroup(snapshot SessionSnapshot, counselorCabin map[string]string, cabinsByID map[string]Cabin) []UnmetPreference {
+func findUnmetReturningAgeGroup(snapshot SessionSnapshot, counselorCabin map[string]string, cabinsByID map[string]Cabin, ageGroupNames map[string]string) []UnmetPreference {
 	var unmet []UnmetPreference
 	for counselorID, placement := range snapshot.CounselorPreviousPlacements {
 		if !counselorWantsToReturn(counselorID, snapshot) {
@@ -135,7 +153,8 @@ func findUnmetReturningAgeGroup(snapshot SessionSnapshot, counselorCabin map[str
 				Constraint:  "returning_age_group",
 				Message: fmt.Sprintf(
 					"previously in age group %q but assigned to age group %q",
-					placement.AgeGroupID, cabin.AgeGroupID,
+					ageGroupLabel(placement.AgeGroupID, ageGroupNames),
+					ageGroupLabel(cabin.AgeGroupID, ageGroupNames),
 				),
 			})
 		}

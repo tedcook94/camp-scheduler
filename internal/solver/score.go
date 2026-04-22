@@ -65,7 +65,7 @@ func scoreReturningAgeGroup(snapshot SessionSnapshot, assignment Assignment, wei
 				Score:       weights.ReturningAgeGroup,
 				CounselorID: counselorID,
 				CabinID:     cabinID,
-				Message:     fmt.Sprintf("counselor returning to same age group in cabin %q", cabin.Name),
+				Message:     fmt.Sprintf("counselor returning to same age group %q in cabin %q", cabin.AgeGroupName, cabin.Name),
 			})
 		}
 	}
@@ -111,6 +111,8 @@ func scoreCocounselorPreference(snapshot SessionSnapshot, assignment Assignment,
 		return nil
 	}
 
+	cabinsByID := indexCabins(snapshot)
+	counselorsByID := indexCounselors(snapshot)
 	counselorCabin := invertAssignment(assignment)
 	boost := effectiveBoost(weights.RepeatedUnmetBoost)
 
@@ -120,6 +122,7 @@ func scoreCocounselorPreference(snapshot SessionSnapshot, assignment Assignment,
 		if !ok {
 			continue
 		}
+		cabin := cabinsByID[cabinID]
 		for _, pref := range prefs {
 			if pref.Rank <= 0 {
 				continue
@@ -131,8 +134,8 @@ func scoreCocounselorPreference(snapshot SessionSnapshot, assignment Assignment,
 			if cabinID == prefCabinID {
 				score := weights.CocounselorPreference / float64(pref.Rank)
 				msg := fmt.Sprintf(
-					"paired with preferred co-counselor (rank %d)",
-					pref.Rank,
+					"paired with preferred co-counselor %s (rank %d) in cabin %q",
+					counselorsByID[pref.TargetID].Name, pref.Rank, cabin.Name,
 				)
 				if snapshot.UnmetCocounselorPreferences[counselorID][pref.TargetID] {
 					score *= boost
@@ -174,8 +177,8 @@ func scoreAgeGroupPreference(snapshot SessionSnapshot, assignment Assignment, we
 			if cabin.AgeGroupID == pref.TargetID {
 				score := weights.AgeGroupPreference / float64(pref.Rank)
 				msg := fmt.Sprintf(
-					"assigned to preferred age group (rank %d) in cabin %q",
-					pref.Rank, cabin.Name,
+					"assigned to preferred age group %q (rank %d) in cabin %q",
+					cabin.AgeGroupName, pref.Rank, cabin.Name,
 				)
 				if snapshot.UnmetAgeGroupPreferences[counselorID][pref.TargetID] {
 					score *= boost

@@ -72,11 +72,37 @@ func (svc *AgeGroupService) ReplaceAll(ctx context.Context, campID, sessionID, c
 	}
 
 	seen := make(map[string]bool, len(items))
-	for _, item := range items {
-		if seen[item.AgeGroupID] {
+	canonicalIDs := make([]string, len(items))
+	for i, item := range items {
+		parsed, err := api.ParseUUID(item.AgeGroupID)
+		if err != nil {
+			return nil, err
+		}
+		canonical := api.UUIDToString(parsed)
+		if seen[canonical] {
 			return nil, api.BadInput(fmt.Sprintf("duplicate age_group_id: %s", item.AgeGroupID))
 		}
-		seen[item.AgeGroupID] = true
+		seen[canonical] = true
+		canonicalIDs[i] = canonical
+	}
+
+	if len(items) > 0 {
+		sessionAgeGroups, err := svc.queries.ListSessionAgeGroups(ctx, db.ListSessionAgeGroupsParams{
+			SessionID: sessionUUID,
+			CampID:    campUUID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error loading session age groups for validation: %w", err)
+		}
+		allowed := make(map[string]bool, len(sessionAgeGroups))
+		for _, sag := range sessionAgeGroups {
+			allowed[api.UUIDToString(sag.AgeGroupID)] = true
+		}
+		for i, canonical := range canonicalIDs {
+			if !allowed[canonical] {
+				return nil, api.BadInput(fmt.Sprintf("age_group_id %s is not configured for this session", items[i].AgeGroupID))
+			}
+		}
 	}
 
 	tx, err := svc.pool.Begin(ctx)

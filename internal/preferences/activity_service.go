@@ -72,11 +72,37 @@ func (svc *ActivityPreferenceService) ReplaceAll(ctx context.Context, campID, se
 	}
 
 	seen := make(map[string]bool, len(items))
-	for _, item := range items {
-		if seen[item.ActivityID] {
+	canonicalIDs := make([]string, len(items))
+	for i, item := range items {
+		parsed, err := api.ParseUUID(item.ActivityID)
+		if err != nil {
+			return nil, err
+		}
+		canonical := api.UUIDToString(parsed)
+		if seen[canonical] {
 			return nil, api.BadInput(fmt.Sprintf("duplicate activity_id: %s", item.ActivityID))
 		}
-		seen[item.ActivityID] = true
+		seen[canonical] = true
+		canonicalIDs[i] = canonical
+	}
+
+	if len(items) > 0 {
+		sessionActivities, err := svc.queries.ListSessionActivities(ctx, db.ListSessionActivitiesParams{
+			SessionID: sessionUUID,
+			CampID:    campUUID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error loading session activities for validation: %w", err)
+		}
+		allowed := make(map[string]bool, len(sessionActivities))
+		for _, sa := range sessionActivities {
+			allowed[api.UUIDToString(sa.ActivityID)] = true
+		}
+		for i, canonical := range canonicalIDs {
+			if !allowed[canonical] {
+				return nil, api.BadInput(fmt.Sprintf("activity_id %s is not configured for this session", items[i].ActivityID))
+			}
+		}
 	}
 
 	tx, err := svc.pool.Begin(ctx)

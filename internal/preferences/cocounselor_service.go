@@ -72,14 +72,41 @@ func (svc *CocounselorService) ReplaceAll(ctx context.Context, campID, sessionID
 	}
 
 	seen := make(map[string]bool, len(items))
-	for _, item := range items {
-		if item.PreferredCounselorID == counselorID {
+	canonicalIDs := make([]string, len(items))
+	canonicalCounselorID := api.UUIDToString(counselorUUID)
+	for i, item := range items {
+		parsed, err := api.ParseUUID(item.PreferredCounselorID)
+		if err != nil {
+			return nil, err
+		}
+		canonical := api.UUIDToString(parsed)
+		if canonical == canonicalCounselorID {
 			return nil, api.BadInput("a counselor cannot prefer themselves")
 		}
-		if seen[item.PreferredCounselorID] {
+		if seen[canonical] {
 			return nil, api.BadInput(fmt.Sprintf("duplicate preferred_counselor_id: %s", item.PreferredCounselorID))
 		}
-		seen[item.PreferredCounselorID] = true
+		seen[canonical] = true
+		canonicalIDs[i] = canonical
+	}
+
+	if len(items) > 0 {
+		rosterIDs, err := svc.queries.ListSessionCounselorIDs(ctx, db.ListSessionCounselorIDsParams{
+			SessionID: sessionUUID,
+			CampID:    campUUID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error loading session counselor roster for validation: %w", err)
+		}
+		allowed := make(map[string]bool, len(rosterIDs))
+		for _, id := range rosterIDs {
+			allowed[api.UUIDToString(id)] = true
+		}
+		for i, canonical := range canonicalIDs {
+			if !allowed[canonical] {
+				return nil, api.BadInput(fmt.Sprintf("preferred_counselor_id %s is not on this session's roster", items[i].PreferredCounselorID))
+			}
+		}
 	}
 
 	tx, err := svc.pool.Begin(ctx)

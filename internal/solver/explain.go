@@ -71,14 +71,17 @@ func ageGroupLabel(id string, names map[string]string) string {
 	return id
 }
 
-func buildReasonMap(breakdown []ScoreComponent) map[string][]string {
-	reasons := make(map[string][]string)
+func buildReasonMap(breakdown []ScoreComponent) map[string][]AssignmentReason {
+	reasons := make(map[string][]AssignmentReason)
 	for _, c := range breakdown {
 		if c.CounselorID == "" {
 			continue
 		}
-		reason := fmt.Sprintf("%s (+%.1f)", c.Message, c.Score)
-		reasons[c.CounselorID] = append(reasons[c.CounselorID], reason)
+		reasons[c.CounselorID] = append(reasons[c.CounselorID], AssignmentReason{
+			Constraint: c.Constraint,
+			Rank:       c.Rank,
+			Message:    fmt.Sprintf("%s (+%.1f)", c.Message, c.Score),
+		})
 	}
 	return reasons
 }
@@ -93,15 +96,15 @@ func findUnmetAgeGroupPreferences(snapshot SessionSnapshot, counselorCabin map[s
 			assignedAgeGroup = cabinsByID[cabinID].AgeGroupID
 		}
 
-		var topPrefAgeGroup string
+		var topPref RankedPreference
 		for _, p := range prefs {
 			if p.Rank == 1 {
-				topPrefAgeGroup = p.TargetID
+				topPref = p
 				break
 			}
 		}
 
-		if assignedAgeGroup == topPrefAgeGroup {
+		if assignedAgeGroup == topPref.TargetID {
 			continue
 		}
 
@@ -125,9 +128,10 @@ func findUnmetAgeGroupPreferences(snapshot SessionSnapshot, counselorCabin map[s
 		unmet = append(unmet, UnmetPreference{
 			CounselorID: counselorID,
 			Constraint:  "age_group_preference",
+			Rank:        topPref.Rank,
 			Message: fmt.Sprintf(
 				"preferred age group %q but %s",
-				ageGroupLabel(topPrefAgeGroup, ageGroupNames), detail,
+				ageGroupLabel(topPref.TargetID, ageGroupNames), detail,
 			),
 		})
 	}
@@ -205,6 +209,7 @@ func findUnmetCocounselorPreferences(snapshot SessionSnapshot, counselorCabin ma
 				unmet = append(unmet, UnmetPreference{
 					CounselorID: counselorID,
 					Constraint:  "cocounselor_preference",
+					Rank:        pref.Rank,
 					Message: fmt.Sprintf(
 						"preferred co-counselor %q but not placed together",
 						prefName,

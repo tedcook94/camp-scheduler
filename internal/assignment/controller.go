@@ -114,6 +114,7 @@ type ExplanationResponse struct {
 	CamperName      string  `json:"camper_name,omitempty"`
 	ExplanationType string  `json:"explanation_type"`
 	ConstraintName  *string `json:"constraint_name"`
+	Rank            *int32  `json:"rank,omitempty"`
 	Message         string  `json:"message"`
 }
 

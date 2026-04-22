@@ -49,14 +49,17 @@ func ExplainCamper(snapshot CamperCabinSnapshot, solution CamperSolution) Camper
 	}
 }
 
-func buildCamperReasonMap(breakdown []ScoreComponent) map[string][]string {
-	reasons := make(map[string][]string)
+func buildCamperReasonMap(breakdown []ScoreComponent) map[string][]AssignmentReason {
+	reasons := make(map[string][]AssignmentReason)
 	for _, c := range breakdown {
 		if c.CamperID == "" {
 			continue
 		}
-		reason := fmt.Sprintf("%s (+%.1f)", c.Message, c.Score)
-		reasons[c.CamperID] = append(reasons[c.CamperID], reason)
+		reasons[c.CamperID] = append(reasons[c.CamperID], AssignmentReason{
+			Constraint: c.Constraint,
+			Rank:       c.Rank,
+			Message:    fmt.Sprintf("%s (+%.1f)", c.Message, c.Score),
+		})
 	}
 	return reasons
 }
@@ -79,6 +82,7 @@ func findUnmetFriendPreferences(snapshot CamperCabinSnapshot, camperCabin map[st
 				unmet = append(unmet, CamperUnmetPreference{
 					CamperID:   camperID,
 					Constraint: "friend_preference",
+					Rank:       pref.Rank,
 					Message: fmt.Sprintf(
 						"preferred friend %q (rank %d) but placed in different cabins",
 						prefName, pref.Rank,

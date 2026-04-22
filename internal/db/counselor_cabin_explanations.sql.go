@@ -12,9 +12,9 @@ import (
 )
 
 const createCounselorCabinExplanation = `-- name: CreateCounselorCabinExplanation :one
-INSERT INTO counselor_cabin_explanations (camp_id, solution_id, counselor_id, explanation_type, constraint_name, message)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, camp_id, solution_id, counselor_id, explanation_type, constraint_name, message
+INSERT INTO counselor_cabin_explanations (camp_id, solution_id, counselor_id, explanation_type, constraint_name, rank, message)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, camp_id, solution_id, counselor_id, explanation_type, constraint_name, rank, message
 `
 
 type CreateCounselorCabinExplanationParams struct {
@@ -23,19 +23,32 @@ type CreateCounselorCabinExplanationParams struct {
 	CounselorID     pgtype.UUID
 	ExplanationType string
 	ConstraintName  pgtype.Text
+	Rank            pgtype.Int4
 	Message         string
 }
 
-func (q *Queries) CreateCounselorCabinExplanation(ctx context.Context, arg CreateCounselorCabinExplanationParams) (CounselorCabinExplanation, error) {
+type CreateCounselorCabinExplanationRow struct {
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	SolutionID      pgtype.UUID
+	CounselorID     pgtype.UUID
+	ExplanationType string
+	ConstraintName  pgtype.Text
+	Rank            pgtype.Int4
+	Message         string
+}
+
+func (q *Queries) CreateCounselorCabinExplanation(ctx context.Context, arg CreateCounselorCabinExplanationParams) (CreateCounselorCabinExplanationRow, error) {
 	row := q.db.QueryRow(ctx, createCounselorCabinExplanation,
 		arg.CampID,
 		arg.SolutionID,
 		arg.CounselorID,
 		arg.ExplanationType,
 		arg.ConstraintName,
+		arg.Rank,
 		arg.Message,
 	)
-	var i CounselorCabinExplanation
+	var i CreateCounselorCabinExplanationRow
 	err := row.Scan(
 		&i.ID,
 		&i.CampID,
@@ -43,18 +56,19 @@ func (q *Queries) CreateCounselorCabinExplanation(ctx context.Context, arg Creat
 		&i.CounselorID,
 		&i.ExplanationType,
 		&i.ConstraintName,
+		&i.Rank,
 		&i.Message,
 	)
 	return i, err
 }
 
 const listCounselorCabinExplanationsBySolution = `-- name: ListCounselorCabinExplanationsBySolution :many
-SELECT e.id, e.camp_id, e.solution_id, e.counselor_id, e.explanation_type, e.constraint_name, e.message,
+SELECT e.id, e.camp_id, e.solution_id, e.counselor_id, e.explanation_type, e.constraint_name, e.rank, e.message,
        co.counselor_name AS counselor_name
 FROM counselor_cabin_explanations e
 JOIN counselors co ON co.id = e.counselor_id
 WHERE e.solution_id = $1 AND e.camp_id = $2
-ORDER BY co.counselor_name, e.explanation_type, e.message
+ORDER BY co.counselor_name, e.explanation_type, COALESCE(e.constraint_name, ''), COALESCE(e.rank, 0), e.message
 `
 
 type ListCounselorCabinExplanationsBySolutionParams struct {
@@ -69,6 +83,7 @@ type ListCounselorCabinExplanationsBySolutionRow struct {
 	CounselorID     pgtype.UUID
 	ExplanationType string
 	ConstraintName  pgtype.Text
+	Rank            pgtype.Int4
 	Message         string
 	CounselorName   string
 }
@@ -89,6 +104,7 @@ func (q *Queries) ListCounselorCabinExplanationsBySolution(ctx context.Context, 
 			&i.CounselorID,
 			&i.ExplanationType,
 			&i.ConstraintName,
+			&i.Rank,
 			&i.Message,
 			&i.CounselorName,
 		); err != nil {

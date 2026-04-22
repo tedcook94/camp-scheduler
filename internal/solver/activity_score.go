@@ -81,6 +81,7 @@ func scoreActivityPreference(snapshot ActivitySnapshot, assignment ActivityAssig
 					components = append(components, ScoreComponent{
 						Constraint:  "activity_preference",
 						Score:       score,
+						Rank:        pref.Rank,
 						CounselorID: counselorID,
 						SlotID:      sa.SlotID,
 						Message:     msg,

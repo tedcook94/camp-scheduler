@@ -125,7 +125,9 @@ func storeCamperExplanations(ctx context.Context, qtx *db.Queries, campID, solut
 				SolutionID:      solutionID,
 				CamperID:        camperUUID,
 				ExplanationType: "reason",
-				Message:         reason,
+				ConstraintName:  pgtype.Text{String: reason.Constraint, Valid: reason.Constraint != ""},
+				Rank:            pgtype.Int4{Int32: int32(reason.Rank), Valid: reason.Rank > 0},
+				Message:         reason.Message,
 			})
 			if err != nil {
 				return fmt.Errorf("error creating reason explanation for camper %s: %w", ae.CamperID, err)
@@ -145,6 +147,7 @@ func storeCamperExplanations(ctx context.Context, qtx *db.Queries, campID, solut
 			CamperID:        camperUUID,
 			ExplanationType: "unmet_preference",
 			ConstraintName:  pgtype.Text{String: up.Constraint, Valid: true},
+			Rank:            pgtype.Int4{Int32: int32(up.Rank), Valid: up.Rank > 0},
 			Message:         up.Message,
 		})
 		if err != nil {

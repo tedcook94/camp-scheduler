@@ -74,15 +74,18 @@ func ExplainActivity(snapshot ActivitySnapshot, solution ActivitySolution) Activ
 
 // buildActivityReasonMap keys reasons by "counselorID|slotID" so that
 // explanations are accurate per assignment, not just per counselor.
-func buildActivityReasonMap(breakdown []ScoreComponent) map[string][]string {
-	reasons := make(map[string][]string)
+func buildActivityReasonMap(breakdown []ScoreComponent) map[string][]AssignmentReason {
+	reasons := make(map[string][]AssignmentReason)
 	for _, c := range breakdown {
 		if c.CounselorID == "" {
 			continue
 		}
 		key := c.CounselorID + "|" + c.SlotID
-		reason := fmt.Sprintf("%s (+%.1f)", c.Message, c.Score)
-		reasons[key] = append(reasons[key], reason)
+		reasons[key] = append(reasons[key], AssignmentReason{
+			Constraint: c.Constraint,
+			Rank:       c.Rank,
+			Message:    fmt.Sprintf("%s (+%.1f)", c.Message, c.Score),
+		})
 	}
 	return reasons
 }
@@ -289,6 +292,7 @@ func findUnmetActivityPreferences(snapshot ActivitySnapshot, counselorSlots map[
 				eligibleUnmet = append(eligibleUnmet, ActivityUnmetPreference{
 					CounselorID: counselorID,
 					Constraint:  "activity_preference",
+					Rank:        pref.Rank,
 					Message: fmt.Sprintf(
 						"not assigned to preferred activity %s (rank %d)",
 						activityLabel(pref.TargetID), pref.Rank,
@@ -334,6 +338,7 @@ func findUnmetActivityPreferences(snapshot ActivitySnapshot, counselorSlots map[
 				ineligible = append(ineligible, ActivityUnmetPreference{
 					CounselorID: counselorID,
 					Constraint:  "activity_preference_ineligible",
+					Rank:        pm.pref.Rank,
 					Message:     msg,
 				})
 			}

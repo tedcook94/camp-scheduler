@@ -12,9 +12,9 @@ import (
 )
 
 const createCamperCabinExplanation = `-- name: CreateCamperCabinExplanation :one
-INSERT INTO camper_cabin_explanations (camp_id, solution_id, camper_id, explanation_type, constraint_name, message)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, camp_id, solution_id, camper_id, explanation_type, constraint_name, message
+INSERT INTO camper_cabin_explanations (camp_id, solution_id, camper_id, explanation_type, constraint_name, rank, message)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, camp_id, solution_id, camper_id, explanation_type, constraint_name, rank, message
 `
 
 type CreateCamperCabinExplanationParams struct {
@@ -23,19 +23,32 @@ type CreateCamperCabinExplanationParams struct {
 	CamperID        pgtype.UUID
 	ExplanationType string
 	ConstraintName  pgtype.Text
+	Rank            pgtype.Int4
 	Message         string
 }
 
-func (q *Queries) CreateCamperCabinExplanation(ctx context.Context, arg CreateCamperCabinExplanationParams) (CamperCabinExplanation, error) {
+type CreateCamperCabinExplanationRow struct {
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	SolutionID      pgtype.UUID
+	CamperID        pgtype.UUID
+	ExplanationType string
+	ConstraintName  pgtype.Text
+	Rank            pgtype.Int4
+	Message         string
+}
+
+func (q *Queries) CreateCamperCabinExplanation(ctx context.Context, arg CreateCamperCabinExplanationParams) (CreateCamperCabinExplanationRow, error) {
 	row := q.db.QueryRow(ctx, createCamperCabinExplanation,
 		arg.CampID,
 		arg.SolutionID,
 		arg.CamperID,
 		arg.ExplanationType,
 		arg.ConstraintName,
+		arg.Rank,
 		arg.Message,
 	)
-	var i CamperCabinExplanation
+	var i CreateCamperCabinExplanationRow
 	err := row.Scan(
 		&i.ID,
 		&i.CampID,
@@ -43,18 +56,19 @@ func (q *Queries) CreateCamperCabinExplanation(ctx context.Context, arg CreateCa
 		&i.CamperID,
 		&i.ExplanationType,
 		&i.ConstraintName,
+		&i.Rank,
 		&i.Message,
 	)
 	return i, err
 }
 
 const listCamperCabinExplanationsBySolution = `-- name: ListCamperCabinExplanationsBySolution :many
-SELECT e.id, e.camp_id, e.solution_id, e.camper_id, e.explanation_type, e.constraint_name, e.message,
+SELECT e.id, e.camp_id, e.solution_id, e.camper_id, e.explanation_type, e.constraint_name, e.rank, e.message,
        cm.camper_name AS camper_name
 FROM camper_cabin_explanations e
 JOIN campers cm ON cm.id = e.camper_id
 WHERE e.solution_id = $1 AND e.camp_id = $2
-ORDER BY cm.camper_name, e.explanation_type, e.message
+ORDER BY cm.camper_name, e.explanation_type, COALESCE(e.constraint_name, ''), COALESCE(e.rank, 0), e.message
 `
 
 type ListCamperCabinExplanationsBySolutionParams struct {
@@ -69,6 +83,7 @@ type ListCamperCabinExplanationsBySolutionRow struct {
 	CamperID        pgtype.UUID
 	ExplanationType string
 	ConstraintName  pgtype.Text
+	Rank            pgtype.Int4
 	Message         string
 	CamperName      string
 }
@@ -89,6 +104,7 @@ func (q *Queries) ListCamperCabinExplanationsBySolution(ctx context.Context, arg
 			&i.CamperID,
 			&i.ExplanationType,
 			&i.ConstraintName,
+			&i.Rank,
 			&i.Message,
 			&i.CamperName,
 		); err != nil {

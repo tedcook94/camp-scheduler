@@ -114,12 +114,14 @@ func (q *Queries) GetSessionActivity(ctx context.Context, arg GetSessionActivity
 const listActivityCertificationsBySession = `-- name: ListActivityCertificationsBySession :many
 SELECT
     sa.id AS session_activity_id,
-    ac.certification_id
+    ac.certification_id,
+    c.certification_name
 FROM session_activities sa
 JOIN session_time_slots sts ON sts.id = sa.session_time_slot_id
 JOIN activity_certifications ac ON ac.activity_id = sa.activity_id AND ac.camp_id = sa.camp_id
+JOIN certifications c ON c.id = ac.certification_id
 WHERE sts.session_id = $1 AND sa.camp_id = $2
-ORDER BY sa.id, ac.certification_id
+ORDER BY sa.id, c.certification_name
 `
 
 type ListActivityCertificationsBySessionParams struct {
@@ -130,6 +132,7 @@ type ListActivityCertificationsBySessionParams struct {
 type ListActivityCertificationsBySessionRow struct {
 	SessionActivityID pgtype.UUID
 	CertificationID   pgtype.UUID
+	CertificationName string
 }
 
 func (q *Queries) ListActivityCertificationsBySession(ctx context.Context, arg ListActivityCertificationsBySessionParams) ([]ListActivityCertificationsBySessionRow, error) {
@@ -141,7 +144,7 @@ func (q *Queries) ListActivityCertificationsBySession(ctx context.Context, arg L
 	var items []ListActivityCertificationsBySessionRow
 	for rows.Next() {
 		var i ListActivityCertificationsBySessionRow
-		if err := rows.Scan(&i.SessionActivityID, &i.CertificationID); err != nil {
+		if err := rows.Scan(&i.SessionActivityID, &i.CertificationID, &i.CertificationName); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

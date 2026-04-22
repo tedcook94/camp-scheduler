@@ -44,7 +44,8 @@ func ExplainActivity(snapshot ActivitySnapshot, solution ActivitySolution) Activ
 	})
 
 	var unmet []ActivityUnmetPreference
-	unmet = append(unmet, findUnmetActivityPreferences(snapshot, counselorSlots, slotsByID)...)
+	eligibleUnmet, ineligible := findUnmetActivityPreferences(snapshot, counselorSlots, slotsByID)
+	unmet = append(unmet, eligibleUnmet...)
 	unmet = append(unmet, findUnassignedCounselors(snapshot, counselorSlots)...)
 
 	sort.Slice(unmet, func(i, j int) bool {
@@ -57,9 +58,17 @@ func ExplainActivity(snapshot ActivitySnapshot, solution ActivitySolution) Activ
 		return unmet[i].Message < unmet[j].Message
 	})
 
+	sort.Slice(ineligible, func(i, j int) bool {
+		if ineligible[i].CounselorID != ineligible[j].CounselorID {
+			return ineligible[i].CounselorID < ineligible[j].CounselorID
+		}
+		return ineligible[i].Message < ineligible[j].Message
+	})
+
 	return ActivityExplanation{
-		Assignments:      assignments,
-		UnmetPreferences: unmet,
+		Assignments:           assignments,
+		UnmetPreferences:      unmet,
+		IneligiblePreferences: ineligible,
 	}
 }
 
@@ -78,7 +87,18 @@ func buildActivityReasonMap(breakdown []ScoreComponent) map[string][]string {
 	return reasons
 }
 
-func findUnmetActivityPreferences(snapshot ActivitySnapshot, counselorSlots map[string][]string, slotsByID map[string]ActivitySlot) []ActivityUnmetPreference {
+// findUnmetActivityPreferences partitions a counselor's unmet preferences
+// into two buckets: those they were eligible for but not assigned to, and
+// those they could never be assigned to because they lack a required
+// certification. The two buckets are aggregated independently: when a
+// bucket contains every preference, it produces a single combined message;
+// otherwise it produces one message per preference.
+func findUnmetActivityPreferences(snapshot ActivitySnapshot, counselorSlots map[string][]string, slotsByID map[string]ActivitySlot) ([]ActivityUnmetPreference, []ActivityUnmetPreference) {
+	activityNames := make(map[string]string)
+	for _, slot := range snapshot.Slots {
+		activityNames[slot.ActivityID] = slot.ActivityName
+	}
+
 	// Build counselor -> set of activity IDs they're assigned to.
 	counselorActivities := make(map[string]map[string]bool)
 	for cID, slotIDs := range counselorSlots {
@@ -91,11 +111,51 @@ func findUnmetActivityPreferences(snapshot ActivitySnapshot, counselorSlots map[
 		}
 	}
 
-	// Build activityID -> activityName lookup from slots.
-	activityNames := make(map[string]string)
-	for _, slot := range snapshot.Slots {
-		activityNames[slot.ActivityID] = slot.ActivityName
+	counselorsByID := indexActivityCounselors(snapshot)
+
+	// For each (counselor, activity) compute whether the counselor could
+	// be assigned to ANY slot of that activity in the session, and which
+	// certification IDs they would be missing if not.
+	type ineligibilityInfo struct {
+		eligible       bool
+		noSlots        bool
+		missingCertIDs []string
 	}
+	checkEligibility := func(c ActivityCounselor, activityID string) ineligibilityInfo {
+		// Iterate every slot for this activity. The counselor is eligible
+		// if any slot's required certs are all satisfied. When ineligible,
+		// report the cert gap from the slot with the fewest missing certs
+		// (the "easiest" gap to fix). If the activity has no slots in
+		// this session at all, flag it separately so the message reflects
+		// that rather than producing a blank cert list.
+		var bestMissing []string
+		bestMissingFound := false
+		sawSlot := false
+		for _, slot := range snapshot.Slots {
+			if slot.ActivityID != activityID {
+				continue
+			}
+			sawSlot = true
+			missing := []string{}
+			for _, certID := range slot.RequiredCertifications {
+				if !c.Certifications[certID] {
+					missing = append(missing, certID)
+				}
+			}
+			if len(missing) == 0 {
+				return ineligibilityInfo{eligible: true}
+			}
+			if !bestMissingFound || len(missing) < len(bestMissing) {
+				bestMissing = missing
+				bestMissingFound = true
+			}
+		}
+		if !sawSlot {
+			return ineligibilityInfo{eligible: false, noSlots: true}
+		}
+		return ineligibilityInfo{eligible: false, missingCertIDs: bestMissing}
+	}
+
 	activityLabel := func(id string) string {
 		if name, ok := activityNames[id]; ok && name != "" {
 			return name
@@ -103,31 +163,88 @@ func findUnmetActivityPreferences(snapshot ActivitySnapshot, counselorSlots map[
 		return id
 	}
 
-	var unmet []ActivityUnmetPreference
-	for counselorID, prefs := range snapshot.ActivityPreferences {
-		assigned := counselorActivities[counselorID]
-		var unmetPrefs []RankedPreference
-		for _, pref := range prefs {
-			if !assigned[pref.TargetID] {
-				unmetPrefs = append(unmetPrefs, pref)
+	certNameLabel := func(id string) string {
+		if snapshot.CertificationNames != nil {
+			if name, ok := snapshot.CertificationNames[id]; ok && name != "" {
+				return name
 			}
 		}
-		if len(unmetPrefs) == 0 {
+		return id
+	}
+
+	missingCertList := func(ids []string) string {
+		names := make([]string, len(ids))
+		for i, id := range ids {
+			names[i] = certNameLabel(id)
+		}
+		return strings.Join(names, ", ")
+	}
+
+	missingCertPhrase := func(ids []string) string {
+		if len(ids) == 1 {
+			return fmt.Sprintf("missing required certification %s", certNameLabel(ids[0]))
+		}
+		return fmt.Sprintf("missing required certifications %s", missingCertList(ids))
+	}
+
+	missingCertShort := func(ids []string) string {
+		return fmt.Sprintf("missing %s", missingCertList(ids))
+	}
+
+	var eligibleUnmet, ineligible []ActivityUnmetPreference
+	for counselorID, prefs := range snapshot.ActivityPreferences {
+		assigned := counselorActivities[counselorID]
+
+		counselor, hasCounselor := counselorsByID[counselorID]
+
+		type prefWithMiss struct {
+			pref    RankedPreference
+			missing []string
+			noSlots bool
+		}
+		var eligibleBucket []RankedPreference
+		var ineligibleBucket []prefWithMiss
+
+		for _, pref := range prefs {
+			if pref.Rank <= 0 {
+				continue
+			}
+			if assigned[pref.TargetID] {
+				continue
+			}
+			if !hasCounselor {
+				eligibleBucket = append(eligibleBucket, pref)
+				continue
+			}
+			info := checkEligibility(counselor, pref.TargetID)
+			if info.eligible {
+				eligibleBucket = append(eligibleBucket, pref)
+			} else {
+				ineligibleBucket = append(ineligibleBucket, prefWithMiss{pref: pref, missing: info.missingCertIDs, noSlots: info.noSlots})
+			}
+		}
+
+		if len(eligibleBucket) == 0 && len(ineligibleBucket) == 0 {
 			continue
 		}
 
-		sort.Slice(unmetPrefs, func(i, j int) bool {
-			return unmetPrefs[i].Rank < unmetPrefs[j].Rank
+		sort.Slice(eligibleBucket, func(i, j int) bool {
+			return eligibleBucket[i].Rank < eligibleBucket[j].Rank
+		})
+		sort.Slice(ineligibleBucket, func(i, j int) bool {
+			return ineligibleBucket[i].pref.Rank < ineligibleBucket[j].pref.Rank
 		})
 
-		// Hybrid aggregation: single row when ALL prefs unmet, individual
-		// rows otherwise.
-		if len(unmetPrefs) == len(prefs) {
-			parts := make([]string, len(unmetPrefs))
-			for i, p := range unmetPrefs {
-				parts[i] = fmt.Sprintf("%s (rank %d)", activityLabel(p.TargetID), p.Rank)
+		// Eligible-unmet aggregation: single row when this bucket covers
+		// ALL of the counselor's preferences (no eligible-but-assigned, no
+		// ineligible). Otherwise individual rows.
+		aggregateEligible := len(eligibleBucket) > 0 && len(eligibleBucket) == len(prefs)
+		if aggregateEligible {
+			parts := make([]string, len(eligibleBucket))
+			for i, p := range eligibleBucket {
+				parts[i] = activityLabel(p.TargetID)
 			}
-			unmet = append(unmet, ActivityUnmetPreference{
+			eligibleUnmet = append(eligibleUnmet, ActivityUnmetPreference{
 				CounselorID: counselorID,
 				Constraint:  "activity_preference",
 				Message: fmt.Sprintf(
@@ -136,8 +253,8 @@ func findUnmetActivityPreferences(snapshot ActivitySnapshot, counselorSlots map[
 				),
 			})
 		} else {
-			for _, pref := range unmetPrefs {
-				unmet = append(unmet, ActivityUnmetPreference{
+			for _, pref := range eligibleBucket {
+				eligibleUnmet = append(eligibleUnmet, ActivityUnmetPreference{
 					CounselorID: counselorID,
 					Constraint:  "activity_preference",
 					Message: fmt.Sprintf(
@@ -147,8 +264,50 @@ func findUnmetActivityPreferences(snapshot ActivitySnapshot, counselorSlots map[
 				})
 			}
 		}
+
+		// Ineligible aggregation mirrors the same rule.
+		aggregateIneligible := len(ineligibleBucket) > 0 && len(ineligibleBucket) == len(prefs)
+		if aggregateIneligible {
+			parts := make([]string, len(ineligibleBucket))
+			for i, pm := range ineligibleBucket {
+				if pm.noSlots {
+					parts[i] = fmt.Sprintf("%s — not scheduled", activityLabel(pm.pref.TargetID))
+				} else {
+					parts[i] = fmt.Sprintf("%s — %s",
+						activityLabel(pm.pref.TargetID), missingCertShort(pm.missing))
+				}
+			}
+			ineligible = append(ineligible, ActivityUnmetPreference{
+				CounselorID: counselorID,
+				Constraint:  "activity_preference_ineligible",
+				Message: fmt.Sprintf(
+					"cannot be assigned to any preferred activity (%s)",
+					strings.Join(parts, ", "),
+				),
+			})
+		} else {
+			for _, pm := range ineligibleBucket {
+				var msg string
+				if pm.noSlots {
+					msg = fmt.Sprintf(
+						"cannot be assigned to preferred activity %s (rank %d) — no slots scheduled this session",
+						activityLabel(pm.pref.TargetID), pm.pref.Rank,
+					)
+				} else {
+					msg = fmt.Sprintf(
+						"cannot be assigned to preferred activity %s (rank %d) — %s",
+						activityLabel(pm.pref.TargetID), pm.pref.Rank, missingCertPhrase(pm.missing),
+					)
+				}
+				ineligible = append(ineligible, ActivityUnmetPreference{
+					CounselorID: counselorID,
+					Constraint:  "activity_preference_ineligible",
+					Message:     msg,
+				})
+			}
+		}
 	}
-	return unmet
+	return eligibleUnmet, ineligible
 }
 
 func findUnassignedCounselors(snapshot ActivitySnapshot, counselorSlots map[string][]string) []ActivityUnmetPreference {

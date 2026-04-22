@@ -63,9 +63,11 @@ WHERE session_time_slot_id = $1 AND camp_id = $2;
 -- name: ListActivityCertificationsBySession :many
 SELECT
     sa.id AS session_activity_id,
-    ac.certification_id
+    ac.certification_id,
+    c.certification_name
 FROM session_activities sa
 JOIN session_time_slots sts ON sts.id = sa.session_time_slot_id
 JOIN activity_certifications ac ON ac.activity_id = sa.activity_id AND ac.camp_id = sa.camp_id
+JOIN certifications c ON c.id = ac.certification_id
 WHERE sts.session_id = $1 AND sa.camp_id = $2
-ORDER BY sa.id, ac.certification_id;
+ORDER BY sa.id, c.certification_name;

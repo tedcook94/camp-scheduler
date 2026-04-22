@@ -24,6 +24,7 @@ type ActivitySnapshot struct {
 	Counselors               []ActivityCounselor
 	ActivityPreferences      map[string][]RankedPreference
 	UnmetActivityPreferences map[string]map[string]bool
+	CertificationNames       map[string]string
 }
 
 type ActivityAssignment struct {
@@ -62,8 +63,9 @@ type ActivitySolution struct {
 }
 
 type ActivityExplanation struct {
-	Assignments      []ActivityAssignmentExplanation
-	UnmetPreferences []ActivityUnmetPreference
+	Assignments            []ActivityAssignmentExplanation
+	UnmetPreferences       []ActivityUnmetPreference
+	IneligiblePreferences  []ActivityUnmetPreference
 }
 
 type ActivityAssignmentExplanation struct {

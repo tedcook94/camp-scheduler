@@ -25,6 +25,7 @@
 	import UsersIcon from "@lucide/svelte/icons/users";
 	import DumbbellIcon from "@lucide/svelte/icons/dumbbell";
 	import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
+	import BanIcon from "@lucide/svelte/icons/ban";
 
 	type RunType = "counselor_cabin" | "camper_cabin" | "activity_schedule";
 
@@ -134,6 +135,7 @@
 
 	let expandedMet = $state<Set<string>>(new Set());
 	let expandedUnmet = $state<Set<string>>(new Set());
+	let expandedIneligible = $state<Set<string>>(new Set());
 
 	function toggleMet(solutionId: string) {
 		const next = new Set(expandedMet);
@@ -147,6 +149,13 @@
 		if (next.has(solutionId)) next.delete(solutionId);
 		else next.add(solutionId);
 		expandedUnmet = next;
+	}
+
+	function toggleIneligible(solutionId: string) {
+		const next = new Set(expandedIneligible);
+		if (next.has(solutionId)) next.delete(solutionId);
+		else next.add(solutionId);
+		expandedIneligible = next;
 	}
 
 	let deleteOpen = $state(false);
@@ -442,6 +451,7 @@
 											{#if details.explanations.length > 0}
 												{@const metPreferences = details.explanations.filter((e) => e.explanation_type === "reason")}
 												{@const unmetPreferences = details.explanations.filter((e) => e.explanation_type === "unmet_preference")}
+												{@const ineligiblePreferences = details.explanations.filter((e) => e.explanation_type === "ineligible_preference")}
 
 												{#if metPreferences.length > 0}
 													<div>
@@ -503,6 +513,45 @@
 																	<div class="rounded-lg border bg-amber-50 p-3 dark:bg-amber-950/20">
 																		<div class="flex items-start gap-2">
 																			<TriangleAlertIcon class="mt-0.5 size-4 shrink-0 text-amber-600" />
+																			<div>
+																				{#if entityLabel(explanation, run.run_type)}
+																					<span class="font-medium">{entityLabel(explanation, run.run_type)}</span>
+																					{#if explanation.constraint_name}
+																						<span class="text-muted-foreground"> — {formatConstraintName(explanation.constraint_name)}</span>
+																					{/if}
+																					<br />
+																				{/if}
+																				<span class="text-sm">{explanation.message}</span>
+																			</div>
+																		</div>
+																	</div>
+																{/each}
+															</div>
+														{/if}
+													</div>
+												{/if}
+
+												{#if ineligiblePreferences.length > 0}
+													<div>
+														<button
+															type="button"
+															class="mb-2 flex w-full items-center gap-2 text-left text-sm font-medium text-red-700 hover:opacity-80 dark:text-red-400"
+															aria-expanded={expandedIneligible.has(solution.id)}
+															onclick={() => toggleIneligible(solution.id)}
+														>
+															{#if expandedIneligible.has(solution.id)}
+																<ChevronDownIcon class="size-4" />
+															{:else}
+																<ChevronRightIcon class="size-4" />
+															{/if}
+															Cannot Satisfy ({ineligiblePreferences.length})
+														</button>
+														{#if expandedIneligible.has(solution.id)}
+															<div class="grid gap-2">
+																{#each ineligiblePreferences as explanation}
+																	<div class="rounded-lg border bg-red-50 p-3 dark:bg-red-950/20">
+																		<div class="flex items-start gap-2">
+																			<BanIcon class="mt-0.5 size-4 shrink-0 text-red-600" />
 																			<div>
 																				{#if entityLabel(explanation, run.run_type)}
 																					<span class="font-medium">{entityLabel(explanation, run.run_type)}</span>

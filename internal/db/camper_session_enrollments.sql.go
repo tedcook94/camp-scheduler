@@ -107,6 +107,67 @@ func (q *Queries) GetSessionEnrollment(ctx context.Context, arg GetSessionEnroll
 	return i, err
 }
 
+const listEnrollmentsByCamper = `-- name: ListEnrollmentsByCamper :many
+SELECT
+    e.id,
+    e.camp_id,
+    e.camper_id,
+    e.session_age_group_id,
+    c.camper_name,
+    sag.session_id,
+    sag.age_group_id
+FROM camper_session_enrollments e
+JOIN campers c ON c.id = e.camper_id AND c.camp_id = e.camp_id
+JOIN session_age_groups sag ON sag.id = e.session_age_group_id AND sag.camp_id = e.camp_id
+JOIN sessions s ON s.id = sag.session_id AND s.camp_id = e.camp_id
+JOIN seasons se ON se.id = s.season_id AND se.camp_id = e.camp_id
+WHERE e.camper_id = $1 AND e.camp_id = $2
+ORDER BY se.start_date DESC, s.session_name ASC
+`
+
+type ListEnrollmentsByCamperParams struct {
+	CamperID pgtype.UUID
+	CampID   pgtype.UUID
+}
+
+type ListEnrollmentsByCamperRow struct {
+	ID                pgtype.UUID
+	CampID            pgtype.UUID
+	CamperID          pgtype.UUID
+	SessionAgeGroupID pgtype.UUID
+	CamperName        string
+	SessionID         pgtype.UUID
+	AgeGroupID        pgtype.UUID
+}
+
+func (q *Queries) ListEnrollmentsByCamper(ctx context.Context, arg ListEnrollmentsByCamperParams) ([]ListEnrollmentsByCamperRow, error) {
+	rows, err := q.db.Query(ctx, listEnrollmentsByCamper, arg.CamperID, arg.CampID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListEnrollmentsByCamperRow
+	for rows.Next() {
+		var i ListEnrollmentsByCamperRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.CamperID,
+			&i.SessionAgeGroupID,
+			&i.CamperName,
+			&i.SessionID,
+			&i.AgeGroupID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listEnrollmentsBySessionAgeGroup = `-- name: ListEnrollmentsBySessionAgeGroup :many
 SELECT
     e.id,

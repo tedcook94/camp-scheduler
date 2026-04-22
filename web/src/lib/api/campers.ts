@@ -28,6 +28,8 @@ export const camperApi = {
 export const enrollmentApi = {
 	list: (sessionId: string) =>
 		api.get<Enrollment[]>(`/api/v1/sessions/${sessionId}/enrollments`),
+	listByCamper: (camperId: string, signal?: AbortSignal) =>
+		api.get<Enrollment[]>(`/api/v1/campers/${camperId}/enrollments`, { signal }),
 	get: (sessionId: string, id: string) =>
 		api.get<Enrollment>(`/api/v1/sessions/${sessionId}/enrollments/${id}`),
 	create: (sessionId: string, data: CreateEnrollmentRequest) =>

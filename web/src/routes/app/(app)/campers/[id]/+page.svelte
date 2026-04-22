@@ -54,7 +54,7 @@
 
 	// Enrollments
 	let enrollments = $state<Enrollment[]>([]);
-	let enrollLoadPartial = $state(false);
+	let enrollLoadFailed = $state(false);
 	let enrollSessionId = $state("");
 	let sessionAgeGroups = $state<SessionAgeGroup[]>([]);
 	let enrollSessionAgeGroupId = $state("");
@@ -160,23 +160,15 @@
 	});
 
 	async function loadAllEnrollments() {
-		const allEnrollments: Enrollment[] = [];
-		let hadError = false;
-		const results = await Promise.all(
-			sessions.map((s) =>
-				enrollmentApi.list(s.id).catch(() => {
-					hadError = true;
-					return [] as Enrollment[];
-				})
-			)
-		);
-		for (const sessionEnrollments of results) {
-			allEnrollments.push(...sessionEnrollments.filter((e) => e.camper_id === camperId));
-		}
-		enrollments = allEnrollments;
-		enrollLoadPartial = hadError;
-		if (hadError) {
-			toast.warning("Some enrollment data could not be loaded");
+		try {
+			enrollments = await enrollmentApi.listByCamper(camperId);
+			enrollLoadFailed = false;
+		} catch (err) {
+			enrollments = [];
+			enrollLoadFailed = true;
+			const message =
+				err instanceof ApiClientError ? err.message : "Failed to load enrollment data";
+			toast.warning(message);
 		}
 	}
 
@@ -413,9 +405,9 @@
 						Sessions this camper is enrolled in.
 					</p>
 
-					{#if enrollLoadPartial}
+					{#if enrollLoadFailed}
 						<div class="text-warning-foreground bg-warning/10 border-warning/20 rounded-md border px-3 py-2 text-sm">
-							Some enrollment data could not be loaded. Enrollment changes are disabled until all data loads successfully.
+							Failed to load enrollment data. Try refreshing the page.
 						</div>
 					{/if}
 
@@ -443,7 +435,7 @@
 											<Button
 												variant="ghost"
 												size="icon-sm"
-												disabled={disabled || enrollLoadPartial}
+												disabled={disabled || enrollLoadFailed}
 												title="Remove enrollment"
 												onclick={() => confirmDeleteEnroll(enrollment)}
 											>
@@ -512,7 +504,7 @@
 
 										<Button
 											size="sm"
-											disabled={disabled || enrollLoadPartial || !enrollSessionAgeGroupId || enrolling}
+											disabled={disabled || enrollLoadFailed || !enrollSessionAgeGroupId || enrolling}
 											onclick={handleEnroll}
 										>
 											{#if enrolling}

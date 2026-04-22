@@ -47,6 +47,32 @@ func (svc *Service) ListBySession(ctx context.Context, campID, sessionID string)
 	return result, nil
 }
 
+func (svc *Service) ListByCamper(ctx context.Context, campID, camperID string) ([]EnrollmentResponse, error) {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return nil, err
+	}
+
+	camperUUID, err := api.ParseUUID(camperID)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := svc.queries.ListEnrollmentsByCamper(ctx, db.ListEnrollmentsByCamperParams{
+		CamperID: camperUUID,
+		CampID:   campUUID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error listing camper enrollments: %w", err)
+	}
+
+	result := make([]EnrollmentResponse, len(rows))
+	for i, r := range rows {
+		result[i] = toEnrollmentResponseFromCamperList(r)
+	}
+	return result, nil
+}
+
 func (svc *Service) GetByID(ctx context.Context, campID, sessionID, id string) (EnrollmentResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {
@@ -167,5 +193,9 @@ func toEnrollmentResponseFromList(r db.ListSessionEnrollmentsRow) EnrollmentResp
 }
 
 func toEnrollmentResponseFromGet(r db.GetSessionEnrollmentRow) EnrollmentResponse {
+	return toEnrollmentFields(r.ID, r.CampID, r.CamperID, r.SessionAgeGroupID, r.CamperName, r.SessionID, r.AgeGroupID)
+}
+
+func toEnrollmentResponseFromCamperList(r db.ListEnrollmentsByCamperRow) EnrollmentResponse {
 	return toEnrollmentFields(r.ID, r.CampID, r.CamperID, r.SessionAgeGroupID, r.CamperName, r.SessionID, r.AgeGroupID)
 }

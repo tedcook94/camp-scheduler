@@ -36,6 +36,23 @@ RETURNING id, camp_id, camper_id, session_id, session_age_group_id;
 DELETE FROM camper_session_enrollments
 WHERE id = $1 AND camp_id = $2 AND session_id = $3;
 
+-- name: ListEnrollmentsByCamper :many
+SELECT
+    e.id,
+    e.camp_id,
+    e.camper_id,
+    e.session_age_group_id,
+    c.camper_name,
+    sag.session_id,
+    sag.age_group_id
+FROM camper_session_enrollments e
+JOIN campers c ON c.id = e.camper_id AND c.camp_id = e.camp_id
+JOIN session_age_groups sag ON sag.id = e.session_age_group_id AND sag.camp_id = e.camp_id
+JOIN sessions s ON s.id = sag.session_id AND s.camp_id = e.camp_id
+JOIN seasons se ON se.id = s.season_id AND se.camp_id = e.camp_id
+WHERE e.camper_id = $1 AND e.camp_id = $2
+ORDER BY se.start_date DESC, s.session_name ASC;
+
 -- name: ListEnrollmentsBySessionAgeGroup :many
 SELECT
     e.id,

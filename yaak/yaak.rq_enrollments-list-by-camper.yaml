@@ -1,0 +1,22 @@
+type: http_request
+model: http_request
+id: rq_enrollments-list-by-camper
+createdAt: "2026-04-22T00:00:00.000000"
+updatedAt: "2026-04-22T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_enrollments
+name: List By Camper
+description: ""
+url: "${[ base_url ]}/campers/:test-camper-id/enrollments"
+urlParameters:
+  - enabled: true
+    name: ":test-camper-id"
+    value: "${[ test-camper-id ]}"
+    id: null
+method: GET
+headers: []
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+sortPriority: 0.5

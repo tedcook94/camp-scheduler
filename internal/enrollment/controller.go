@@ -25,6 +25,9 @@ func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	enrollments.GET("/:enrollmentId", ctrl.Get)
 	enrollments.POST("", ctrl.Create)
 	enrollments.DELETE("/:enrollmentId", ctrl.Delete)
+
+	camperEnrollments := rg.Group("/campers/:camperId/enrollments")
+	camperEnrollments.GET("", ctrl.ListByCamper)
 }
 
 type CreateEnrollmentRequest struct {
@@ -57,6 +60,28 @@ func (ctrl *Controller) List(c *gin.Context) {
 			With("session_id", sessionID).
 			With("error", err).
 			Error("error listing enrollments")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, enrollments)
+}
+
+func (ctrl *Controller) ListByCamper(c *gin.Context) {
+	log := auth.Logger(c)
+	campID := auth.GetCampID(c)
+	camperID := c.Param("camperId")
+
+	enrollments, err := ctrl.svc.ListByCamper(c.Request.Context(), campID, camperID)
+	if err != nil {
+		if api.IsBadInput(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		log.
+			With("camper_id", camperID).
+			With("error", err).
+			Error("error listing camper enrollments")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}

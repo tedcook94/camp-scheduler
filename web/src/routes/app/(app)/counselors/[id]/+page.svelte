@@ -16,6 +16,9 @@
 		ageGroupPreferenceApi,
 		cocounselorPreferenceApi,
 		activityPreferenceApi,
+		sessionAgeGroupApi,
+		sessionActivityApi,
+		sessionCounselorApi,
 	} from "$lib/api";
 	import { toast } from "svelte-sonner";
 	import { Button } from "$lib/components/ui/button";
@@ -148,20 +151,35 @@
 	let activityPrefs = $state<ActivityPreference[]>([]);
 	let prefSaving = $state(false);
 
+	// Session-scoped option sources, populated when a pref session is selected.
+	let sessionAgeGroupIds = $state<Set<string>>(new Set());
+	let sessionActivityIds = $state<Set<string>>(new Set());
+	let sessionCounselorIds = $state<Set<string>>(new Set());
+
 	let addAgeGroupId = $state("");
 	let addCocounselorId = $state("");
 	let addActivityId = $state("");
 
+	let ageGroupsInSession = $derived(
+		ageGroups.filter((ag) => sessionAgeGroupIds.has(ag.id))
+	);
+	let counselorsInSession = $derived(
+		allCounselors.filter((c) => sessionCounselorIds.has(c.id))
+	);
+	let activitiesInSession = $derived(
+		allActivities.filter((a) => sessionActivityIds.has(a.id))
+	);
+
 	let availableAgeGroupsForPref = $derived(
-		ageGroups.filter((ag) => !ageGroupPrefs.some((p) => p.age_group_id === ag.id))
+		ageGroupsInSession.filter((ag) => !ageGroupPrefs.some((p) => p.age_group_id === ag.id))
 	);
 	let availableCounselorsForPref = $derived(
-		allCounselors.filter(
+		counselorsInSession.filter(
 			(c) => c.id !== counselorId && !cocounselorPrefs.some((p) => p.preferred_counselor_id === c.id)
 		)
 	);
 	let availableActivitiesForPref = $derived(
-		allActivities.filter((a) => !activityPrefs.some((p) => p.activity_id === a.id))
+		activitiesInSession.filter((a) => !activityPrefs.some((p) => p.activity_id === a.id))
 	);
 
 	onDestroy(() => {
@@ -347,6 +365,9 @@
 			ageGroupPrefs = [];
 			cocounselorPrefs = [];
 			activityPrefs = [];
+			sessionAgeGroupIds = new Set();
+			sessionActivityIds = new Set();
+			sessionCounselorIds = new Set();
 			prefLoading = false;
 			return;
 		}
@@ -357,15 +378,21 @@
 		prefLoading = true;
 
 		try {
-			const [agp, cop, acp] = await Promise.all([
+			const [agp, cop, acp, sessAg, sessAct, sessCoun] = await Promise.all([
 				ageGroupPreferenceApi.list(sessionId, counselorId, signal),
 				cocounselorPreferenceApi.list(sessionId, counselorId, signal),
 				activityPreferenceApi.list(sessionId, counselorId, signal),
+				sessionAgeGroupApi.list(sessionId, signal),
+				sessionActivityApi.listAll(sessionId),
+				sessionCounselorApi.list(sessionId),
 			]);
 			if (signal.aborted) return;
 			ageGroupPrefs = agp.sort((a, b) => a.rank - b.rank);
 			cocounselorPrefs = cop.sort((a, b) => a.rank - b.rank);
 			activityPrefs = acp.sort((a, b) => a.rank - b.rank);
+			sessionAgeGroupIds = new Set(sessAg.map((s) => s.age_group_id));
+			sessionActivityIds = new Set(sessAct.map((s) => s.activity_id));
+			sessionCounselorIds = new Set(sessCoun.map((s) => s.counselor_id));
 		} catch (err) {
 			if (signal.aborted) return;
 			const message = err instanceof ApiClientError ? err.message : "Failed to load preferences";

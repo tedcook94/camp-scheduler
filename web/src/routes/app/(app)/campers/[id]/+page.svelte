@@ -14,6 +14,7 @@
 	} from "$lib/api";
 	import { toast } from "svelte-sonner";
 	import { Button } from "$lib/components/ui/button";
+	import { Badge } from "$lib/components/ui/badge";
 	import { Separator } from "$lib/components/ui/separator";
 	import * as Table from "$lib/components/ui/table";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog";
@@ -593,7 +594,14 @@
 										{#each friendPrefs as pref, i (pref.id)}
 											<Table.TableRow>
 												<Table.TableCell class="text-muted-foreground">{pref.rank}</Table.TableCell>
-												<Table.TableCell>{getCamperName(pref.preferred_camper_id)}</Table.TableCell>
+												<Table.TableCell>
+													<div class="flex items-center gap-2">
+														<span>{getCamperName(pref.preferred_camper_id)}</span>
+														{#if !sessionEnrolledCamperIds.has(pref.preferred_camper_id)}
+															<Badge variant="outline" class="text-muted-foreground" title="This camper is no longer enrolled in the selected session and will be ignored by the solver.">no longer in session</Badge>
+														{/if}
+													</div>
+												</Table.TableCell>
 												<Table.TableCell>
 													<div class="flex justify-end gap-1">
 														<Button variant="ghost" size="icon-sm" title="Move up" disabled={disabled || prefSaving || i === 0} onclick={() => moveFriendPref(i, -1)}>

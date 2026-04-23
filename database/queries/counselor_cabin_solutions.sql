@@ -21,6 +21,6 @@ JOIN assignment_run_selected_solutions arss
     ON arss.run_id = ar.id AND arss.camp_id = ar.camp_id
 WHERE ar.session_id = @session_id
     AND ar.camp_id = @camp_id
-    AND ar.run_type = 'counselor_cabin'
+    AND ar.run_type = 'cabin'
 ORDER BY ar.created_at DESC
 LIMIT 1;

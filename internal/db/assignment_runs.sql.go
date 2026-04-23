@@ -61,6 +61,25 @@ func (q *Queries) DeleteAssignmentRun(ctx context.Context, arg DeleteAssignmentR
 	return result.RowsAffected(), nil
 }
 
+const deleteAssignmentRunsBySessionAndType = `-- name: DeleteAssignmentRunsBySessionAndType :execrows
+DELETE FROM assignment_runs
+WHERE camp_id = $1 AND session_id = $2 AND run_type = $3
+`
+
+type DeleteAssignmentRunsBySessionAndTypeParams struct {
+	CampID    pgtype.UUID
+	SessionID pgtype.UUID
+	RunType   string
+}
+
+func (q *Queries) DeleteAssignmentRunsBySessionAndType(ctx context.Context, arg DeleteAssignmentRunsBySessionAndTypeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteAssignmentRunsBySessionAndType, arg.CampID, arg.SessionID, arg.RunType)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getAssignmentRun = `-- name: GetAssignmentRun :one
 SELECT id, camp_id, session_id, run_type, status, created_at
 FROM assignment_runs

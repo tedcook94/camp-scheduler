@@ -391,7 +391,12 @@
 			{#if loading}
 				<h1 class="text-2xl font-semibold tracking-tight">Loading...</h1>
 			{:else if camper}
-				<h1 class="text-2xl font-semibold tracking-tight">{camper.name}</h1>
+				<div class="flex items-center gap-3">
+					<h1 class="text-2xl font-semibold tracking-tight">{camper.name}</h1>
+					<Badge variant={camper.gender === "female" ? "secondary" : "outline"}>
+						{camper.gender === "female" ? "Female" : "Male"}
+					</Badge>
+				</div>
 			{:else}
 				<h1 class="text-2xl font-semibold tracking-tight">Camper not found</h1>
 			{/if}

@@ -12,7 +12,8 @@
 	import * as Table from "$lib/components/ui/table";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog";
-	import type { Counselor, Camp } from "$lib/api/types";
+	import * as Select from "$lib/components/ui/select";
+	import type { Counselor, Camp, Gender } from "$lib/api/types";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import TrashIcon from "@lucide/svelte/icons/trash";
@@ -31,7 +32,7 @@
 	let loading = $state(true);
 	let loadError = $state(false);
 
-	let sortKey = $state<"name" | "junior_counselor" | "enabled">("name");
+	let sortKey = $state<"name" | "junior_counselor" | "enabled" | "gender">("name");
 	let sortDirection = $state<SortDirection>("asc");
 	let sortedCounselors = $derived(
 		sortItems(
@@ -60,8 +61,10 @@
 	let formName = $state("");
 	let formJunior = $state(false);
 	let formEnabled = $state(true);
+	let formGender = $state<Gender | "">("");
 	let submitting = $state(false);
 	let nameError = $state("");
+	let genderError = $state("");
 
 	let dialogTitle = $derived(editingCounselor ? "Edit Counselor" : "Add Counselor");
 	let dialogDescription = $derived(
@@ -92,7 +95,9 @@
 		formName = "";
 		formJunior = false;
 		formEnabled = true;
+		formGender = "";
 		nameError = "";
+		genderError = "";
 		dialogOpen = true;
 	}
 
@@ -101,19 +106,28 @@
 		formName = counselor.name;
 		formJunior = counselor.junior_counselor;
 		formEnabled = counselor.enabled;
+		formGender = counselor.gender;
 		nameError = "";
+		genderError = "";
 		dialogOpen = true;
 	}
 
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
 		nameError = "";
+		genderError = "";
 
 		const name = formName.trim();
+		let valid = true;
 		if (!name) {
 			nameError = "Name is required.";
-			return;
+			valid = false;
 		}
+		if (formGender !== "male" && formGender !== "female") {
+			genderError = "Gender is required.";
+			valid = false;
+		}
+		if (!valid) return;
 
 		submitting = true;
 
@@ -123,6 +137,7 @@
 					name,
 					junior_counselor: formJunior,
 					enabled: formEnabled,
+					gender: formGender as Gender,
 				});
 				counselors = counselors.map((c) => (c.id === updated.id ? updated : c));
 				toast.success("Counselor updated");
@@ -130,6 +145,7 @@
 				const created = await counselorApi.create({
 					name,
 					junior_counselor: formJunior,
+					gender: formGender as Gender,
 				});
 				counselors = [...counselors, created];
 				toast.success("Counselor created");
@@ -200,6 +216,7 @@
 				<Table.TableRow>
 					<SortableTableHead label="Name" active={sortKey === "name"} direction={sortDirection} onclick={() => toggleSort("name")} />
 					<SortableTableHead label="Type" active={sortKey === "junior_counselor"} direction={sortDirection} onclick={() => toggleSort("junior_counselor")} />
+					<SortableTableHead label="Gender" active={sortKey === "gender"} direction={sortDirection} onclick={() => toggleSort("gender")} />
 					<SortableTableHead label="Status" active={sortKey === "enabled"} direction={sortDirection} onclick={() => toggleSort("enabled")} />
 					<Table.TableHead class="w-24">
 						<span class="sr-only">Actions</span>
@@ -213,6 +230,11 @@
 						<Table.TableCell>
 							<Badge variant={counselor.junior_counselor ? "secondary" : "default"}>
 								{counselor.junior_counselor ? "Junior" : "Senior"}
+							</Badge>
+						</Table.TableCell>
+						<Table.TableCell>
+							<Badge variant={counselor.gender === "female" ? "secondary" : "outline"}>
+								{counselor.gender === "female" ? "Female" : "Male"}
 							</Badge>
 						</Table.TableCell>
 						<Table.TableCell>
@@ -290,6 +312,27 @@
 					class="size-4 rounded border-gray-300"
 				/>
 				<Label for="counselor-junior">Junior counselor</Label>
+			</div>
+			<div class="grid gap-2">
+				<Label for="counselor-gender">Gender</Label>
+				<Select.Select type="single" bind:value={formGender} disabled={submitting} onValueChange={() => (genderError = "")}>
+					<Select.SelectTrigger id="counselor-gender" class="w-full">
+						{#if formGender === "female"}
+							Female
+						{:else if formGender === "male"}
+							Male
+						{:else}
+							<span class="text-muted-foreground">Select gender</span>
+						{/if}
+					</Select.SelectTrigger>
+					<Select.SelectContent>
+						<Select.SelectItem value="female">Female</Select.SelectItem>
+						<Select.SelectItem value="male">Male</Select.SelectItem>
+					</Select.SelectContent>
+				</Select.Select>
+				{#if genderError}
+					<p class="text-destructive text-sm">{genderError}</p>
+				{/if}
 			</div>
 			{#if editingCounselor}
 				<div class="flex items-center gap-2">

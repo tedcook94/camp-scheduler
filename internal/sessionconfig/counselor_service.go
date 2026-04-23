@@ -27,6 +27,7 @@ type SessionCounselorResponse struct {
 	CounselorName    string `json:"counselor_name"`
 	JuniorCounselor  bool   `json:"junior_counselor"`
 	CounselorEnabled bool   `json:"counselor_enabled"`
+	Gender           string `json:"gender"`
 }
 
 type AddSessionCounselorRequest struct {
@@ -62,6 +63,7 @@ func (svc *CounselorService) List(ctx context.Context, campID, sessionID string)
 			CounselorName:    r.CounselorName,
 			JuniorCounselor:  r.JuniorCounselor,
 			CounselorEnabled: r.CounselorEnabled,
+			Gender:           r.Gender,
 		}
 	}
 	return result, nil
@@ -118,6 +120,7 @@ func (svc *CounselorService) Add(ctx context.Context, campID, sessionID string, 
 		CounselorName:    counselor.CounselorName,
 		JuniorCounselor:  counselor.JuniorCounselor,
 		CounselorEnabled: counselor.CounselorEnabled,
+		Gender:           counselor.Gender,
 	}, nil
 }
 

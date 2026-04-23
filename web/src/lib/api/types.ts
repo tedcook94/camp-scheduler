@@ -72,6 +72,8 @@ export interface ApiError {
 	error: string;
 }
 
+export type Gender = "male" | "female";
+
 export interface Cabin {
 	id: string;
 	camp_id: string;
@@ -80,6 +82,7 @@ export interface Cabin {
 	name: string;
 	default_group_size: number;
 	default_required_counselors: number;
+	gender: Gender;
 }
 
 export interface CreateCabinRequest {
@@ -87,6 +90,7 @@ export interface CreateCabinRequest {
 	default_age_group_id: string;
 	default_group_size: number;
 	default_required_counselors: number;
+	gender: Gender;
 }
 
 export interface UpdateCabinRequest {
@@ -94,6 +98,7 @@ export interface UpdateCabinRequest {
 	default_age_group_id: string;
 	default_group_size: number;
 	default_required_counselors: number;
+	gender: Gender;
 }
 
 export interface Season {
@@ -207,17 +212,20 @@ export interface Counselor {
 	name: string;
 	junior_counselor: boolean;
 	enabled: boolean;
+	gender: Gender;
 }
 
 export interface CreateCounselorRequest {
 	name: string;
 	junior_counselor: boolean;
+	gender: Gender;
 }
 
 export interface UpdateCounselorRequest {
 	name: string;
 	junior_counselor: boolean;
 	enabled: boolean;
+	gender: Gender;
 }
 
 export interface CounselorCertification {
@@ -308,14 +316,17 @@ export interface Camper {
 	id: string;
 	camp_id: string;
 	name: string;
+	gender: Gender;
 }
 
 export interface CreateCamperRequest {
 	name: string;
+	gender: Gender;
 }
 
 export interface UpdateCamperRequest {
 	name: string;
+	gender: Gender;
 }
 
 export interface SessionAgeGroup {
@@ -333,6 +344,7 @@ export interface SessionCounselor {
 	counselor_name: string;
 	junior_counselor: boolean;
 	counselor_enabled: boolean;
+	gender: Gender;
 }
 
 export interface AddSessionCounselorRequest {

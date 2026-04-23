@@ -625,6 +625,9 @@
 					<Badge variant={counselor.junior_counselor ? "secondary" : "default"}>
 						{counselor.junior_counselor ? "Junior" : "Senior"}
 					</Badge>
+					<Badge variant={counselor.gender === "female" ? "secondary" : "outline"}>
+						{counselor.gender === "female" ? "Female" : "Male"}
+					</Badge>
 					<Badge variant={counselor.enabled ? "default" : "outline"}>
 						{counselor.enabled ? "Active" : "Inactive"}
 					</Badge>

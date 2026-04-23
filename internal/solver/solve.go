@@ -60,7 +60,11 @@ func (s *searchState) search(counselors []Counselor, index int) {
 	counselor := remaining[0]
 
 	for _, cabinID := range s.cabinIDs {
-		if s.snapshot.Cabins[s.cabinIndexByID[cabinID]].Gender != counselor.Gender {
+		cabin := s.snapshot.Cabins[s.cabinIndexByID[cabinID]]
+		if cabin.Gender != counselor.Gender {
+			continue
+		}
+		if len(s.assignment[cabinID]) >= cabin.Capacity {
 			continue
 		}
 		s.assignment[cabinID] = append(s.assignment[cabinID], counselor.ID)

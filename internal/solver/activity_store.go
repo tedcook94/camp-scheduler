@@ -33,6 +33,14 @@ func StoreActivitySolutions(ctx context.Context, pool *pgxpool.Pool, campID, ses
 
 	qtx := db.New(tx)
 
+	if _, err := qtx.DeleteAssignmentRunsBySessionAndType(ctx, db.DeleteAssignmentRunsBySessionAndTypeParams{
+		CampID:    campUUID,
+		SessionID: sessionUUID,
+		RunType:   runTypeActivitySchedule,
+	}); err != nil {
+		return "", fmt.Errorf("error deleting prior activity runs: %w", err)
+	}
+
 	run, err := qtx.CreateAssignmentRun(ctx, db.CreateAssignmentRunParams{
 		CampID:    campUUID,
 		SessionID: sessionUUID,

@@ -7,7 +7,10 @@ type Cabin struct {
 	AgeGroupName           string
 	SessionAgeGroupCabinID string
 	RequiredCounselors     int
-	Gender                 string
+	// Capacity is the total occupancy cap for the cabin: counselors + campers
+	// combined cannot exceed this number.
+	Capacity int
+	Gender   string
 }
 
 type Counselor struct {

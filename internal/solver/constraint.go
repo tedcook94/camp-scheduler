@@ -7,6 +7,28 @@ func CheckHardConstraints(snapshot SessionSnapshot, assignment Assignment) []Vio
 	violations = append(violations, checkCabinMinimumCounselors(snapshot, assignment)...)
 	violations = append(violations, checkCabinWithoutSeniorCounselor(snapshot, assignment)...)
 	violations = append(violations, checkCabinGenderMatchCounselors(snapshot, assignment)...)
+	violations = append(violations, checkCabinCounselorCapacity(snapshot, assignment)...)
+	return violations
+}
+
+// checkCabinCounselorCapacity verifies that counselors alone do not exceed
+// the cabin's total occupancy capacity. The combined cabin solver further
+// enforces that counselors + campers stay within capacity per cabin.
+func checkCabinCounselorCapacity(snapshot SessionSnapshot, assignment Assignment) []Violation {
+	var violations []Violation
+	for _, cabin := range snapshot.Cabins {
+		assigned := len(assignment.CabinCounselors[cabin.ID])
+		if assigned > cabin.Capacity {
+			violations = append(violations, Violation{
+				Constraint: "cabin_capacity",
+				CabinID:    cabin.ID,
+				Message: fmt.Sprintf(
+					"cabin %q has %d counselor(s) assigned but capacity is %d",
+					cabin.Name, assigned, cabin.Capacity,
+				),
+			})
+		}
+	}
 	return violations
 }
 

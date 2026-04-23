@@ -446,7 +446,7 @@ func configureSessions(ctx context.Context, q *db.Queries, campID pgtype.UUID, s
 				CampID:             campID,
 				SessionAgeGroupID:  sagMap[cd.ageGroup].ID,
 				CabinID:            cabins[cd.name].ID,
-				GroupSize:          6,
+				GroupSize:          9,
 				RequiredCounselors: 2,
 			})
 			if err != nil {
@@ -725,17 +725,18 @@ func setCounselorPreferences(ctx context.Context, q *db.Queries, campID pgtype.U
 		rank      int32
 	}
 	s1CoPrefs := []coPref{
-		{"Sarah Johnson", "Mike Chen", 1},
-		{"Mike Chen", "Sarah Johnson", 1},
-		{"James Wilson", "Lisa Rodriguez", 1},
-		{"Lisa Rodriguez", "James Wilson", 1},
-		{"Rachel Kim", "Tom Anderson", 1},
+		{"Sarah Johnson", "Emily Davis", 1},
+		{"Emily Davis", "Sarah Johnson", 1},
+		{"Mike Chen", "James Wilson", 1},
+		{"James Wilson", "Mike Chen", 1},
+		{"Rachel Kim", "Lisa Rodriguez", 1},
+		{"Tom Anderson", "David Brown", 1},
 	}
 	s2CoPrefs := []coPref{
 		{"Sarah Johnson", "Emily Davis", 1},
 		{"Emily Davis", "Sarah Johnson", 1},
-		{"James Wilson", "Karen Martinez", 1},
-		{"Rachel Kim", "Tom Anderson", 1},
+		{"James Wilson", "David Brown", 1},
+		{"Rachel Kim", "Karen Martinez", 1},
 	}
 
 	for _, p := range s1CoPrefs {
@@ -896,15 +897,15 @@ func setFriendPreferences(ctx context.Context, q *db.Queries, campID pgtype.UUID
 
 	s1Prefs := []friendPref{
 		{"Emma", "Olivia", 1},
-		{"Emma", "Liam", 2},
+		{"Emma", "Sophia", 2},
 		{"Olivia", "Emma", 1},
 		{"Olivia", "Sophia", 2},
 		{"Liam", "Noah", 1},
-		{"Aiden", "Charlotte", 1},
-		{"Aiden", "Benjamin", 2},
-		{"Charlotte", "Aiden", 1},
-		{"Logan", "Chloe", 1},
-		{"Logan", "Caleb", 2},
+		{"Aiden", "Benjamin", 1},
+		{"Aiden", "Daniel", 2},
+		{"Charlotte", "Harper", 1},
+		{"Logan", "Caleb", 1},
+		{"Logan", "Nathan", 2},
 	}
 
 	s2Prefs := []friendPref{
@@ -914,11 +915,11 @@ func setFriendPreferences(ctx context.Context, q *db.Queries, campID pgtype.UUID
 		{"Olivia", "Sophia", 2},
 		{"Liam", "Noah", 1},
 		{"Liam", "Mason", 2},
-		{"Aiden", "Charlotte", 1},
-		{"Aiden", "Benjamin", 2},
-		{"Charlotte", "Aiden", 1},
-		{"Logan", "Chloe", 1},
-		{"Logan", "Caleb", 2},
+		{"Aiden", "Benjamin", 1},
+		{"Aiden", "Daniel", 2},
+		{"Charlotte", "Harper", 1},
+		{"Logan", "Caleb", 1},
+		{"Logan", "Nathan", 2},
 	}
 
 	for _, p := range s1Prefs {

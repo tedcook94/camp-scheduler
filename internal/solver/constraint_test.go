@@ -16,8 +16,8 @@ func TestCheckCabinMinimumCounselors(t *testing.T) {
 			name: "all cabins meet minimum",
 			snapshot: SessionSnapshot{
 				Cabins: []Cabin{
-					{ID: "c1", Name: "Pine", RequiredCounselors: 2, Capacity: 10},
-					{ID: "c2", Name: "Oak", RequiredCounselors: 1, Capacity: 10},
+					{ID: "c1", Name: "Pine", RequiredCounselors: 2, Capacity: 10, HasCampers: true},
+					{ID: "c2", Name: "Oak", RequiredCounselors: 1, Capacity: 10, HasCampers: true},
 				},
 			},
 			assignment: Assignment{
@@ -32,7 +32,7 @@ func TestCheckCabinMinimumCounselors(t *testing.T) {
 			name: "cabin exceeds minimum is fine",
 			snapshot: SessionSnapshot{
 				Cabins: []Cabin{
-					{ID: "c1", Name: "Pine", RequiredCounselors: 1, Capacity: 10},
+					{ID: "c1", Name: "Pine", RequiredCounselors: 1, Capacity: 10, HasCampers: true},
 				},
 			},
 			assignment: Assignment{
@@ -46,8 +46,8 @@ func TestCheckCabinMinimumCounselors(t *testing.T) {
 			name: "one cabin under minimum",
 			snapshot: SessionSnapshot{
 				Cabins: []Cabin{
-					{ID: "c1", Name: "Pine", RequiredCounselors: 2, Capacity: 10},
-					{ID: "c2", Name: "Oak", RequiredCounselors: 1, Capacity: 10},
+					{ID: "c1", Name: "Pine", RequiredCounselors: 2, Capacity: 10, HasCampers: true},
+					{ID: "c2", Name: "Oak", RequiredCounselors: 1, Capacity: 10, HasCampers: true},
 				},
 			},
 			assignment: Assignment{
@@ -63,8 +63,8 @@ func TestCheckCabinMinimumCounselors(t *testing.T) {
 			name: "multiple cabins under minimum",
 			snapshot: SessionSnapshot{
 				Cabins: []Cabin{
-					{ID: "c1", Name: "Pine", RequiredCounselors: 2, Capacity: 10},
-					{ID: "c2", Name: "Oak", RequiredCounselors: 3, Capacity: 10},
+					{ID: "c1", Name: "Pine", RequiredCounselors: 2, Capacity: 10, HasCampers: true},
+					{ID: "c2", Name: "Oak", RequiredCounselors: 3, Capacity: 10, HasCampers: true},
 				},
 			},
 			assignment: Assignment{
@@ -80,7 +80,7 @@ func TestCheckCabinMinimumCounselors(t *testing.T) {
 			name: "cabin not in assignment map treated as zero",
 			snapshot: SessionSnapshot{
 				Cabins: []Cabin{
-					{ID: "c1", Name: "Pine", RequiredCounselors: 1, Capacity: 10},
+					{ID: "c1", Name: "Pine", RequiredCounselors: 1, Capacity: 10, HasCampers: true},
 				},
 			},
 			assignment: Assignment{
@@ -93,11 +93,25 @@ func TestCheckCabinMinimumCounselors(t *testing.T) {
 			name: "zero required with zero assigned is fine",
 			snapshot: SessionSnapshot{
 				Cabins: []Cabin{
-					{ID: "c1", Name: "Pine", RequiredCounselors: 0, Capacity: 10},
+					{ID: "c1", Name: "Pine", RequiredCounselors: 0, Capacity: 10, HasCampers: true},
 				},
 			},
 			assignment: Assignment{
 				CabinCounselors: map[string][]string{},
+			},
+			wantCount: 0,
+		},
+		{
+			name: "cabin without campers exempt from minimum",
+			snapshot: SessionSnapshot{
+				Cabins: []Cabin{
+					{ID: "c1", Name: "Pine", RequiredCounselors: 2, Capacity: 10, HasCampers: false},
+				},
+			},
+			assignment: Assignment{
+				CabinCounselors: map[string][]string{
+					"c1": {"a"},
+				},
 			},
 			wantCount: 0,
 		},
@@ -130,8 +144,8 @@ func TestCheckCabinWithoutSeniorCounselor(t *testing.T) {
 			{ID: "sr2", Name: "Counselor 2", IsJunior: false},
 		},
 		Cabins: []Cabin{
-			{ID: "c1", Name: "Pine"},
-			{ID: "c2", Name: "Oak"},
+			{ID: "c1", Name: "Pine", HasCampers: true},
+			{ID: "c2", Name: "Oak", HasCampers: true},
 		},
 	}
 
@@ -198,6 +212,18 @@ func TestCheckCabinWithoutSeniorCounselor(t *testing.T) {
 			wantCount:  1,
 			wantCabins: []string{"c1"},
 		},
+		{
+			name: "junior-only cabin without campers exempt",
+			cabins: []Cabin{
+				{ID: "c1", Name: "Pine", HasCampers: false},
+			},
+			assignment: Assignment{
+				CabinCounselors: map[string][]string{
+					"c1": {"jr1"},
+				},
+			},
+			wantCount: 0,
+		},
 	}
 
 	for _, tt := range tests {
@@ -226,7 +252,7 @@ func TestCheckHardConstraints(t *testing.T) {
 	t.Run("valid assignment returns no violations", func(t *testing.T) {
 		snapshot := SessionSnapshot{
 			Cabins: []Cabin{
-				{ID: "c1", Name: "Pine", RequiredCounselors: 1, Capacity: 10},
+				{ID: "c1", Name: "Pine", RequiredCounselors: 1, Capacity: 10, HasCampers: true},
 			},
 			Counselors: []Counselor{
 				{ID: "sr1", Name: "Counselor 1", IsJunior: false},
@@ -247,8 +273,8 @@ func TestCheckHardConstraints(t *testing.T) {
 	t.Run("both constraint types violated", func(t *testing.T) {
 		snapshot := SessionSnapshot{
 			Cabins: []Cabin{
-				{ID: "c1", Name: "Pine", RequiredCounselors: 2, Capacity: 10},
-				{ID: "c2", Name: "Oak", RequiredCounselors: 1, Capacity: 10},
+				{ID: "c1", Name: "Pine", RequiredCounselors: 2, Capacity: 10, HasCampers: true},
+				{ID: "c2", Name: "Oak", RequiredCounselors: 1, Capacity: 10, HasCampers: true},
 			},
 			Counselors: []Counselor{
 				{ID: "jr1", Name: "Junior 1", IsJunior: true},

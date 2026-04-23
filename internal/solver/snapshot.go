@@ -36,6 +36,12 @@ func BuildSnapshot(ctx context.Context, queries *db.Queries, campID, sessionID s
 		return SessionSnapshot{}, err
 	}
 
+	campers, err := loadCampers(ctx, queries, sessionUUID, campUUID)
+	if err != nil {
+		return SessionSnapshot{}, err
+	}
+	cabins = markCabinsWithCampers(cabins, campers)
+
 	counselors, err := loadCounselors(ctx, queries, sessionUUID, campUUID)
 	if err != nil {
 		return SessionSnapshot{}, err
@@ -106,6 +112,22 @@ func loadCabins(ctx context.Context, queries *db.Queries, sessionID, campID pgty
 		}
 	}
 	return cabins, nil
+}
+
+// markCabinsWithCampers sets HasCampers on each cabin based on whether the
+// session has any enrolled camper whose age group + gender matches the
+// cabin. The minimum-counselor and senior-presence rules only fire on
+// cabins with HasCampers=true.
+func markCabinsWithCampers(cabins []Cabin, campers []Camper) []Cabin {
+	type key struct{ ageGroupID, gender string }
+	hasCampers := make(map[key]bool, len(campers))
+	for _, c := range campers {
+		hasCampers[key{c.AgeGroupID, c.Gender}] = true
+	}
+	for i := range cabins {
+		cabins[i].HasCampers = hasCampers[key{cabins[i].AgeGroupID, cabins[i].Gender}]
+	}
+	return cabins
 }
 
 // loadSessionRoster returns the rows from the session counselor roster,

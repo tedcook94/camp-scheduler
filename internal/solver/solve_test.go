@@ -34,7 +34,7 @@ func TestSolve(t *testing.T) {
 	t.Run("no valid solution with all juniors", func(t *testing.T) {
 		snapshot := SessionSnapshot{
 			Cabins: []Cabin{
-				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 10},
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 10, HasCampers: true},
 			},
 			Counselors: []Counselor{
 				{ID: "jr1", Name: "Junior 1", IsJunior: true},

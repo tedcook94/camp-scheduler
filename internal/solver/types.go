@@ -11,6 +11,11 @@ type Cabin struct {
 	// combined cannot exceed this number.
 	Capacity int
 	Gender   string
+	// HasCampers reports whether this cabin's age group + gender has any
+	// enrolled campers in the session. Cabins without eligible campers
+	// (HasCampers=false) do not enforce the minimum-counselors or
+	// senior-presence rules — only gender + capacity.
+	HasCampers bool
 }
 
 type Counselor struct {

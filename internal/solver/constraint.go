@@ -35,6 +35,9 @@ func checkCabinCounselorCapacity(snapshot SessionSnapshot, assignment Assignment
 func checkCabinMinimumCounselors(snapshot SessionSnapshot, assignment Assignment) []Violation {
 	var violations []Violation
 	for _, cabin := range snapshot.Cabins {
+		if !cabin.HasCampers {
+			continue
+		}
 		assigned := len(assignment.CabinCounselors[cabin.ID])
 		if assigned < cabin.RequiredCounselors {
 			violations = append(violations, Violation{
@@ -50,14 +53,19 @@ func checkCabinMinimumCounselors(snapshot SessionSnapshot, assignment Assignment
 	return violations
 }
 
-// checkCabinWithoutSeniorCounselor verifies that every staffed cabin has at
-// least one non-junior counselor. A cabin with zero counselors is not flagged
-// here — that's caught by the minimum counselors check.
+// checkCabinWithoutSeniorCounselor verifies that every staffed cabin that
+// will host campers has at least one non-junior counselor. Cabins without
+// campers are exempt — a counselors-only cabin has no campers to supervise
+// and so does not require a senior. A cabin with zero counselors is not
+// flagged here either; that's caught by the minimum counselors check.
 func checkCabinWithoutSeniorCounselor(snapshot SessionSnapshot, assignment Assignment) []Violation {
 	counselorsByID := indexCounselors(snapshot)
 
 	var violations []Violation
 	for _, cabin := range snapshot.Cabins {
+		if !cabin.HasCampers {
+			continue
+		}
 		counselorIDs := assignment.CabinCounselors[cabin.ID]
 		if len(counselorIDs) == 0 {
 			continue

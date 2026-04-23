@@ -99,6 +99,10 @@ func (s *searchState) feasible(remaining []Counselor) bool {
 
 	cabinsNeedingSenior := 0
 	for _, cabin := range s.snapshot.Cabins {
+		if !cabin.HasCampers {
+			// No campers => no senior requirement; skip senior pruning.
+			continue
+		}
 		assigned := s.assignment[cabin.ID]
 		if len(assigned) == 0 {
 			// Empty cabins with no staffing requirement can stay empty --
@@ -127,10 +131,14 @@ func (s *searchState) feasible(remaining []Counselor) bool {
 		return false
 	}
 
-	// Check that each cabin can still reach its required_counselors count.
+	// Check that each cabin with campers can still reach its
+	// required_counselors count. Cabins without campers have no minimum.
 	totalRemaining := len(remaining)
 	deficit := 0
 	for _, cabin := range s.snapshot.Cabins {
+		if !cabin.HasCampers {
+			continue
+		}
 		need := cabin.RequiredCounselors - len(s.assignment[cabin.ID])
 		if need > 0 {
 			deficit += need

@@ -84,3 +84,24 @@ func TestFilterCocounselorUnmetByRoster(t *testing.T) {
 		t.Errorf("expected off-roster targets pruned, got %v want %v", got, want)
 	}
 }
+
+func TestMarkCabinsWithCampers(t *testing.T) {
+	cabins := []Cabin{
+		{ID: "c1", AgeGroupID: "ag1", Gender: "male"},
+		{ID: "c2", AgeGroupID: "ag1", Gender: "female"},
+		{ID: "c3", AgeGroupID: "ag2", Gender: "male"},
+	}
+	campers := []Camper{
+		{ID: "k1", AgeGroupID: "ag1", Gender: "male"},
+		{ID: "k2", AgeGroupID: "ag2", Gender: "male"},
+	}
+
+	got := markCabinsWithCampers(cabins, campers)
+
+	want := map[string]bool{"c1": true, "c2": false, "c3": true}
+	for _, c := range got {
+		if c.HasCampers != want[c.ID] {
+			t.Errorf("cabin %q HasCampers = %v, want %v", c.ID, c.HasCampers, want[c.ID])
+		}
+	}
+}

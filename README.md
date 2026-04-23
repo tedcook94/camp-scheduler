@@ -58,14 +58,13 @@ and stores the selected solution back.
 
 ## Solver
 
-The solver is a constraint satisfaction + optimization engine that handles three
+The solver is a constraint satisfaction + optimization engine that handles two
 assignment types:
 
-1. **Counselor-to-Cabin** — assign counselors to cabins respecting capacity,
-   seniority, and age group constraints while optimizing for preferences
-2. **Camper-to-Cabin** — assign campers to cabins within their enrolled age
-   group while honoring friend requests
-3. **Activity Scheduling** — assign counselors to activities in time slots
+1. **Cabin Assignment** — assign counselors and campers to cabins simultaneously,
+   respecting cabin capacity (counselors + campers), seniority, gender, and age
+   group constraints while optimizing for counselor and camper preferences
+2. **Activity Scheduling** — assign counselors to activities in time slots
    respecting certifications and avoiding conflicts
 
 Each solver run produces top-N ranked solutions with full score breakdowns and

@@ -6,6 +6,7 @@ func CheckHardConstraints(snapshot SessionSnapshot, assignment Assignment) []Vio
 	var violations []Violation
 	violations = append(violations, checkCabinMinimumCounselors(snapshot, assignment)...)
 	violations = append(violations, checkCabinWithoutSeniorCounselor(snapshot, assignment)...)
+	violations = append(violations, checkCabinGenderMatchCounselors(snapshot, assignment)...)
 	return violations
 }
 
@@ -57,6 +58,32 @@ func checkCabinWithoutSeniorCounselor(snapshot SessionSnapshot, assignment Assig
 					cabin.Name,
 				),
 			})
+		}
+	}
+	return violations
+}
+
+// checkCabinGenderMatchCounselors verifies that every assigned counselor's
+// gender matches the cabin's gender. Cabins are gender-segregated so a
+// counselor can only staff a cabin of their own gender.
+func checkCabinGenderMatchCounselors(snapshot SessionSnapshot, assignment Assignment) []Violation {
+	counselorsByID := indexCounselors(snapshot)
+
+	var violations []Violation
+	for _, cabin := range snapshot.Cabins {
+		for _, cID := range assignment.CabinCounselors[cabin.ID] {
+			counselor := counselorsByID[cID]
+			if counselor.Gender != cabin.Gender {
+				violations = append(violations, Violation{
+					Constraint:  "cabin_gender_mismatch",
+					CabinID:     cabin.ID,
+					CounselorID: cID,
+					Message: fmt.Sprintf(
+						"counselor %q (%s) cannot be assigned to cabin %q (%s)",
+						counselor.Name, counselor.Gender, cabin.Name, cabin.Gender,
+					),
+				})
+			}
 		}
 	}
 	return violations

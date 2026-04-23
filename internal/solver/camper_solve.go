@@ -96,6 +96,15 @@ func (s *camperSearchState) search(campers []Camper, index int) {
 	camper := campers[index]
 	eligibleCabins := s.cabinsByAgeGroup[camper.AgeGroupID]
 
+	// Filter out cabins whose gender doesn't match the camper's.
+	gendered := make([]CamperCabin, 0, len(eligibleCabins))
+	for _, c := range eligibleCabins {
+		if c.Gender == camper.Gender {
+			gendered = append(gendered, c)
+		}
+	}
+	eligibleCabins = gendered
+
 	// Order cabins by most-remaining-capacity first so backtracking
 	// explores balanced placements before lopsided ones.
 	ordered := make([]CamperCabin, len(eligibleCabins))
@@ -186,10 +195,14 @@ func fillRemaining(base CamperAssignment, campers []Camper, snapshot CamperCabin
 			continue
 		}
 
-		// Pick the cabin with the most remaining capacity.
+		// Pick the cabin with the most remaining capacity that matches the
+		// camper's gender.
 		bestCabin := ""
 		bestRemaining := -1
 		for _, cabin := range cabins {
+			if cabin.Gender != camper.Gender {
+				continue
+			}
 			remaining := capacities[cabin.ID] - counts[cabin.ID]
 			if remaining > bestRemaining {
 				bestRemaining = remaining

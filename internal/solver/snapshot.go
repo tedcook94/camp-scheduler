@@ -101,6 +101,7 @@ func loadCabins(ctx context.Context, queries *db.Queries, sessionID, campID pgty
 			AgeGroupName:           r.AgeGroupName,
 			SessionAgeGroupCabinID: api.UUIDToString(r.SessionAgeGroupCabinID),
 			RequiredCounselors:     int(r.RequiredCounselors),
+			Gender:                 r.Gender,
 		}
 	}
 	return cabins, nil
@@ -208,6 +209,7 @@ func loadCounselors(ctx context.Context, queries *db.Queries, sessionID, campID 
 			ID:       api.UUIDToString(r.CounselorID),
 			Name:     r.CounselorName,
 			IsJunior: r.JuniorCounselor,
+			Gender:   r.Gender,
 		}
 	}
 	return counselors, nil

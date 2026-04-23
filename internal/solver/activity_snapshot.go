@@ -61,12 +61,13 @@ func BuildActivitySnapshot(ctx context.Context, queries *db.Queries, campID, ses
 	unmetPrefs = filterMapByRoster(unmetPrefs, rosterSet)
 
 	return ActivitySnapshot{
-		SessionID:                sessionID,
-		Slots:                    slots,
-		Counselors:               counselors,
-		ActivityPreferences:      prefs,
-		UnmetActivityPreferences: unmetPrefs,
-		CertificationNames:       certNames,
+		SessionID:                    sessionID,
+		Slots:                        slots,
+		Counselors:                   counselors,
+		ActivityPreferences:          prefs,
+		UnmetActivityPreferences:     unmetPrefs,
+		CertificationNames:           certNames,
+		eligibleTimeSlotsByCounselor: computeEligibleTimeSlots(counselors, slots),
 	}, nil
 }
 

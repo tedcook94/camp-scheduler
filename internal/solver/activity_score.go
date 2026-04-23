@@ -133,20 +133,11 @@ func scoreMissingTimeSlots(snapshot ActivitySnapshot, assignment ActivityAssignm
 		}
 	}
 
-	// For each counselor, build the set of time slots where at least one
-	// eligible activity slot exists.
-	eligibleByTS := make(map[string]map[string]bool, len(snapshot.Counselors))
-	for _, c := range snapshot.Counselors {
-		for _, slot := range snapshot.Slots {
-			if !counselorHasCerts(c, slot) {
-				continue
-			}
-			if eligibleByTS[c.ID] == nil {
-				eligibleByTS[c.ID] = make(map[string]bool)
-			}
-			eligibleByTS[c.ID][slot.TimeSlotID] = true
-		}
-	}
+	// For each counselor, look up the set of time slots where at least
+	// one eligible activity slot exists. Cached on the snapshot so the
+	// search loop doesn't re-scan every (counselor × slot) pair on each
+	// scoring call.
+	eligibleByTS := snapshot.eligibleTimeSlots()
 
 	var components []ScoreComponent
 	for _, c := range snapshot.Counselors {

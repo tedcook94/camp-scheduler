@@ -387,18 +387,7 @@ func findMissingTimeSlotAssignments(snapshot ActivitySnapshot, assignment Activi
 		}
 	}
 
-	eligible := make(map[string]map[string]bool)
-	for _, c := range snapshot.Counselors {
-		for _, slot := range snapshot.Slots {
-			if !counselorHasCerts(c, slot) {
-				continue
-			}
-			if eligible[c.ID] == nil {
-				eligible[c.ID] = make(map[string]bool)
-			}
-			eligible[c.ID][slot.TimeSlotID] = true
-		}
-	}
+	eligible := snapshot.eligibleTimeSlots()
 
 	var unmet, ineligible []ActivityUnmetPreference
 	for _, c := range snapshot.Counselors {

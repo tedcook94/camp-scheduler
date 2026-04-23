@@ -10,7 +10,8 @@
 	import * as Dialog from "$lib/components/ui/dialog";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog";
 	import * as Select from "$lib/components/ui/select";
-	import type { AgeGroup, Cabin, Camp } from "$lib/api/types";
+	import { Badge } from "$lib/components/ui/badge";
+	import type { AgeGroup, Cabin, Camp, Gender } from "$lib/api/types";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import TrashIcon from "@lucide/svelte/icons/trash";
@@ -30,11 +31,11 @@
 	let loadError = $state(false);
 	let noAgeGroups = $derived(!loading && ageGroups.length === 0);
 
-	let sortKey = $state<"name" | "default_age_group_name">("name");
+	let sortKey = $state<"name" | "default_age_group_name" | "gender">("name");
 	let sortDirection = $state<SortDirection>("asc");
 	let sortedCabins = $derived(sortItems(cabins, sortKey, sortDirection));
 
-	function toggleSort(key: "name" | "default_age_group_name") {
+	function toggleSort(key: "name" | "default_age_group_name" | "gender") {
 		if (sortKey === key) {
 			sortDirection = sortDirection === "asc" ? "desc" : "asc";
 		} else {
@@ -50,11 +51,13 @@
 	let formAgeGroupId = $state("");
 	let formGroupSize = $state("");
 	let formRequiredCounselors = $state("");
+	let formGender = $state<Gender | "">("");
 	let submitting = $state(false);
 	let nameError = $state("");
 	let ageGroupError = $state("");
 	let groupSizeError = $state("");
 	let requiredCounselorsError = $state("");
+	let genderError = $state("");
 
 	let dialogTitle = $derived(editingCabin ? "Edit Cabin" : "Add Cabin");
 	let dialogDescription = $derived(
@@ -90,6 +93,7 @@
 		ageGroupError = "";
 		groupSizeError = "";
 		requiredCounselorsError = "";
+		genderError = "";
 	}
 
 	function openCreate() {
@@ -98,6 +102,7 @@
 		formAgeGroupId = "";
 		formGroupSize = "";
 		formRequiredCounselors = "";
+		formGender = "";
 		clearErrors();
 		dialogOpen = true;
 	}
@@ -108,6 +113,7 @@
 		formAgeGroupId = cabin.default_age_group_id;
 		formGroupSize = String(cabin.default_group_size);
 		formRequiredCounselors = String(cabin.default_required_counselors);
+		formGender = cabin.gender;
 		clearErrors();
 		dialogOpen = true;
 	}
@@ -136,6 +142,10 @@
 			requiredCounselorsError = requiredCounselors.error;
 			valid = false;
 		}
+		if (formGender !== "male" && formGender !== "female") {
+			genderError = "Gender is required.";
+			valid = false;
+		}
 		if (!valid || !groupSize.ok || !requiredCounselors.ok) return;
 
 		submitting = true;
@@ -147,6 +157,7 @@
 					default_age_group_id: formAgeGroupId,
 					default_group_size: groupSize.value,
 					default_required_counselors: requiredCounselors.value,
+					gender: formGender as Gender,
 				});
 				cabins = cabins.map((c) => (c.id === updated.id ? updated : c));
 				toast.success("Cabin updated");
@@ -156,6 +167,7 @@
 					default_age_group_id: formAgeGroupId,
 					default_group_size: groupSize.value,
 					default_required_counselors: requiredCounselors.value,
+					gender: formGender as Gender,
 				});
 				cabins = [...cabins, created];
 				toast.success("Cabin created");
@@ -232,6 +244,7 @@
 					<SortableTableHead label="Default Age Group" active={sortKey === "default_age_group_name"} direction={sortDirection} onclick={() => toggleSort("default_age_group_name")} />
 					<Table.TableHead>Default Group Size</Table.TableHead>
 					<Table.TableHead>Default Required Counselors</Table.TableHead>
+					<SortableTableHead label="Gender" active={sortKey === "gender"} direction={sortDirection} onclick={() => toggleSort("gender")} />
 					<Table.TableHead class="w-24">
 						<span class="sr-only">Actions</span>
 					</Table.TableHead>
@@ -244,6 +257,11 @@
 						<Table.TableCell>{cabin.default_age_group_name}</Table.TableCell>
 						<Table.TableCell>{cabin.default_group_size}</Table.TableCell>
 						<Table.TableCell>{cabin.default_required_counselors}</Table.TableCell>
+						<Table.TableCell>
+							<Badge variant={cabin.gender === "female" ? "secondary" : "outline"}>
+								{cabin.gender === "female" ? "Female" : "Male"}
+							</Badge>
+						</Table.TableCell>
 						<Table.TableCell>
 							<div class="flex justify-end gap-1">
 								<Button
@@ -345,6 +363,27 @@
 				/>
 				{#if requiredCounselorsError}
 					<p class="text-destructive text-sm">{requiredCounselorsError}</p>
+				{/if}
+			</div>
+			<div class="grid gap-2">
+				<Label for="cabin-gender">Gender</Label>
+				<Select.Select type="single" bind:value={formGender} disabled={submitting} onValueChange={() => (genderError = "")}>
+					<Select.SelectTrigger id="cabin-gender" class="w-full">
+						{#if formGender === "female"}
+							Female
+						{:else if formGender === "male"}
+							Male
+						{:else}
+							<span class="text-muted-foreground">Select gender</span>
+						{/if}
+					</Select.SelectTrigger>
+					<Select.SelectContent>
+						<Select.SelectItem value="female">Female</Select.SelectItem>
+						<Select.SelectItem value="male">Male</Select.SelectItem>
+					</Select.SelectContent>
+				</Select.Select>
+				{#if genderError}
+					<p class="text-destructive text-sm">{genderError}</p>
 				{/if}
 			</div>
 			<Dialog.DialogFooter>

@@ -240,6 +240,10 @@ func seedData(ctx context.Context, tx pgx.Tx, q *db.Queries, campID pgtype.UUID)
 		return err
 	}
 
+	if err := rosterCounselors(ctx, q, campID, counselors, s1, s2); err != nil {
+		return err
+	}
+
 	if err := linkCounselorCertifications(ctx, q, campID, counselors, certs); err != nil {
 		return err
 	}
@@ -826,6 +830,22 @@ func createCampers(ctx context.Context, q *db.Queries, campID pgtype.UUID, ageGr
 		m[name] = c
 	}
 	return m, nil
+}
+
+func rosterCounselors(ctx context.Context, q *db.Queries, campID pgtype.UUID, counselors map[string]db.Counselor, s1, s2 db.Session) error {
+	for name, c := range counselors {
+		for _, s := range []db.Session{s1, s2} {
+			_, err := q.AddSessionCounselor(ctx, db.AddSessionCounselorParams{
+				CampID:      campID,
+				SessionID:   s.ID,
+				CounselorID: c.ID,
+			})
+			if err != nil {
+				return fmt.Errorf("error rostering counselor %s on session %s: %w", name, s.SessionName, err)
+			}
+		}
+	}
+	return nil
 }
 
 func enrollCampers(ctx context.Context, q *db.Queries, campID pgtype.UUID, campers map[string]db.Camper, s1, s2 db.Session, cfg *sessionConfig) error {

@@ -151,7 +151,7 @@ viable configurations and understand trade-offs.
 - [x] Add dedicated camper enrollments endpoint to eliminate N+1 loading on camper detail page
 - [x] Filter counselor preference options to session-configured age groups and activities
 - [x] Filter camper preference options to session-enrolled campers
-- [ ] Enforce gender for cabins
+- [x] Enforce gender for cabins
 - [ ] Assign counselors and campers to cabin at once (respect max cabin size of campers + counselors)
 - [ ] Assign all counselors for cabins/activities
 - [ ] Reports

@@ -14,6 +14,6 @@ headers: []
 authentication: {}
 authenticationType: null
 body:
-  text: '{"name": "Cabin Name", "default_age_group_id": "${[ test-age-group-id ]}", "default_group_size": 8, "default_required_counselors": 1}'
+  text: '{"name": "Cabin Name", "default_age_group_id": "${[ test-age-group-id ]}", "default_group_size": 8, "default_required_counselors": 1, "gender": "female"}'
 bodyType: application/json
 sortPriority: 2.0

@@ -110,8 +110,9 @@ type Solution struct {
 }
 
 type Explanation struct {
-	Assignments      []AssignmentExplanation
-	UnmetPreferences []UnmetPreference
+	Assignments           []AssignmentExplanation
+	UnmetPreferences      []UnmetPreference
+	IneligiblePreferences []IneligiblePreference
 }
 
 type AssignmentExplanation struct {
@@ -132,6 +133,18 @@ type AssignmentReason struct {
 }
 
 type UnmetPreference struct {
+	CounselorID string
+	Constraint  string
+	Rank        int
+	Message     string
+}
+
+// IneligiblePreference describes a preference that cannot be satisfied for a
+// structural reason (e.g. target counselor is not on the session roster, or
+// would require sharing a gender-segregated cabin with a counselor of a
+// different gender). Distinct from UnmetPreference, which is a preference
+// that could have been satisfied but wasn't in the chosen solution.
+type IneligiblePreference struct {
 	CounselorID string
 	Constraint  string
 	Rank        int

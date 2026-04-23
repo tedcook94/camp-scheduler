@@ -58,8 +58,9 @@ type CamperSolution struct {
 }
 
 type CamperExplanation struct {
-	Assignments      []CamperAssignmentExplanation
-	UnmetPreferences []CamperUnmetPreference
+	Assignments           []CamperAssignmentExplanation
+	UnmetPreferences      []CamperUnmetPreference
+	IneligiblePreferences []CamperIneligiblePreference
 }
 
 type CamperAssignmentExplanation struct {
@@ -69,6 +70,19 @@ type CamperAssignmentExplanation struct {
 }
 
 type CamperUnmetPreference struct {
+	CamperID   string
+	Constraint string
+	Rank       int
+	Message    string
+}
+
+// CamperIneligiblePreference describes a friend preference that cannot be
+// satisfied for a structural reason (target not enrolled in this session,
+// or would require sharing a gender-segregated/age-grouped cabin with a
+// camper of a different gender or age group). Distinct from
+// CamperUnmetPreference, which is a preference that could have been
+// satisfied but wasn't in the chosen solution.
+type CamperIneligiblePreference struct {
 	CamperID   string
 	Constraint string
 	Rank       int

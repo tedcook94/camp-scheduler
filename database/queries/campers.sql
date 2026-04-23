@@ -1,24 +1,25 @@
 -- name: ListCampers :many
-SELECT id, camp_id, camper_name
+SELECT id, camp_id, camper_name, gender
 FROM campers
 WHERE camp_id = $1
 ORDER BY camper_name;
 
 -- name: GetCamper :one
-SELECT id, camp_id, camper_name
+SELECT id, camp_id, camper_name, gender
 FROM campers
 WHERE id = $1 AND camp_id = $2;
 
 -- name: CreateCamper :one
-INSERT INTO campers (camp_id, camper_name)
-VALUES ($1, $2)
-RETURNING id, camp_id, camper_name;
+INSERT INTO campers (camp_id, camper_name, gender)
+VALUES ($1, $2, $3)
+RETURNING id, camp_id, camper_name, gender;
 
 -- name: UpdateCamper :one
 UPDATE campers
-SET camper_name = $3
+SET camper_name = $3,
+    gender = $4
 WHERE id = $1 AND camp_id = $2
-RETURNING id, camp_id, camper_name;
+RETURNING id, camp_id, camper_name, gender;
 
 -- name: DeleteCamper :execrows
 DELETE FROM campers

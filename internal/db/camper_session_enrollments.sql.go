@@ -234,6 +234,7 @@ SELECT
     e.camper_id,
     e.session_age_group_id,
     c.camper_name,
+    c.gender,
     sag.session_id,
     sag.age_group_id
 FROM camper_session_enrollments e
@@ -254,6 +255,7 @@ type ListSessionEnrollmentsRow struct {
 	CamperID          pgtype.UUID
 	SessionAgeGroupID pgtype.UUID
 	CamperName        string
+	Gender            string
 	SessionID         pgtype.UUID
 	AgeGroupID        pgtype.UUID
 }
@@ -273,6 +275,7 @@ func (q *Queries) ListSessionEnrollments(ctx context.Context, arg ListSessionEnr
 			&i.CamperID,
 			&i.SessionAgeGroupID,
 			&i.CamperName,
+			&i.Gender,
 			&i.SessionID,
 			&i.AgeGroupID,
 		); err != nil {

@@ -2,6 +2,7 @@
 SELECT
     c.id,
     c.cabin_name,
+    c.gender,
     sag.age_group_id,
     ag.age_group_name,
     sagc.id AS session_age_group_cabin_id,
@@ -57,6 +58,7 @@ WHERE sagc.id = $1 AND sagc.camp_id = $2
 SELECT
     c.id,
     c.cabin_name,
+    c.gender,
     sag.age_group_id,
     sagc.id AS session_age_group_cabin_id,
     sagc.group_size,

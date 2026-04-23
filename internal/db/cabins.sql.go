@@ -14,13 +14,13 @@ import (
 const createCabin = `-- name: CreateCabin :one
 WITH inserted AS (
     INSERT INTO cabins (camp_id, default_age_group_id, cabin_name,
-                        default_group_size, default_required_counselors)
-    VALUES ($1, $2, $3, $4, $5)
+                        default_group_size, default_required_counselors, gender)
+    VALUES ($1, $2, $3, $4, $5, $6)
     RETURNING id, camp_id, default_age_group_id, cabin_name,
-              default_group_size, default_required_counselors
+              default_group_size, default_required_counselors, gender
 )
 SELECT i.id, i.camp_id, i.default_age_group_id, i.cabin_name,
-       i.default_group_size, i.default_required_counselors,
+       i.default_group_size, i.default_required_counselors, i.gender,
        ag.age_group_name AS default_age_group_name
 FROM inserted i
 JOIN age_groups ag ON ag.id = i.default_age_group_id
@@ -32,6 +32,7 @@ type CreateCabinParams struct {
 	CabinName                 string
 	DefaultGroupSize          int32
 	DefaultRequiredCounselors int32
+	Gender                    string
 }
 
 type CreateCabinRow struct {
@@ -41,6 +42,7 @@ type CreateCabinRow struct {
 	CabinName                 string
 	DefaultGroupSize          int32
 	DefaultRequiredCounselors int32
+	Gender                    string
 	DefaultAgeGroupName       string
 }
 
@@ -51,6 +53,7 @@ func (q *Queries) CreateCabin(ctx context.Context, arg CreateCabinParams) (Creat
 		arg.CabinName,
 		arg.DefaultGroupSize,
 		arg.DefaultRequiredCounselors,
+		arg.Gender,
 	)
 	var i CreateCabinRow
 	err := row.Scan(
@@ -60,6 +63,7 @@ func (q *Queries) CreateCabin(ctx context.Context, arg CreateCabinParams) (Creat
 		&i.CabinName,
 		&i.DefaultGroupSize,
 		&i.DefaultRequiredCounselors,
+		&i.Gender,
 		&i.DefaultAgeGroupName,
 	)
 	return i, err
@@ -85,7 +89,7 @@ func (q *Queries) DeleteCabin(ctx context.Context, arg DeleteCabinParams) (int64
 
 const getCabin = `-- name: GetCabin :one
 SELECT c.id, c.camp_id, c.default_age_group_id, c.cabin_name,
-       c.default_group_size, c.default_required_counselors,
+       c.default_group_size, c.default_required_counselors, c.gender,
        ag.age_group_name AS default_age_group_name
 FROM cabins c
 JOIN age_groups ag ON ag.id = c.default_age_group_id
@@ -104,6 +108,7 @@ type GetCabinRow struct {
 	CabinName                 string
 	DefaultGroupSize          int32
 	DefaultRequiredCounselors int32
+	Gender                    string
 	DefaultAgeGroupName       string
 }
 
@@ -117,6 +122,7 @@ func (q *Queries) GetCabin(ctx context.Context, arg GetCabinParams) (GetCabinRow
 		&i.CabinName,
 		&i.DefaultGroupSize,
 		&i.DefaultRequiredCounselors,
+		&i.Gender,
 		&i.DefaultAgeGroupName,
 	)
 	return i, err
@@ -124,7 +130,7 @@ func (q *Queries) GetCabin(ctx context.Context, arg GetCabinParams) (GetCabinRow
 
 const listCabins = `-- name: ListCabins :many
 SELECT c.id, c.camp_id, c.default_age_group_id, c.cabin_name,
-       c.default_group_size, c.default_required_counselors,
+       c.default_group_size, c.default_required_counselors, c.gender,
        ag.age_group_name AS default_age_group_name
 FROM cabins c
 JOIN age_groups ag ON ag.id = c.default_age_group_id
@@ -139,6 +145,7 @@ type ListCabinsRow struct {
 	CabinName                 string
 	DefaultGroupSize          int32
 	DefaultRequiredCounselors int32
+	Gender                    string
 	DefaultAgeGroupName       string
 }
 
@@ -158,6 +165,7 @@ func (q *Queries) ListCabins(ctx context.Context, campID pgtype.UUID) ([]ListCab
 			&i.CabinName,
 			&i.DefaultGroupSize,
 			&i.DefaultRequiredCounselors,
+			&i.Gender,
 			&i.DefaultAgeGroupName,
 		); err != nil {
 			return nil, err
@@ -176,13 +184,14 @@ WITH updated AS (
     SET default_age_group_id = $3,
         cabin_name = $4,
         default_group_size = $5,
-        default_required_counselors = $6
+        default_required_counselors = $6,
+        gender = $7
     WHERE cabins.id = $1 AND cabins.camp_id = $2
     RETURNING cabins.id, cabins.camp_id, cabins.default_age_group_id, cabins.cabin_name,
-              cabins.default_group_size, cabins.default_required_counselors
+              cabins.default_group_size, cabins.default_required_counselors, cabins.gender
 )
 SELECT u.id, u.camp_id, u.default_age_group_id, u.cabin_name,
-       u.default_group_size, u.default_required_counselors,
+       u.default_group_size, u.default_required_counselors, u.gender,
        ag.age_group_name AS default_age_group_name
 FROM updated u
 JOIN age_groups ag ON ag.id = u.default_age_group_id
@@ -195,6 +204,7 @@ type UpdateCabinParams struct {
 	CabinName                 string
 	DefaultGroupSize          int32
 	DefaultRequiredCounselors int32
+	Gender                    string
 }
 
 type UpdateCabinRow struct {
@@ -204,6 +214,7 @@ type UpdateCabinRow struct {
 	CabinName                 string
 	DefaultGroupSize          int32
 	DefaultRequiredCounselors int32
+	Gender                    string
 	DefaultAgeGroupName       string
 }
 
@@ -215,6 +226,7 @@ func (q *Queries) UpdateCabin(ctx context.Context, arg UpdateCabinParams) (Updat
 		arg.CabinName,
 		arg.DefaultGroupSize,
 		arg.DefaultRequiredCounselors,
+		arg.Gender,
 	)
 	var i UpdateCabinRow
 	err := row.Scan(
@@ -224,6 +236,7 @@ func (q *Queries) UpdateCabin(ctx context.Context, arg UpdateCabinParams) (Updat
 		&i.CabinName,
 		&i.DefaultGroupSize,
 		&i.DefaultRequiredCounselors,
+		&i.Gender,
 		&i.DefaultAgeGroupName,
 	)
 	return i, err

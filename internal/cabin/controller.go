@@ -33,6 +33,7 @@ type CreateCabinRequest struct {
 	DefaultAgeGroupID         string `json:"default_age_group_id" binding:"required"`
 	DefaultGroupSize          int32  `json:"default_group_size" binding:"required,min=1"`
 	DefaultRequiredCounselors int32  `json:"default_required_counselors" binding:"required,min=1"`
+	Gender                    string `json:"gender" binding:"required,oneof=male female"`
 }
 
 type UpdateCabinRequest struct {
@@ -40,6 +41,7 @@ type UpdateCabinRequest struct {
 	DefaultAgeGroupID         string `json:"default_age_group_id" binding:"required"`
 	DefaultGroupSize          int32  `json:"default_group_size" binding:"required,min=1"`
 	DefaultRequiredCounselors int32  `json:"default_required_counselors" binding:"required,min=1"`
+	Gender                    string `json:"gender" binding:"required,oneof=male female"`
 }
 
 type CabinResponse struct {
@@ -50,6 +52,7 @@ type CabinResponse struct {
 	Name                      string `json:"name"`
 	DefaultGroupSize          int32  `json:"default_group_size"`
 	DefaultRequiredCounselors int32  `json:"default_required_counselors"`
+	Gender                    string `json:"gender"`
 }
 
 func (ctrl *Controller) List(c *gin.Context) {
@@ -110,7 +113,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 
 	cabin, err := ctrl.svc.Create(c.Request.Context(), campID, req)
 	if err != nil {
-		if api.IsBadInput(err) {
+		if api.IsBadInput(err) || api.IsCheckViolation(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -141,7 +144,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "cabin not found"})
 			return
 		}
-		if api.IsBadInput(err) {
+		if api.IsBadInput(err) || api.IsCheckViolation(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

@@ -12,20 +12,26 @@ import (
 )
 
 const createCamper = `-- name: CreateCamper :one
-INSERT INTO campers (camp_id, camper_name)
-VALUES ($1, $2)
-RETURNING id, camp_id, camper_name
+INSERT INTO campers (camp_id, camper_name, gender)
+VALUES ($1, $2, $3)
+RETURNING id, camp_id, camper_name, gender
 `
 
 type CreateCamperParams struct {
 	CampID     pgtype.UUID
 	CamperName string
+	Gender     string
 }
 
 func (q *Queries) CreateCamper(ctx context.Context, arg CreateCamperParams) (Camper, error) {
-	row := q.db.QueryRow(ctx, createCamper, arg.CampID, arg.CamperName)
+	row := q.db.QueryRow(ctx, createCamper, arg.CampID, arg.CamperName, arg.Gender)
 	var i Camper
-	err := row.Scan(&i.ID, &i.CampID, &i.CamperName)
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.CamperName,
+		&i.Gender,
+	)
 	return i, err
 }
 
@@ -48,7 +54,7 @@ func (q *Queries) DeleteCamper(ctx context.Context, arg DeleteCamperParams) (int
 }
 
 const getCamper = `-- name: GetCamper :one
-SELECT id, camp_id, camper_name
+SELECT id, camp_id, camper_name, gender
 FROM campers
 WHERE id = $1 AND camp_id = $2
 `
@@ -61,12 +67,17 @@ type GetCamperParams struct {
 func (q *Queries) GetCamper(ctx context.Context, arg GetCamperParams) (Camper, error) {
 	row := q.db.QueryRow(ctx, getCamper, arg.ID, arg.CampID)
 	var i Camper
-	err := row.Scan(&i.ID, &i.CampID, &i.CamperName)
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.CamperName,
+		&i.Gender,
+	)
 	return i, err
 }
 
 const listCampers = `-- name: ListCampers :many
-SELECT id, camp_id, camper_name
+SELECT id, camp_id, camper_name, gender
 FROM campers
 WHERE camp_id = $1
 ORDER BY camper_name
@@ -81,7 +92,12 @@ func (q *Queries) ListCampers(ctx context.Context, campID pgtype.UUID) ([]Camper
 	var items []Camper
 	for rows.Next() {
 		var i Camper
-		if err := rows.Scan(&i.ID, &i.CampID, &i.CamperName); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.CamperName,
+			&i.Gender,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -94,20 +110,32 @@ func (q *Queries) ListCampers(ctx context.Context, campID pgtype.UUID) ([]Camper
 
 const updateCamper = `-- name: UpdateCamper :one
 UPDATE campers
-SET camper_name = $3
+SET camper_name = $3,
+    gender = $4
 WHERE id = $1 AND camp_id = $2
-RETURNING id, camp_id, camper_name
+RETURNING id, camp_id, camper_name, gender
 `
 
 type UpdateCamperParams struct {
 	ID         pgtype.UUID
 	CampID     pgtype.UUID
 	CamperName string
+	Gender     string
 }
 
 func (q *Queries) UpdateCamper(ctx context.Context, arg UpdateCamperParams) (Camper, error) {
-	row := q.db.QueryRow(ctx, updateCamper, arg.ID, arg.CampID, arg.CamperName)
+	row := q.db.QueryRow(ctx, updateCamper,
+		arg.ID,
+		arg.CampID,
+		arg.CamperName,
+		arg.Gender,
+	)
 	var i Camper
-	err := row.Scan(&i.ID, &i.CampID, &i.CamperName)
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.CamperName,
+		&i.Gender,
+	)
 	return i, err
 }

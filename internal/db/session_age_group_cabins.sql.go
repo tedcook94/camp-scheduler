@@ -176,6 +176,7 @@ const listSessionCabins = `-- name: ListSessionCabins :many
 SELECT
     c.id,
     c.cabin_name,
+    c.gender,
     sag.age_group_id,
     ag.age_group_name,
     sagc.id AS session_age_group_cabin_id,
@@ -196,6 +197,7 @@ type ListSessionCabinsParams struct {
 type ListSessionCabinsRow struct {
 	ID                     pgtype.UUID
 	CabinName              string
+	Gender                 string
 	AgeGroupID             pgtype.UUID
 	AgeGroupName           string
 	SessionAgeGroupCabinID pgtype.UUID
@@ -214,6 +216,7 @@ func (q *Queries) ListSessionCabins(ctx context.Context, arg ListSessionCabinsPa
 		if err := rows.Scan(
 			&i.ID,
 			&i.CabinName,
+			&i.Gender,
 			&i.AgeGroupID,
 			&i.AgeGroupName,
 			&i.SessionAgeGroupCabinID,
@@ -233,6 +236,7 @@ const listSessionCabinsWithCapacity = `-- name: ListSessionCabinsWithCapacity :m
 SELECT
     c.id,
     c.cabin_name,
+    c.gender,
     sag.age_group_id,
     sagc.id AS session_age_group_cabin_id,
     sagc.group_size,
@@ -252,6 +256,7 @@ type ListSessionCabinsWithCapacityParams struct {
 type ListSessionCabinsWithCapacityRow struct {
 	ID                     pgtype.UUID
 	CabinName              string
+	Gender                 string
 	AgeGroupID             pgtype.UUID
 	SessionAgeGroupCabinID pgtype.UUID
 	GroupSize              int32
@@ -270,6 +275,7 @@ func (q *Queries) ListSessionCabinsWithCapacity(ctx context.Context, arg ListSes
 		if err := rows.Scan(
 			&i.ID,
 			&i.CabinName,
+			&i.Gender,
 			&i.AgeGroupID,
 			&i.SessionAgeGroupCabinID,
 			&i.GroupSize,

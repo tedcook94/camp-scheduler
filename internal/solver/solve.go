@@ -241,10 +241,10 @@ func orderCounselors(snapshot SessionSnapshot) []Counselor {
 }
 
 // fillRemainingCounselors places any counselor not already in the assignment
-// into a gender-matching cabin with remaining capacity. Cabins are ordered
-// by counselor's age-group preference (best rank first), then by remaining
-// counselor-slot capacity (highest first) for round-robin balancing. The
-// fill pass refuses placements that would create a hard-constraint
+// into a gender-matching cabin with remaining capacity. For each counselor,
+// eligible cabins are considered greedily by age-group preference (best
+// rank first), then by remaining counselor-slot capacity (highest first).
+// The fill pass refuses placements that would create a hard-constraint
 // violation (specifically, dropping a junior into a cabin with campers
 // that has no senior present). A counselor with no eligible cabin is left
 // out — the unassigned-counselor scoring penalty will surface that.

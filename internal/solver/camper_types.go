@@ -4,6 +4,7 @@ type CamperCabin struct {
 	ID                     string
 	Name                   string
 	AgeGroupID             string
+	AgeGroupName           string
 	SessionAgeGroupCabinID string
 	Capacity               int
 	Gender                 string

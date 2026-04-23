@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
@@ -96,6 +97,37 @@ func validateCounselorCabin(snapshot solver.SessionSnapshot) string {
 
 	if len(snapshot.Counselors) < totalRequired {
 		return fmt.Sprintf("Not enough counselors (%d) to fill all cabin requirements (%d)", len(snapshot.Counselors), totalRequired)
+	}
+
+	// Per-gender feasibility: cabins are gender-segregated, so we need
+	// enough counselors and at least one senior of each gender to staff
+	// the cabins of that gender.
+	requiredByGender := map[string]int{}
+	cabinsByGender := map[string]int{}
+	for _, c := range snapshot.Cabins {
+		requiredByGender[c.Gender] += c.RequiredCounselors
+		if c.RequiredCounselors > 0 {
+			cabinsByGender[c.Gender]++
+		}
+	}
+	counselorsByGender := map[string]int{}
+	seniorsByGender := map[string]int{}
+	for _, c := range snapshot.Counselors {
+		counselorsByGender[c.Gender]++
+		if !c.IsJunior {
+			seniorsByGender[c.Gender]++
+		}
+	}
+	for gender, need := range requiredByGender {
+		if need == 0 {
+			continue
+		}
+		if counselorsByGender[gender] < need {
+			return fmt.Sprintf("Not enough %s counselors (%d) to fill %s cabin requirements (%d)", gender, counselorsByGender[gender], gender, need)
+		}
+		if seniorsByGender[gender] < cabinsByGender[gender] {
+			return fmt.Sprintf("Not enough senior %s counselors (%d) to seat one in each of the %d staffed %s cabin(s)", gender, seniorsByGender[gender], cabinsByGender[gender], gender)
+		}
 	}
 
 	return ""
@@ -196,6 +228,40 @@ func validateCamperCabin(snapshot solver.CamperCabinSnapshot) string {
 	}
 	if len(snapshot.Cabins) == 0 {
 		return "No cabins configured for this session"
+	}
+
+	// Per-(age group, gender) capacity feasibility check: every camper must
+	// have at least one cabin of their age group and gender with capacity.
+	type key struct{ ageGroup, gender string }
+	capacityByKey := map[key]int{}
+	ageGroupNames := map[string]string{}
+	for _, c := range snapshot.Cabins {
+		capacityByKey[key{c.AgeGroupID, c.Gender}] += c.Capacity
+		ageGroupNames[c.AgeGroupID] = c.AgeGroupName
+	}
+	demandByKey := map[key]int{}
+	for _, c := range snapshot.Campers {
+		demandByKey[key{c.AgeGroupID, c.Gender}]++
+	}
+	keys := make([]key, 0, len(demandByKey))
+	for k := range demandByKey {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].ageGroup != keys[j].ageGroup {
+			return keys[i].ageGroup < keys[j].ageGroup
+		}
+		return keys[i].gender < keys[j].gender
+	})
+	for _, k := range keys {
+		demand := demandByKey[k]
+		if capacityByKey[k] < demand {
+			ageGroup := ageGroupNames[k.ageGroup]
+			if ageGroup == "" {
+				ageGroup = k.ageGroup
+			}
+			return fmt.Sprintf("Not enough %s cabin capacity (%d) for %d %s camper(s) in age group %q", k.gender, capacityByKey[k], demand, k.gender, ageGroup)
+		}
 	}
 
 	return ""

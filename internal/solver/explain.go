@@ -36,6 +36,7 @@ func Explain(snapshot SessionSnapshot, solution Solution) Explanation {
 	unmet = append(unmet, findUnmetAgeGroupPreferences(snapshot, counselorCabin, cabinsByID, ageGroupNames)...)
 	unmet = append(unmet, findUnmetReturningAgeGroup(snapshot, counselorCabin, cabinsByID, ageGroupNames)...)
 	unmet = append(unmet, findUnmetReturningCabin(snapshot, counselorCabin, cabinsByID)...)
+	unmet = append(unmet, findUnassignedCabinCounselors(snapshot, counselorCabin)...)
 
 	rosterSet := buildRosterSet(snapshot.Counselors)
 	unmetCo, ineligibleCo := findUnmetCocounselorPreferences(snapshot, counselorCabin, counselorsByID, rosterSet)
@@ -266,4 +267,27 @@ func findUnmetCocounselorPreferences(snapshot SessionSnapshot, counselorCabin ma
 		}
 	}
 	return unmet, ineligible
+}
+
+// findUnassignedCabinCounselors reports every counselor on the session
+// roster who was not placed in any cabin in the chosen solution. The
+// scoring penalty applied during search ranks fuller solutions higher; this
+// surfaces the gap to the user when capacity (or gender mix) leaves a
+// counselor with no viable cabin.
+func findUnassignedCabinCounselors(snapshot SessionSnapshot, counselorCabin map[string]string) []UnmetPreference {
+	var unmet []UnmetPreference
+	for _, c := range snapshot.Counselors {
+		if _, ok := counselorCabin[c.ID]; ok {
+			continue
+		}
+		unmet = append(unmet, UnmetPreference{
+			CounselorID: c.ID,
+			Constraint:  "unassigned_counselor",
+			Message: fmt.Sprintf(
+				"counselor %q not assigned to any cabin",
+				c.Name,
+			),
+		})
+	}
+	return unmet
 }

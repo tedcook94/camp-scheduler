@@ -60,22 +60,24 @@ type Violation struct {
 }
 
 type Weights struct {
-	ReturningAgeGroup     float64
-	ReturningCabin        float64
-	CocounselorPreference float64
-	AgeGroupPreference    float64
-	MultipleSeniors       float64
-	RepeatedUnmetBoost    float64
+	ReturningAgeGroup          float64
+	ReturningCabin             float64
+	CocounselorPreference      float64
+	AgeGroupPreference         float64
+	MultipleSeniors            float64
+	RepeatedUnmetBoost         float64
+	UnassignedCounselorPenalty float64
 }
 
 func DefaultWeights() Weights {
 	return Weights{
-		ReturningAgeGroup:     10.0,
-		ReturningCabin:        5.0,
-		CocounselorPreference: 5.0,
-		AgeGroupPreference:    5.0,
-		MultipleSeniors:       2.0,
-		RepeatedUnmetBoost:    1.5,
+		ReturningAgeGroup:          10.0,
+		ReturningCabin:             5.0,
+		CocounselorPreference:      5.0,
+		AgeGroupPreference:         5.0,
+		MultipleSeniors:            2.0,
+		RepeatedUnmetBoost:         1.5,
+		UnassignedCounselorPenalty: 50.0,
 	}
 }
 

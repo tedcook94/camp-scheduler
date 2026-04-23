@@ -14,6 +14,7 @@ func ScoreSoftConstraints(snapshot SessionSnapshot, assignment Assignment, weigh
 		scoreCocounselorPreference,
 		scoreAgeGroupPreference,
 		scoreMultipleSeniors,
+		scoreUnassignedCounselors,
 	}
 
 	for _, scorer := range scorers {
@@ -259,4 +260,39 @@ func effectiveBoost(boost float64) float64 {
 		return 1.0
 	}
 	return boost
+}
+
+// scoreUnassignedCounselors applies a negative score for every counselor on
+// the session roster that the assignment does not place in any cabin. The
+// penalty pushes solutions that place everyone above those that don't,
+// without forbidding partial assignments outright (capacity may genuinely
+// be too tight to fit the entire roster).
+func scoreUnassignedCounselors(snapshot SessionSnapshot, assignment Assignment, weights Weights) []ScoreComponent {
+	if weights.UnassignedCounselorPenalty == 0 {
+		return nil
+	}
+
+	placed := make(map[string]bool)
+	for _, counselorIDs := range assignment.CabinCounselors {
+		for _, cID := range counselorIDs {
+			placed[cID] = true
+		}
+	}
+
+	var components []ScoreComponent
+	for _, counselor := range snapshot.Counselors {
+		if placed[counselor.ID] {
+			continue
+		}
+		components = append(components, ScoreComponent{
+			Constraint:  "unassigned_counselor",
+			Score:       -weights.UnassignedCounselorPenalty,
+			CounselorID: counselor.ID,
+			Message: fmt.Sprintf(
+				"counselor %q not assigned to any cabin",
+				counselor.Name,
+			),
+		})
+	}
+	return components
 }

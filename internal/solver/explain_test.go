@@ -415,4 +415,37 @@ func TestExplain(t *testing.T) {
 			t.Errorf("unexpected message: %q", ip.Message)
 		}
 	})
+
+	t.Run("unassigned counselor surfaced as unmet preference", func(t *testing.T) {
+		snapshot := SessionSnapshot{
+			Cabins: []Cabin{
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 1, Gender: "male"},
+			},
+			Counselors: []Counselor{
+				{ID: "sr1", Name: "Counselor 1", IsJunior: false, Gender: "male"},
+				{ID: "sr2", Name: "Counselor 2", IsJunior: false, Gender: "male"},
+			},
+		}
+
+		assignment := Assignment{
+			CabinCounselors: map[string][]string{
+				"c1": {"sr1"},
+			},
+		}
+		score := ScoreSoftConstraints(snapshot, assignment, DefaultWeights())
+		explanation := Explain(snapshot, Solution{Assignment: assignment, Score: score})
+
+		var found bool
+		for _, u := range explanation.UnmetPreferences {
+			if u.Constraint == "unassigned_counselor" && u.CounselorID == "sr2" {
+				found = true
+				if !strings.Contains(u.Message, "not assigned to any cabin") {
+					t.Errorf("unexpected message: %q", u.Message)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("expected unassigned_counselor entry for sr2, got %+v", explanation.UnmetPreferences)
+		}
+	})
 }

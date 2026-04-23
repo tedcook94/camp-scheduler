@@ -120,10 +120,10 @@ func TestSolve(t *testing.T) {
 		Solve(snapshot, config)
 	})
 
-	t.Run("extra counselors can be left unassigned", func(t *testing.T) {
+	t.Run("all counselors placed when capacity allows", func(t *testing.T) {
 		snapshot := SessionSnapshot{
 			Cabins: []Cabin{
-				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 10},
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 10, HasCampers: true},
 			},
 			Counselors: []Counselor{
 				{ID: "sr1", Name: "Counselor 1", IsJunior: false},
@@ -142,6 +142,215 @@ func TestSolve(t *testing.T) {
 			if len(violations) > 0 {
 				t.Errorf("solution has hard constraint violations: %v", violations)
 			}
+
+			placed := make(map[string]bool)
+			for _, ids := range sol.Assignment.CabinCounselors {
+				for _, id := range ids {
+					placed[id] = true
+				}
+			}
+			for _, c := range snapshot.Counselors {
+				if !placed[c.ID] {
+					t.Errorf("expected counselor %q to be placed; got %v", c.ID, sol.Assignment.CabinCounselors)
+				}
+			}
+		}
+	})
+
+	t.Run("over-subscribed roster: leftovers penalized but solution still returned", func(t *testing.T) {
+		snapshot := SessionSnapshot{
+			Cabins: []Cabin{
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 2, Gender: "male", HasCampers: true},
+			},
+			Counselors: []Counselor{
+				{ID: "sr1", Name: "Counselor 1", IsJunior: false, Gender: "male"},
+				{ID: "sr2", Name: "Counselor 2", IsJunior: false, Gender: "male"},
+				{ID: "sr3", Name: "Counselor 3", IsJunior: false, Gender: "male"},
+			},
+		}
+
+		solutions := Solve(snapshot, DefaultSolverConfig())
+		if len(solutions) == 0 {
+			t.Fatal("expected at least one solution")
+		}
+
+		best := solutions[0]
+		// Capacity 2 with 3 counselors leaves exactly one unplaced.
+		placed := 0
+		for _, ids := range best.Assignment.CabinCounselors {
+			placed += len(ids)
+		}
+		if placed != 2 {
+			t.Errorf("expected 2 counselors placed (capacity), got %d", placed)
+		}
+
+		penalty := DefaultWeights().UnassignedCounselorPenalty
+		if best.Score.Total >= 0 {
+			t.Errorf("expected negative total score from unassigned counselor, got %v", best.Score.Total)
+		}
+
+		var penaltyComponents int
+		for _, comp := range best.Score.Breakdown {
+			if comp.Constraint == "unassigned_counselor" {
+				penaltyComponents++
+				if comp.Score != -penalty {
+					t.Errorf("expected penalty score %v, got %v", -penalty, comp.Score)
+				}
+			}
+		}
+		if penaltyComponents != 1 {
+			t.Errorf("expected 1 unassigned_counselor breakdown entry, got %d", penaltyComponents)
+		}
+	})
+
+	t.Run("junior leftover allowed in cabin without campers", func(t *testing.T) {
+		// Two cabins: one with campers (needs senior + min), one without
+		// campers (relaxed). One senior fills the campered cabin; the
+		// junior leftover gets placed in the empty no-campers cabin
+		// without a senior — and that's valid.
+		snapshot := SessionSnapshot{
+			Cabins: []Cabin{
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 2, Gender: "male", HasCampers: true},
+				{ID: "c2", Name: "Oak", AgeGroupID: "ag2", RequiredCounselors: 0, Capacity: 2, Gender: "male", HasCampers: false},
+			},
+			Counselors: []Counselor{
+				{ID: "sr1", Name: "Senior", IsJunior: false, Gender: "male"},
+				{ID: "jr1", Name: "Junior", IsJunior: true, Gender: "male"},
+			},
+		}
+
+		solutions := Solve(snapshot, DefaultSolverConfig())
+		if len(solutions) == 0 {
+			t.Fatal("expected at least one solution")
+		}
+
+		// At least one solution should place both counselors.
+		fullPlacement := false
+		for _, sol := range solutions {
+			placed := 0
+			for _, ids := range sol.Assignment.CabinCounselors {
+				placed += len(ids)
+			}
+			if placed == 2 {
+				fullPlacement = true
+				violations := CheckHardConstraints(snapshot, sol.Assignment)
+				if len(violations) > 0 {
+					t.Errorf("full-placement solution has violations: %v", violations)
+				}
+			}
+		}
+		if !fullPlacement {
+			t.Errorf("expected at least one solution placing both counselors, got %v", solutions)
+		}
+	})
+
+	t.Run("junior leftover stays unplaced when only campered cabin available", func(t *testing.T) {
+		// Single campered cabin already filled with a senior to capacity;
+		// the junior leftover cannot be placed (no other cabin) and
+		// receives the unassigned-counselor penalty.
+		snapshot := SessionSnapshot{
+			Cabins: []Cabin{
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 1, Gender: "male", HasCampers: true},
+			},
+			Counselors: []Counselor{
+				{ID: "sr1", Name: "Senior", IsJunior: false, Gender: "male"},
+				{ID: "jr1", Name: "Junior", IsJunior: true, Gender: "male"},
+			},
+		}
+
+		solutions := Solve(snapshot, DefaultSolverConfig())
+		if len(solutions) == 0 {
+			t.Fatal("expected at least one solution")
+		}
+
+		best := solutions[0]
+		violations := CheckHardConstraints(snapshot, best.Assignment)
+		if len(violations) > 0 {
+			t.Errorf("best solution has violations: %v", violations)
+		}
+
+		var penaltyHits int
+		for _, comp := range best.Score.Breakdown {
+			if comp.Constraint == "unassigned_counselor" && comp.CounselorID == "jr1" {
+				penaltyHits++
+			}
+		}
+		if penaltyHits != 1 {
+			t.Errorf("expected junior to be flagged as unassigned, got %d hits", penaltyHits)
+		}
+	})
+
+	t.Run("junior leftover not dropped into campered cabin without senior", func(t *testing.T) {
+		// Single campered cabin with no minimum and no existing senior.
+		// The fill pass must NOT place the junior here (would create a
+		// senior-rule violation). Junior should stay unassigned.
+		snapshot := SessionSnapshot{
+			Cabins: []Cabin{
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 0, Capacity: 2, Gender: "male", HasCampers: true},
+			},
+			Counselors: []Counselor{
+				{ID: "jr1", Name: "Junior", IsJunior: true, Gender: "male"},
+			},
+		}
+
+		solutions := Solve(snapshot, DefaultSolverConfig())
+		if len(solutions) == 0 {
+			t.Fatal("expected at least one solution")
+		}
+
+		for _, sol := range solutions {
+			violations := CheckHardConstraints(snapshot, sol.Assignment)
+			if len(violations) > 0 {
+				t.Errorf("solution has hard constraint violations: %v", violations)
+			}
+			if len(sol.Assignment.CabinCounselors["c1"]) != 0 {
+				t.Errorf("expected junior to be left unassigned, got %v", sol.Assignment.CabinCounselors)
+			}
+		}
+
+		// Penalty must fire for the unassigned junior.
+		var penaltyHits int
+		for _, comp := range solutions[0].Score.Breakdown {
+			if comp.Constraint == "unassigned_counselor" && comp.CounselorID == "jr1" {
+				penaltyHits++
+			}
+		}
+		if penaltyHits != 1 {
+			t.Errorf("expected junior to be flagged as unassigned, got %d hits", penaltyHits)
+		}
+	})
+
+	t.Run("junior leftover joins campered cabin once a senior is there", func(t *testing.T) {
+		// Single campered cabin (cap 2, req 1) is the only option for
+		// both counselors. Senior placed by search; junior fill pass
+		// must accept the cabin since a senior is now present.
+		snapshot := SessionSnapshot{
+			Cabins: []Cabin{
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 2, Gender: "male", HasCampers: true},
+			},
+			Counselors: []Counselor{
+				{ID: "sr1", Name: "Senior", IsJunior: false, Gender: "male"},
+				{ID: "jr1", Name: "Junior", IsJunior: true, Gender: "male"},
+			},
+		}
+
+		solutions := Solve(snapshot, DefaultSolverConfig())
+		if len(solutions) == 0 {
+			t.Fatal("expected at least one solution")
+		}
+
+		fullPlacement := false
+		for _, sol := range solutions {
+			violations := CheckHardConstraints(snapshot, sol.Assignment)
+			if len(violations) > 0 {
+				t.Errorf("solution has hard constraint violations: %v", violations)
+			}
+			if len(sol.Assignment.CabinCounselors["c1"]) == 2 {
+				fullPlacement = true
+			}
+		}
+		if !fullPlacement {
+			t.Errorf("expected at least one solution placing both counselors in c1, got %v", solutions)
 		}
 	})
 

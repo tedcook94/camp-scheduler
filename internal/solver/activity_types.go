@@ -32,14 +32,16 @@ type ActivityAssignment struct {
 }
 
 type ActivityWeights struct {
-	ActivityPreference float64
-	RepeatedUnmetBoost float64
+	ActivityPreference     float64
+	RepeatedUnmetBoost     float64
+	MissingTimeSlotPenalty float64
 }
 
 func DefaultActivityWeights() ActivityWeights {
 	return ActivityWeights{
-		ActivityPreference: 10.0,
-		RepeatedUnmetBoost: 1.5,
+		ActivityPreference:     10.0,
+		RepeatedUnmetBoost:     1.5,
+		MissingTimeSlotPenalty: 10.0,
 	}
 }
 

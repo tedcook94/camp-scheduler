@@ -86,10 +86,11 @@ func TestExplainActivityIneligibility(t *testing.T) {
 
 		exp := ExplainActivity(snapshot, solution)
 
-		if len(exp.IneligiblePreferences) != 1 {
-			t.Fatalf("expected 1 ineligible, got %d: %v", len(exp.IneligiblePreferences), exp.IneligiblePreferences)
+		ineligiblePref := filterByConstraint(exp.IneligiblePreferences, "activity_preference_ineligible")
+		if len(ineligiblePref) != 1 {
+			t.Fatalf("expected 1 ineligible, got %d: %v", len(ineligiblePref), ineligiblePref)
 		}
-		ip := exp.IneligiblePreferences[0]
+		ip := ineligiblePref[0]
 		if ip.Constraint != "activity_preference_ineligible" {
 			t.Errorf("expected constraint activity_preference_ineligible, got %q", ip.Constraint)
 		}
@@ -134,10 +135,11 @@ func TestExplainActivityIneligibility(t *testing.T) {
 
 		exp := ExplainActivity(snapshot, solution)
 
-		if len(exp.IneligiblePreferences) != 1 {
-			t.Fatalf("expected 1 ineligible, got %d: %v", len(exp.IneligiblePreferences), exp.IneligiblePreferences)
+		ineligiblePref := filterByConstraint(exp.IneligiblePreferences, "activity_preference_ineligible")
+		if len(ineligiblePref) != 1 {
+			t.Fatalf("expected 1 ineligible, got %d: %v", len(ineligiblePref), ineligiblePref)
 		}
-		msg := exp.IneligiblePreferences[0].Message
+		msg := ineligiblePref[0].Message
 		if !strings.Contains(msg, "Lifeguard") || !strings.Contains(msg, "First Aid") {
 			t.Errorf("expected message to list both certs, got %q", msg)
 		}
@@ -178,8 +180,9 @@ func TestExplainActivityIneligibility(t *testing.T) {
 
 		exp := ExplainActivity(snapshot, solution)
 
-		if len(exp.IneligiblePreferences) != 0 {
-			t.Errorf("expected 0 ineligible (eligible via easy slot), got %v", exp.IneligiblePreferences)
+		ineligiblePref := filterByConstraint(exp.IneligiblePreferences, "activity_preference_ineligible")
+		if len(ineligiblePref) != 0 {
+			t.Errorf("expected 0 activity_preference_ineligible (eligible via easy slot), got %v", ineligiblePref)
 		}
 	})
 
@@ -204,10 +207,11 @@ func TestExplainActivityIneligibility(t *testing.T) {
 		exp := ExplainActivity(snapshot, solution)
 
 		// Ineligible bucket: not all-or-nothing, so individual row.
-		if len(exp.IneligiblePreferences) != 1 {
-			t.Fatalf("expected 1 ineligible row, got %d: %v", len(exp.IneligiblePreferences), exp.IneligiblePreferences)
+		ineligiblePref := filterByConstraint(exp.IneligiblePreferences, "activity_preference_ineligible")
+		if len(ineligiblePref) != 1 {
+			t.Fatalf("expected 1 ineligible row, got %d: %v", len(ineligiblePref), ineligiblePref)
 		}
-		ip := exp.IneligiblePreferences[0]
+		ip := ineligiblePref[0]
 		want := "cannot be assigned to preferred activity Canoeing (rank 1) — missing required certification Lifeguard"
 		if ip.Message != want {
 			t.Errorf("ineligible message:\n got  %q\n want %q", ip.Message, want)
@@ -248,11 +252,12 @@ func TestExplainActivityIneligibility(t *testing.T) {
 
 		exp := ExplainActivity(snapshot, solution)
 
-		if len(exp.IneligiblePreferences) != 1 {
+		ineligiblePref := filterByConstraint(exp.IneligiblePreferences, "activity_preference_ineligible")
+		if len(ineligiblePref) != 1 {
 			t.Fatalf("expected single aggregated ineligible row, got %d: %v",
-				len(exp.IneligiblePreferences), exp.IneligiblePreferences)
+				len(ineligiblePref), ineligiblePref)
 		}
-		msg := exp.IneligiblePreferences[0].Message
+		msg := ineligiblePref[0].Message
 		if !strings.HasPrefix(msg, "cannot be assigned to any preferred activity") {
 			t.Errorf("expected aggregated form, got %q", msg)
 		}
@@ -284,10 +289,11 @@ func TestExplainActivityIneligibility(t *testing.T) {
 
 		exp := ExplainActivity(snapshot, solution)
 
-		if len(exp.IneligiblePreferences) != 1 {
-			t.Fatalf("expected 1 ineligible row, got %d: %v", len(exp.IneligiblePreferences), exp.IneligiblePreferences)
+		ineligiblePref := filterByConstraint(exp.IneligiblePreferences, "activity_preference_ineligible")
+		if len(ineligiblePref) != 1 {
+			t.Fatalf("expected 1 ineligible row, got %d: %v", len(ineligiblePref), ineligiblePref)
 		}
-		ip := exp.IneligiblePreferences[0]
+		ip := ineligiblePref[0]
 		if ip.Constraint != "activity_preference_ineligible" {
 			t.Errorf("expected constraint activity_preference_ineligible, got %q", ip.Constraint)
 		}
@@ -299,6 +305,205 @@ func TestExplainActivityIneligibility(t *testing.T) {
 		// Regression guard: must not produce the empty-cert text.
 		if strings.Contains(ip.Message, "missing required certification") {
 			t.Errorf("did not expect missing-cert text for no-slots case, got %q", ip.Message)
+		}
+	})
+}
+
+func filterByConstraint(prefs []ActivityUnmetPreference, constraint string) []ActivityUnmetPreference {
+	var out []ActivityUnmetPreference
+	for _, p := range prefs {
+		if p.Constraint == constraint {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// TestFindMissingTimeSlotAssignments covers the per-time-slot reporting
+// that distinguishes capacity-driven gaps (actionable) from structural
+// ineligibility (counselor lacks certifications for any activity at that
+// time, or is wholly uncertified for everything in the session).
+func TestFindMissingTimeSlotAssignments(t *testing.T) {
+	morningArts := ActivitySlot{
+		ID: "slot-arts-morning", ActivityID: "act-arts", ActivityName: "Arts",
+		TimeSlotID: "ts-morning", TimeSlotName: "Morning",
+		RequiredCounselors: 1, Capacity: 1,
+	}
+	afternoonArts := ActivitySlot{
+		ID: "slot-arts-afternoon", ActivityID: "act-arts", ActivityName: "Arts",
+		TimeSlotID: "ts-afternoon", TimeSlotName: "Afternoon",
+		RequiredCounselors: 1, Capacity: 1,
+	}
+
+	t.Run("counselor missing from time slot where eligible-but-full", func(t *testing.T) {
+		snapshot := ActivitySnapshot{
+			Slots: []ActivitySlot{morningArts, afternoonArts},
+			Counselors: []ActivityCounselor{
+				{ID: "c1", Name: "Anna", Certifications: map[string]bool{}},
+				{ID: "c2", Name: "Beth", Certifications: map[string]bool{}},
+			},
+		}
+		// Anna takes both slots; Beth is squeezed out of both.
+		solution := ActivitySolution{
+			Assignment: ActivityAssignment{SlotCounselors: map[string][]string{
+				"slot-arts-morning":   {"c1"},
+				"slot-arts-afternoon": {"c1"},
+			}},
+		}
+
+		exp := ExplainActivity(snapshot, solution)
+
+		gaps := filterByConstraint(exp.UnmetPreferences, "unassigned_time_slot")
+		if len(gaps) != 2 {
+			t.Fatalf("expected 2 unassigned_time_slot entries for Beth, got %d: %v", len(gaps), gaps)
+		}
+		for _, g := range gaps {
+			if g.CounselorID != "c2" {
+				t.Errorf("expected entry for c2, got %q", g.CounselorID)
+			}
+			if !strings.Contains(g.Message, "eligible activities full") {
+				t.Errorf("expected message to mention capacity, got %q", g.Message)
+			}
+		}
+	})
+
+	t.Run("counselor with no certifications for scheduled activities", func(t *testing.T) {
+		certedSlot := ActivitySlot{
+			ID: "slot-canoe", ActivityID: "act-canoe", ActivityName: "Canoeing",
+			TimeSlotID: "ts-morning", TimeSlotName: "Morning",
+			RequiredCounselors: 1, Capacity: 2,
+			RequiredCertifications: []string{"cert-lifeguard"},
+		}
+		snapshot := ActivitySnapshot{
+			Slots: []ActivitySlot{certedSlot},
+			Counselors: []ActivityCounselor{
+				{ID: "c1", Name: "Carl", Certifications: map[string]bool{}},
+			},
+			CertificationNames: map[string]string{"cert-lifeguard": "Lifeguard"},
+		}
+		solution := ActivitySolution{
+			Assignment: ActivityAssignment{SlotCounselors: map[string][]string{}},
+		}
+
+		exp := ExplainActivity(snapshot, solution)
+
+		rosterIneligible := filterByConstraint(exp.IneligiblePreferences, "unassigned_counselor_ineligible")
+		if len(rosterIneligible) != 1 {
+			t.Fatalf("expected one roster-wide ineligible entry, got %d: %v", len(rosterIneligible), rosterIneligible)
+		}
+		if !strings.Contains(rosterIneligible[0].Message, "no matching certifications") {
+			t.Errorf("expected 'no matching certifications' message, got %q", rosterIneligible[0].Message)
+		}
+		// Must not also emit per-time-slot rows for a wholly-ineligible counselor.
+		perSlotIneligible := filterByConstraint(exp.IneligiblePreferences, "unassigned_time_slot_ineligible")
+		if len(perSlotIneligible) != 0 {
+			t.Errorf("expected no per-slot ineligibles when counselor has no eligible slot anywhere, got %v", perSlotIneligible)
+		}
+	})
+
+	t.Run("counselor eligible in some time slots but not others", func(t *testing.T) {
+		morningCanoe := ActivitySlot{
+			ID: "slot-canoe-morning", ActivityID: "act-canoe", ActivityName: "Canoeing",
+			TimeSlotID: "ts-morning", TimeSlotName: "Morning",
+			RequiredCounselors: 1, Capacity: 1,
+			RequiredCertifications: []string{"cert-lifeguard"},
+		}
+		// Counselor is eligible afternoon (no certs) but not morning (needs Lifeguard).
+		snapshot := ActivitySnapshot{
+			Slots: []ActivitySlot{morningCanoe, afternoonArts},
+			Counselors: []ActivityCounselor{
+				{ID: "c1", Name: "Dana", Certifications: map[string]bool{}},
+			},
+			CertificationNames: map[string]string{"cert-lifeguard": "Lifeguard"},
+		}
+		// Place Dana in afternoon so she's not flagged for that slot.
+		solution := ActivitySolution{
+			Assignment: ActivityAssignment{SlotCounselors: map[string][]string{
+				"slot-arts-afternoon": {"c1"},
+			}},
+		}
+
+		exp := ExplainActivity(snapshot, solution)
+
+		perSlotIneligible := filterByConstraint(exp.IneligiblePreferences, "unassigned_time_slot_ineligible")
+		if len(perSlotIneligible) != 1 {
+			t.Fatalf("expected 1 per-slot ineligible (morning), got %d: %v", len(perSlotIneligible), perSlotIneligible)
+		}
+		if !strings.Contains(perSlotIneligible[0].Message, "Morning") {
+			t.Errorf("expected message to mention Morning, got %q", perSlotIneligible[0].Message)
+		}
+		// No capacity gap should fire (afternoon was filled, morning is structural).
+		gaps := filterByConstraint(exp.UnmetPreferences, "unassigned_time_slot")
+		if len(gaps) != 0 {
+			t.Errorf("expected no capacity gaps, got %v", gaps)
+		}
+	})
+}
+
+func TestScoreMissingTimeSlots(t *testing.T) {
+	morningArts := ActivitySlot{
+		ID: "slot-arts-morning", ActivityID: "act-arts", ActivityName: "Arts",
+		TimeSlotID: "ts-morning", TimeSlotName: "Morning",
+		RequiredCounselors: 1, Capacity: 1,
+	}
+	afternoonArts := ActivitySlot{
+		ID: "slot-arts-afternoon", ActivityID: "act-arts", ActivityName: "Arts",
+		TimeSlotID: "ts-afternoon", TimeSlotName: "Afternoon",
+		RequiredCounselors: 1, Capacity: 1,
+	}
+
+	t.Run("penalty applied per missing time slot only when eligible", func(t *testing.T) {
+		certedMorning := ActivitySlot{
+			ID: "slot-canoe-morning", ActivityID: "act-canoe", ActivityName: "Canoeing",
+			TimeSlotID: "ts-morning", TimeSlotName: "Morning",
+			RequiredCounselors: 1, Capacity: 1,
+			RequiredCertifications: []string{"cert-lifeguard"},
+		}
+		snapshot := ActivitySnapshot{
+			Slots: []ActivitySlot{morningArts, afternoonArts, certedMorning},
+			Counselors: []ActivityCounselor{
+				{ID: "c1", Name: "Anna", Certifications: map[string]bool{}},
+				{ID: "c2", Name: "Beth", Certifications: map[string]bool{}},
+			},
+		}
+		// Anna fills both Arts slots; Beth has no assignment but is
+		// eligible for both Arts time slots (capacity-blocked) and
+		// ineligible for the certed morning slot (so no extra penalty).
+		assignment := ActivityAssignment{SlotCounselors: map[string][]string{
+			"slot-arts-morning":   {"c1"},
+			"slot-arts-afternoon": {"c1"},
+		}}
+
+		components := scoreMissingTimeSlots(snapshot, assignment, DefaultActivityWeights())
+
+		var bethPenalties int
+		for _, c := range components {
+			if c.CounselorID == "c2" && c.Constraint == "missing_time_slot" {
+				bethPenalties++
+				if c.Score != -DefaultActivityWeights().MissingTimeSlotPenalty {
+					t.Errorf("expected score %v, got %v", -DefaultActivityWeights().MissingTimeSlotPenalty, c.Score)
+				}
+			}
+		}
+		if bethPenalties != 2 {
+			t.Errorf("expected 2 missing_time_slot penalties for Beth (both Arts slots), got %d", bethPenalties)
+		}
+	})
+
+	t.Run("no penalty when weight is zero", func(t *testing.T) {
+		snapshot := ActivitySnapshot{
+			Slots: []ActivitySlot{morningArts},
+			Counselors: []ActivityCounselor{
+				{ID: "c1", Name: "Anna", Certifications: map[string]bool{}},
+			},
+		}
+		assignment := ActivityAssignment{SlotCounselors: map[string][]string{}}
+		weights := DefaultActivityWeights()
+		weights.MissingTimeSlotPenalty = 0
+
+		components := scoreMissingTimeSlots(snapshot, assignment, weights)
+		if len(components) != 0 {
+			t.Errorf("expected no components when weight is zero, got %v", components)
 		}
 	})
 }

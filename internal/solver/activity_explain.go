@@ -46,7 +46,9 @@ func ExplainActivity(snapshot ActivitySnapshot, solution ActivitySolution) Activ
 	var unmet []ActivityUnmetPreference
 	eligibleUnmet, ineligible := findUnmetActivityPreferences(snapshot, counselorSlots, slotsByID)
 	unmet = append(unmet, eligibleUnmet...)
-	unmet = append(unmet, findUnassignedCounselors(snapshot, counselorSlots)...)
+	missingUnmet, missingIneligible := findMissingTimeSlotAssignments(snapshot, solution.Assignment, slotsByID)
+	unmet = append(unmet, missingUnmet...)
+	ineligible = append(ineligible, missingIneligible...)
 
 	sort.Slice(unmet, func(i, j int) bool {
 		if unmet[i].CounselorID != unmet[j].CounselorID {
@@ -348,6 +350,104 @@ func findUnmetActivityPreferences(snapshot ActivitySnapshot, counselorSlots map[
 	return eligibleUnmet, ineligible
 }
 
+// findMissingTimeSlotAssignments reports per (counselor, time slot) gaps,
+// splitting them into two buckets:
+//
+//   - unmet: the counselor has at least one eligible activity slot in that
+//     time slot but received no assignment (capacity or scheduling pressure
+//     left them out — actionable).
+//   - ineligible: the counselor has no eligible activity slot in that time
+//     slot (structural — they lack the certifications for any scheduled
+//     activity at that time, or no activity is scheduled).
+//
+// When a counselor has no eligible slot in *any* time slot of the session,
+// a single roster-wide ineligible entry is emitted instead of one per time
+// slot, to avoid overwhelming the explanation with redundant rows.
+func findMissingTimeSlotAssignments(snapshot ActivitySnapshot, assignment ActivityAssignment, slotsByID map[string]ActivitySlot) ([]ActivityUnmetPreference, []ActivityUnmetPreference) {
+	timeSlotOrder := orderedTimeSlots(snapshot)
+	if len(timeSlotOrder) == 0 {
+		return nil, nil
+	}
+
+	timeSlotName := make(map[string]string, len(timeSlotOrder))
+	for _, slot := range snapshot.Slots {
+		if _, ok := timeSlotName[slot.TimeSlotID]; !ok {
+			timeSlotName[slot.TimeSlotID] = slot.TimeSlotName
+		}
+	}
+
+	served := make(map[string]map[string]bool)
+	for slotID, counselorIDs := range assignment.SlotCounselors {
+		tsID := slotsByID[slotID].TimeSlotID
+		for _, cID := range counselorIDs {
+			if served[cID] == nil {
+				served[cID] = make(map[string]bool)
+			}
+			served[cID][tsID] = true
+		}
+	}
+
+	eligible := make(map[string]map[string]bool)
+	for _, c := range snapshot.Counselors {
+		for _, slot := range snapshot.Slots {
+			if !counselorHasCerts(c, slot) {
+				continue
+			}
+			if eligible[c.ID] == nil {
+				eligible[c.ID] = make(map[string]bool)
+			}
+			eligible[c.ID][slot.TimeSlotID] = true
+		}
+	}
+
+	var unmet, ineligible []ActivityUnmetPreference
+	for _, c := range snapshot.Counselors {
+		// If the counselor has no eligible slot anywhere in the session,
+		// emit one roster-wide ineligible entry rather than one per time
+		// slot.
+		if len(eligible[c.ID]) == 0 {
+			ineligible = append(ineligible, ActivityUnmetPreference{
+				CounselorID: c.ID,
+				Constraint:  "unassigned_counselor_ineligible",
+				Message: fmt.Sprintf(
+					"counselor %q cannot be assigned to any scheduled activity (no matching certifications)",
+					c.Name,
+				),
+			})
+			continue
+		}
+
+		for _, tsID := range timeSlotOrder {
+			if served[c.ID][tsID] {
+				continue
+			}
+			if eligible[c.ID][tsID] {
+				unmet = append(unmet, ActivityUnmetPreference{
+					CounselorID: c.ID,
+					Constraint:  "unassigned_time_slot",
+					Message: fmt.Sprintf(
+						"counselor %q has no assignment in %s (eligible activities full)",
+						c.Name, timeSlotName[tsID],
+					),
+				})
+			} else {
+				ineligible = append(ineligible, ActivityUnmetPreference{
+					CounselorID: c.ID,
+					Constraint:  "unassigned_time_slot_ineligible",
+					Message: fmt.Sprintf(
+						"counselor %q has no eligible activity in %s",
+						c.Name, timeSlotName[tsID],
+					),
+				})
+			}
+		}
+	}
+	return unmet, ineligible
+}
+
+// findUnassignedCounselors is retained for callers that need the simple
+// "counselor placed in zero slots" check, but ExplainActivity now uses the
+// richer per-time-slot reporting in findMissingTimeSlotAssignments.
 func findUnassignedCounselors(snapshot ActivitySnapshot, counselorSlots map[string][]string) []ActivityUnmetPreference {
 	var unmet []ActivityUnmetPreference
 	for _, c := range snapshot.Counselors {

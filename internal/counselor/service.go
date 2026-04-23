@@ -79,6 +79,7 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCounsel
 		CampID:          uid,
 		CounselorName:   req.Name,
 		JuniorCounselor: req.JuniorCounselor,
+		Gender:          req.Gender,
 	})
 	if err != nil {
 		return CounselorResponse{}, fmt.Errorf("error creating counselor: %w", err)
@@ -137,6 +138,7 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCou
 		CounselorName:    req.Name,
 		JuniorCounselor:  req.JuniorCounselor,
 		CounselorEnabled: req.Enabled,
+		Gender:           req.Gender,
 	})
 	if err != nil {
 		return CounselorResponse{}, fmt.Errorf("error updating counselor %s: %w", id, err)
@@ -193,5 +195,6 @@ func toCounselorResponse(c db.Counselor) CounselorResponse {
 		Name:            c.CounselorName,
 		JuniorCounselor: c.JuniorCounselor,
 		Enabled:         c.CounselorEnabled,
+		Gender:          c.Gender,
 	}
 }

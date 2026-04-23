@@ -31,12 +31,14 @@ func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 type CreateCounselorRequest struct {
 	Name            string `json:"name" binding:"required"`
 	JuniorCounselor bool   `json:"junior_counselor"`
+	Gender          string `json:"gender" binding:"required,oneof=male female"`
 }
 
 type UpdateCounselorRequest struct {
 	Name            string `json:"name" binding:"required"`
 	JuniorCounselor bool   `json:"junior_counselor"`
 	Enabled         bool   `json:"enabled"`
+	Gender          string `json:"gender" binding:"required,oneof=male female"`
 }
 
 type CounselorResponse struct {
@@ -45,6 +47,7 @@ type CounselorResponse struct {
 	Name            string `json:"name"`
 	JuniorCounselor bool   `json:"junior_counselor"`
 	Enabled         bool   `json:"enabled"`
+	Gender          string `json:"gender"`
 }
 
 func (ctrl *Controller) List(c *gin.Context) {
@@ -105,7 +108,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 
 	counselor, err := ctrl.svc.Create(c.Request.Context(), campID, req)
 	if err != nil {
-		if api.IsBadInput(err) {
+		if api.IsBadInput(err) || api.IsCheckViolation(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -136,7 +139,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "counselor not found"})
 			return
 		}
-		if api.IsBadInput(err) {
+		if api.IsBadInput(err) || api.IsCheckViolation(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

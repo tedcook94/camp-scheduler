@@ -80,6 +80,7 @@ type Cabin struct {
 	CabinName                 string
 	DefaultGroupSize          int32
 	DefaultRequiredCounselors int32
+	Gender                    string
 }
 
 type Camp struct {
@@ -93,6 +94,7 @@ type Camper struct {
 	ID         pgtype.UUID
 	CampID     pgtype.UUID
 	CamperName string
+	Gender     string
 }
 
 type CamperCabinAssignment struct {
@@ -152,6 +154,7 @@ type Counselor struct {
 	CounselorName    string
 	JuniorCounselor  bool
 	CounselorEnabled bool
+	Gender           string
 }
 
 type CounselorActivityPreference struct {

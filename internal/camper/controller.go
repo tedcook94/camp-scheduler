@@ -29,17 +29,20 @@ func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 }
 
 type CreateCamperRequest struct {
-	Name string `json:"name" binding:"required"`
+	Name   string `json:"name" binding:"required"`
+	Gender string `json:"gender" binding:"required,oneof=male female"`
 }
 
 type UpdateCamperRequest struct {
-	Name string `json:"name" binding:"required"`
+	Name   string `json:"name" binding:"required"`
+	Gender string `json:"gender" binding:"required,oneof=male female"`
 }
 
 type CamperResponse struct {
 	ID     string `json:"id"`
 	CampID string `json:"camp_id"`
 	Name   string `json:"name"`
+	Gender string `json:"gender"`
 }
 
 func (ctrl *Controller) List(c *gin.Context) {
@@ -100,7 +103,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 
 	camper, err := ctrl.svc.Create(c.Request.Context(), campID, req)
 	if err != nil {
-		if api.IsBadInput(err) {
+		if api.IsBadInput(err) || api.IsCheckViolation(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -131,7 +134,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "camper not found"})
 			return
 		}
-		if api.IsBadInput(err) {
+		if api.IsBadInput(err) || api.IsCheckViolation(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

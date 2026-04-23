@@ -40,6 +40,7 @@ func (svc *Service) List(ctx context.Context, campID string) ([]CabinResponse, e
 			Name:                      c.CabinName,
 			DefaultGroupSize:          c.DefaultGroupSize,
 			DefaultRequiredCounselors: c.DefaultRequiredCounselors,
+			Gender:                    c.Gender,
 		}
 	}
 	return result, nil
@@ -72,6 +73,7 @@ func (svc *Service) GetByID(ctx context.Context, campID, id string) (CabinRespon
 		Name:                      cabin.CabinName,
 		DefaultGroupSize:          cabin.DefaultGroupSize,
 		DefaultRequiredCounselors: cabin.DefaultRequiredCounselors,
+		Gender:                    cabin.Gender,
 	}, nil
 }
 
@@ -92,6 +94,7 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCabinRe
 		CabinName:                 req.Name,
 		DefaultGroupSize:          req.DefaultGroupSize,
 		DefaultRequiredCounselors: req.DefaultRequiredCounselors,
+		Gender:                    req.Gender,
 	})
 	if err != nil {
 		return CabinResponse{}, fmt.Errorf("error creating cabin: %w", err)
@@ -105,6 +108,7 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCabinRe
 		Name:                      cabin.CabinName,
 		DefaultGroupSize:          cabin.DefaultGroupSize,
 		DefaultRequiredCounselors: cabin.DefaultRequiredCounselors,
+		Gender:                    cabin.Gender,
 	}, nil
 }
 
@@ -131,6 +135,7 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCab
 		CabinName:                 req.Name,
 		DefaultGroupSize:          req.DefaultGroupSize,
 		DefaultRequiredCounselors: req.DefaultRequiredCounselors,
+		Gender:                    req.Gender,
 	})
 	if err != nil {
 		return CabinResponse{}, fmt.Errorf("error updating cabin %s: %w", id, err)
@@ -144,6 +149,7 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCab
 		Name:                      cabin.CabinName,
 		DefaultGroupSize:          cabin.DefaultGroupSize,
 		DefaultRequiredCounselors: cabin.DefaultRequiredCounselors,
+		Gender:                    cabin.Gender,
 	}, nil
 }
 

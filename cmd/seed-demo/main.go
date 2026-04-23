@@ -294,13 +294,14 @@ func createCabins(ctx context.Context, q *db.Queries, campID pgtype.UUID, ageGro
 		ageGroup  string
 		size      int32
 		counselors int32
+		gender    string
 	}{
-		{"Pine Lodge", "Bears", 10, 2},
-		{"Cedar Lodge", "Bears", 10, 2},
-		{"Maple Lodge", "Eagles", 12, 2},
-		{"Birch Lodge", "Eagles", 12, 2},
-		{"Oak Lodge", "Wolves", 10, 2},
-		{"Elm Lodge", "Wolves", 10, 2},
+		{"Pine Lodge", "Bears", 10, 2, "female"},
+		{"Cedar Lodge", "Bears", 10, 2, "male"},
+		{"Maple Lodge", "Eagles", 12, 2, "female"},
+		{"Birch Lodge", "Eagles", 12, 2, "male"},
+		{"Oak Lodge", "Wolves", 10, 2, "female"},
+		{"Elm Lodge", "Wolves", 10, 2, "male"},
 	}
 	m := make(map[string]db.CreateCabinRow)
 	for _, d := range defs {
@@ -310,6 +311,7 @@ func createCabins(ctx context.Context, q *db.Queries, campID pgtype.UUID, ageGro
 			CabinName:                 d.name,
 			DefaultGroupSize:          d.size,
 			DefaultRequiredCounselors: d.counselors,
+			Gender:                    d.gender,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("error creating cabin %s: %w", d.name, err)
@@ -553,19 +555,20 @@ func createCounselors(ctx context.Context, q *db.Queries, campID pgtype.UUID) (m
 	defs := []struct {
 		name   string
 		junior bool
+		gender string
 	}{
-		{"Sarah Johnson", false},
-		{"Mike Chen", false},
-		{"Emily Davis", false},
-		{"James Wilson", false},
-		{"Lisa Rodriguez", false},
-		{"David Brown", false},
-		{"Rachel Kim", false},
-		{"Tom Anderson", false},
-		{"Karen Martinez", false},
-		{"Alex Thompson", true},
-		{"Jordan Lee", true},
-		{"Taylor White", true},
+		{"Sarah Johnson", false, "female"},
+		{"Mike Chen", false, "male"},
+		{"Emily Davis", false, "female"},
+		{"James Wilson", false, "male"},
+		{"Lisa Rodriguez", false, "female"},
+		{"David Brown", false, "male"},
+		{"Rachel Kim", false, "female"},
+		{"Tom Anderson", false, "male"},
+		{"Karen Martinez", false, "female"},
+		{"Alex Thompson", true, "male"},
+		{"Jordan Lee", true, "female"},
+		{"Taylor White", true, "male"},
 	}
 	m := make(map[string]db.Counselor)
 	for _, d := range defs {
@@ -573,6 +576,7 @@ func createCounselors(ctx context.Context, q *db.Queries, campID pgtype.UUID) (m
 			CampID:          campID,
 			CounselorName:   d.name,
 			JuniorCounselor:  d.junior,
+			Gender:          d.gender,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("error creating counselor %s: %w", d.name, err)
@@ -790,12 +794,27 @@ func createCampers(ctx context.Context, q *db.Queries, campID pgtype.UUID, ageGr
 	eagles := []string{"Aiden", "Charlotte", "Benjamin", "Harper", "Daniel", "Amelia", "Henry", "Evelyn", "Jack", "Abigail", "Owen", "Grace"}
 	wolves := []string{"Logan", "Chloe", "Caleb", "Zoe", "Nathan", "Lily", "Ryan", "Hannah", "Connor", "Maya", "Dylan", "Stella"}
 
+	// Each age group's name list alternates female/male starting with female,
+	// giving 6 of each gender per age group to match the 6+6 cabin capacity
+	// split (one female and one male cabin per age group).
+	camperGender := map[string]string{}
+	for _, names := range [][]string{bears, eagles, wolves} {
+		for i, name := range names {
+			if i%2 == 0 {
+				camperGender[name] = "female"
+			} else {
+				camperGender[name] = "male"
+			}
+		}
+	}
+
 	allNames := append(append(bears, eagles...), wolves...)
 	m := make(map[string]db.Camper)
 	for _, name := range allNames {
 		c, err := q.CreateCamper(ctx, db.CreateCamperParams{
 			CampID:     campID,
 			CamperName: name,
+			Gender:     camperGender[name],
 		})
 		if err != nil {
 			return nil, fmt.Errorf("error creating camper %s: %w", name, err)

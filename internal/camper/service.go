@@ -68,6 +68,7 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCamperR
 	camper, err := svc.queries.CreateCamper(ctx, db.CreateCamperParams{
 		CampID:     uid,
 		CamperName: req.Name,
+		Gender:     req.Gender,
 	})
 	if err != nil {
 		return CamperResponse{}, fmt.Errorf("error creating camper: %w", err)
@@ -91,6 +92,7 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCam
 		ID:         uid,
 		CampID:     campUUID,
 		CamperName: req.Name,
+		Gender:     req.Gender,
 	})
 	if err != nil {
 		return CamperResponse{}, fmt.Errorf("error updating camper %s: %w", id, err)
@@ -129,5 +131,6 @@ func toCamperResponse(c db.Camper) CamperResponse {
 		ID:     api.UUIDToString(c.ID),
 		CampID: api.UUIDToString(c.CampID),
 		Name:   c.CamperName,
+		Gender: c.Gender,
 	}
 }

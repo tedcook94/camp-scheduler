@@ -5,6 +5,7 @@ SELECT
     e.camper_id,
     e.session_age_group_id,
     c.camper_name,
+    c.gender,
     sag.session_id,
     sag.age_group_id
 FROM camper_session_enrollments e

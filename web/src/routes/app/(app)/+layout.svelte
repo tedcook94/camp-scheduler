@@ -122,9 +122,9 @@
 			],
 		},
 		{
-			label: "Assignment Runs",
+			label: "Assignments",
 			icon: PlayIcon,
-			href: "/app/assignment-runs",
+			href: "/app/assignments",
 		},
 		{ href: "/app/settings", label: "Camp Settings", icon: SettingsIcon },
 	];

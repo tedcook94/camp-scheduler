@@ -446,27 +446,33 @@ export interface ExplanationDetail {
 
 export interface SolutionDetailResponse {
 	id: string;
+	camper_solution_id?: string;
 	assignment_run_id: string;
 	solution_index: number;
 	score: number;
 	score_breakdown: ScoreBreakdown[];
+	camper_score_breakdown?: ScoreBreakdown[];
 	assignments: AssignmentDetail[];
 	explanations: ExplanationDetail[];
 }
 
 export interface SolutionResponse {
 	id: string;
+	camper_solution_id?: string;
 	assignment_run_id: string;
 	solution_index: number;
 	score: number;
 	score_breakdown: ScoreBreakdown[];
+	camper_score_breakdown?: ScoreBreakdown[];
 }
+
+export type RunType = "cabin" | "activity_schedule";
 
 export interface RunResponse {
 	id: string;
 	camp_id: string;
 	session_id: string;
-	run_type: "counselor_cabin" | "camper_cabin" | "activity_schedule";
+	run_type: RunType;
 	status: "completed" | "selected";
 	selected_solution_id: string | null;
 	created_at: string;
@@ -477,7 +483,7 @@ export interface RunDetailResponse extends RunResponse {
 }
 
 export interface TriggerRunRequest {
-	run_type?: "counselor_cabin" | "camper_cabin" | "activity_schedule";
+	run_type: RunType;
 	max_solutions?: number;
 	max_iterations?: number;
 	weights?: {

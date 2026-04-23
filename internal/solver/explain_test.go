@@ -419,7 +419,7 @@ func TestExplain(t *testing.T) {
 	t.Run("unassigned counselor surfaced as unmet preference", func(t *testing.T) {
 		snapshot := SessionSnapshot{
 			Cabins: []Cabin{
-				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 1, Gender: "male"},
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 1, Gender: "male", HasCampers: true},
 			},
 			Counselors: []Counselor{
 				{ID: "sr1", Name: "Counselor 1", IsJunior: false, Gender: "male"},

@@ -42,39 +42,71 @@ func NewService(queries *db.Queries, pool *pgxpool.Pool) *Service {
 	return &Service{queries: queries, pool: pool}
 }
 
-func (svc *Service) TriggerRun(ctx context.Context, campID, sessionID string, cfg solver.SolverConfig) (RunDetailResponse, error) {
-	snapshot, err := solver.BuildSnapshot(ctx, svc.queries, campID, sessionID)
+// TriggerCabinRun replaces the existing cabin run for the session (if any)
+// with a new combined counselor + camper cabin assignment. Counselors and
+// campers share each cabin's total occupancy capacity.
+func (svc *Service) TriggerCabinRun(ctx context.Context, campID, sessionID string, cfg solver.CabinSolverConfig) (RunDetailResponse, error) {
+	snapshot, err := solver.BuildCabinSnapshot(ctx, svc.queries, campID, sessionID)
 	if err != nil {
-		return RunDetailResponse{}, fmt.Errorf("error building snapshot: %w", err)
+		return RunDetailResponse{}, fmt.Errorf("error building cabin snapshot: %w", err)
 	}
 
-	if msg := validateCounselorCabin(snapshot); msg != "" {
+	if msg := validateCabin(snapshot); msg != "" {
 		return RunDetailResponse{}, NewPreconditionError(msg)
 	}
 
-	solutions := solver.Solve(snapshot, cfg)
+	solutions := solver.SolveCabin(snapshot, cfg)
 	if len(solutions) == 0 {
 		return RunDetailResponse{}, ErrNoSolutions
 	}
 
-	runID, err := solver.StoreSolutions(ctx, svc.pool, campID, sessionID, snapshot, solutions)
+	runID, err := solver.StoreCabinSolutions(ctx, svc.pool, campID, sessionID, snapshot, solutions)
 	if err != nil {
-		return RunDetailResponse{}, fmt.Errorf("error storing solutions: %w", err)
+		return RunDetailResponse{}, fmt.Errorf("error storing cabin solutions: %w", err)
 	}
 
 	return svc.GetRun(ctx, campID, runID)
 }
 
-func validateCounselorCabin(snapshot solver.SessionSnapshot) string {
-	if len(snapshot.Cabins) == 0 {
+// validateCabin checks preconditions for a combined cabin run: the session
+// must have cabins, the counselor side must satisfy minimum and gender-feasibility
+// requirements, and per-(age group, gender) cabin capacity (after subtracting
+// required counselors) must accommodate enrolled campers.
+func validateCabin(snapshot solver.CabinSnapshot) string {
+	if len(snapshot.Counselor.Cabins) == 0 {
 		return "No cabins configured for this session"
 	}
 
+	if msg := validateCabinCapacities(snapshot.Counselor); msg != "" {
+		return msg
+	}
+	if msg := validateCounselorSide(snapshot.Counselor); msg != "" {
+		return msg
+	}
+	if msg := validateCamperSideWithCounselors(snapshot); msg != "" {
+		return msg
+	}
+	return ""
+}
+
+// validateCabinCapacities catches misconfigured cabins where the cabin's
+// required counselor count exceeds its total occupancy capacity, which
+// would make the cabin impossible to staff under the combined-occupancy
+// model.
+func validateCabinCapacities(snapshot solver.SessionSnapshot) string {
+	for _, c := range snapshot.Cabins {
+		if c.RequiredCounselors > c.Capacity {
+			return fmt.Sprintf("Cabin %q in age group %q requires %d counselors but has total capacity %d", c.Name, c.AgeGroupName, c.RequiredCounselors, c.Capacity)
+		}
+	}
+	return ""
+}
+
+func validateCounselorSide(snapshot solver.SessionSnapshot) string {
 	totalRequired := 0
 	for _, c := range snapshot.Cabins {
 		totalRequired += c.RequiredCounselors
 	}
-
 	if totalRequired == 0 {
 		return ""
 	}
@@ -90,18 +122,10 @@ func validateCounselorCabin(snapshot solver.SessionSnapshot) string {
 			break
 		}
 	}
-
 	if !hasSenior {
 		return "No senior counselors available; at least one senior is required to satisfy the senior-counselor constraint for staffed cabins"
 	}
 
-	if len(snapshot.Counselors) < totalRequired {
-		return fmt.Sprintf("Not enough counselors (%d) to fill all cabin requirements (%d)", len(snapshot.Counselors), totalRequired)
-	}
-
-	// Per-gender feasibility: cabins are gender-segregated, so we need
-	// enough counselors and at least one senior of each gender to staff
-	// the cabins of that gender.
 	requiredByGender := map[string]int{}
 	cabinsByGender := map[string]int{}
 	for _, c := range snapshot.Cabins {
@@ -127,6 +151,64 @@ func validateCounselorCabin(snapshot solver.SessionSnapshot) string {
 		}
 		if seniorsByGender[gender] < cabinsByGender[gender] {
 			return fmt.Sprintf("Not enough senior %s counselors (%d) to seat one in each of the %d staffed %s cabin(s)", gender, seniorsByGender[gender], cabinsByGender[gender], gender)
+		}
+	}
+
+	return ""
+}
+
+// validateCamperSideWithCounselors checks per-(age group, gender) capacity
+// for campers, after subtracting the cabin's required counselor count from
+// each cabin's total capacity. This catches the case where group_size leaves
+// no room for the required counselors plus the enrolled campers.
+func validateCamperSideWithCounselors(snapshot solver.CabinSnapshot) string {
+	if len(snapshot.Camper.Campers) == 0 {
+		return ""
+	}
+
+	type key struct{ ageGroup, gender string }
+	camperCapByKey := map[key]int{}
+	ageGroupNames := map[string]string{}
+	requiredByCabin := map[string]int{}
+	for _, c := range snapshot.Counselor.Cabins {
+		requiredByCabin[c.ID] = c.RequiredCounselors
+	}
+	for _, c := range snapshot.Camper.Cabins {
+		// Subtract required counselors (which the counselor solver will
+		// place) from the cabin's total capacity to get the worst-case
+		// remaining capacity available for campers.
+		req := requiredByCabin[c.ID]
+		remaining := c.Capacity - req
+		if remaining < 0 {
+			remaining = 0
+		}
+		camperCapByKey[key{c.AgeGroupID, c.Gender}] += remaining
+		ageGroupNames[c.AgeGroupID] = c.AgeGroupName
+	}
+
+	demandByKey := map[key]int{}
+	for _, c := range snapshot.Camper.Campers {
+		demandByKey[key{c.AgeGroupID, c.Gender}]++
+	}
+
+	keys := make([]key, 0, len(demandByKey))
+	for k := range demandByKey {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].ageGroup != keys[j].ageGroup {
+			return keys[i].ageGroup < keys[j].ageGroup
+		}
+		return keys[i].gender < keys[j].gender
+	})
+	for _, k := range keys {
+		demand := demandByKey[k]
+		if camperCapByKey[k] < demand {
+			ageGroup := ageGroupNames[k.ageGroup]
+			if ageGroup == "" {
+				ageGroup = k.ageGroup
+			}
+			return fmt.Sprintf("Not enough %s cabin capacity (%d available for campers after required counselors) for %d %s camper(s) in age group %q", k.gender, camperCapByKey[k], demand, k.gender, ageGroup)
 		}
 	}
 
@@ -159,6 +241,8 @@ func (svc *Service) ListRuns(ctx context.Context, campID, sessionID string) ([]R
 	return result, nil
 }
 
+// TriggerActivityRun replaces the existing activity run for the session
+// (if any) with a fresh activity-schedule assignment.
 func (svc *Service) TriggerActivityRun(ctx context.Context, campID, sessionID string, cfg solver.ActivitySolverConfig) (RunDetailResponse, error) {
 	snapshot, err := solver.BuildActivitySnapshot(ctx, svc.queries, campID, sessionID)
 	if err != nil {
@@ -194,74 +278,6 @@ func validateActivity(snapshot solver.ActivitySnapshot) string {
 
 	if totalRequired > 0 && len(snapshot.Counselors) == 0 {
 		return "No enabled counselors found"
-	}
-
-	return ""
-}
-
-func (svc *Service) TriggerCamperRun(ctx context.Context, campID, sessionID string, cfg solver.CamperSolverConfig) (RunDetailResponse, error) {
-	snapshot, err := solver.BuildCamperCabinSnapshot(ctx, svc.queries, campID, sessionID)
-	if err != nil {
-		return RunDetailResponse{}, fmt.Errorf("error building camper snapshot: %w", err)
-	}
-
-	if msg := validateCamperCabin(snapshot); msg != "" {
-		return RunDetailResponse{}, NewPreconditionError(msg)
-	}
-
-	solutions := solver.SolveCamperCabin(snapshot, cfg)
-	if len(solutions) == 0 {
-		return RunDetailResponse{}, ErrNoSolutions
-	}
-
-	runID, err := solver.StoreCamperSolutions(ctx, svc.pool, campID, sessionID, snapshot, solutions)
-	if err != nil {
-		return RunDetailResponse{}, fmt.Errorf("error storing camper solutions: %w", err)
-	}
-
-	return svc.GetRun(ctx, campID, runID)
-}
-
-func validateCamperCabin(snapshot solver.CamperCabinSnapshot) string {
-	if len(snapshot.Campers) == 0 {
-		return "No campers enrolled in this session"
-	}
-	if len(snapshot.Cabins) == 0 {
-		return "No cabins configured for this session"
-	}
-
-	// Per-(age group, gender) capacity feasibility check: every camper must
-	// have at least one cabin of their age group and gender with capacity.
-	type key struct{ ageGroup, gender string }
-	capacityByKey := map[key]int{}
-	ageGroupNames := map[string]string{}
-	for _, c := range snapshot.Cabins {
-		capacityByKey[key{c.AgeGroupID, c.Gender}] += c.Capacity
-		ageGroupNames[c.AgeGroupID] = c.AgeGroupName
-	}
-	demandByKey := map[key]int{}
-	for _, c := range snapshot.Campers {
-		demandByKey[key{c.AgeGroupID, c.Gender}]++
-	}
-	keys := make([]key, 0, len(demandByKey))
-	for k := range demandByKey {
-		keys = append(keys, k)
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		if keys[i].ageGroup != keys[j].ageGroup {
-			return keys[i].ageGroup < keys[j].ageGroup
-		}
-		return keys[i].gender < keys[j].gender
-	})
-	for _, k := range keys {
-		demand := demandByKey[k]
-		if capacityByKey[k] < demand {
-			ageGroup := ageGroupNames[k.ageGroup]
-			if ageGroup == "" {
-				ageGroup = k.ageGroup
-			}
-			return fmt.Sprintf("Not enough %s cabin capacity (%d) for %d %s camper(s) in age group %q", k.gender, capacityByKey[k], demand, k.gender, ageGroup)
-		}
 	}
 
 	return ""
@@ -305,17 +321,10 @@ func (svc *Service) GetRun(ctx context.Context, campID, runID string) (RunDetail
 
 	var solutions []SolutionSummaryResponse
 	switch run.RunType {
-	case "camper_cabin":
-		solRows, err := svc.queries.ListCamperCabinSolutionsByRun(ctx, db.ListCamperCabinSolutionsByRunParams{
-			AssignmentRunID: runUUID,
-			CampID:          campUUID,
-		})
+	case solver.RunTypeCabin:
+		solutions, err = svc.listCabinRunSolutions(ctx, campUUID, runUUID, runID)
 		if err != nil {
-			return RunDetailResponse{}, fmt.Errorf("error listing camper solutions for run %s: %w", runID, err)
-		}
-		solutions = make([]SolutionSummaryResponse, len(solRows))
-		for i, s := range solRows {
-			solutions[i] = toCamperSolutionSummaryResponse(s)
+			return RunDetailResponse{}, err
 		}
 	case "activity_schedule":
 		solRows, err := svc.queries.ListActivitySolutionsByRun(ctx, db.ListActivitySolutionsByRunParams{
@@ -330,23 +339,57 @@ func (svc *Service) GetRun(ctx context.Context, campID, runID string) (RunDetail
 			solutions[i] = toActivitySolutionSummaryResponse(s)
 		}
 	default:
-		solRows, err := svc.queries.ListCounselorCabinSolutionsByRun(ctx, db.ListCounselorCabinSolutionsByRunParams{
-			AssignmentRunID: runUUID,
-			CampID:          campUUID,
-		})
-		if err != nil {
-			return RunDetailResponse{}, fmt.Errorf("error listing solutions for run %s: %w", runID, err)
-		}
-		solutions = make([]SolutionSummaryResponse, len(solRows))
-		for i, s := range solRows {
-			solutions[i] = toSolutionSummaryResponse(s)
-		}
+		return RunDetailResponse{}, fmt.Errorf("unknown run_type %q for run %s", run.RunType, runID)
 	}
 
 	return RunDetailResponse{
 		RunResponse: toRunResponseFromGet(run, selectedSolutionID),
 		Solutions:   solutions,
 	}, nil
+}
+
+// listCabinRunSolutions fetches the counselor and camper halves of a cabin
+// run and merges them into one summary per solution_index. The summary's ID
+// is the counselor solution's ID (canonical for selection); the camper
+// half's ID is exposed via CamperSolutionID. Scores are summed.
+func (svc *Service) listCabinRunSolutions(ctx context.Context, campUUID, runUUID pgtype.UUID, runID string) ([]SolutionSummaryResponse, error) {
+	counselorRows, err := svc.queries.ListCounselorCabinSolutionsByRun(ctx, db.ListCounselorCabinSolutionsByRunParams{
+		AssignmentRunID: runUUID,
+		CampID:          campUUID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error listing counselor solutions for run %s: %w", runID, err)
+	}
+	camperRows, err := svc.queries.ListCamperCabinSolutionsByRun(ctx, db.ListCamperCabinSolutionsByRunParams{
+		AssignmentRunID: runUUID,
+		CampID:          campUUID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error listing camper solutions for run %s: %w", runID, err)
+	}
+
+	camperByIndex := make(map[int32]db.CamperCabinSolution, len(camperRows))
+	for _, c := range camperRows {
+		camperByIndex[c.SolutionIndex] = c
+	}
+
+	out := make([]SolutionSummaryResponse, 0, len(counselorRows))
+	for _, cs := range counselorRows {
+		camper, ok := camperByIndex[cs.SolutionIndex]
+		if !ok {
+			return nil, fmt.Errorf("error pairing solution_index %d for cabin run %s: missing camper half", cs.SolutionIndex, runID)
+		}
+		out = append(out, SolutionSummaryResponse{
+			ID:               api.UUIDToString(cs.ID),
+			CamperSolutionID: api.UUIDToString(camper.ID),
+			AssignmentRunID:  api.UUIDToString(cs.AssignmentRunID),
+			SolutionIndex:    int(cs.SolutionIndex),
+			Score:            cs.Score + camper.Score,
+			ScoreBreakdown:   cs.ScoreBreakdown,
+			CamperScoreBreakdown: camper.ScoreBreakdown,
+		})
+	}
+	return out, nil
 }
 
 func (svc *Service) DeleteRun(ctx context.Context, campID, runID string) error {
@@ -397,22 +440,25 @@ func (svc *Service) GetSolution(ctx context.Context, campID, runID, solutionID s
 	}
 
 	switch run.RunType {
-	case "camper_cabin":
-		return svc.getCamperSolution(ctx, campUUID, runUUID, solutionID)
+	case solver.RunTypeCabin:
+		return svc.getCabinSolution(ctx, campUUID, runUUID, solutionID)
 	case "activity_schedule":
 		return svc.getActivitySolution(ctx, campUUID, runUUID, solutionID)
 	default:
-		return svc.getCounselorSolution(ctx, campUUID, runUUID, solutionID)
+		return SolutionDetailResponse{}, fmt.Errorf("unknown run_type %q for run %s", run.RunType, runID)
 	}
 }
 
-func (svc *Service) getCounselorSolution(ctx context.Context, campUUID, runUUID pgtype.UUID, solutionID string) (SolutionDetailResponse, error) {
+// getCabinSolution returns both the counselor and camper halves of a paired
+// cabin solution, looked up by the counselor solution's ID. The camper half
+// is found by matching solution_index within the same run.
+func (svc *Service) getCabinSolution(ctx context.Context, campUUID, runUUID pgtype.UUID, solutionID string) (SolutionDetailResponse, error) {
 	solUUID, err := api.ParseUUID(solutionID)
 	if err != nil {
 		return SolutionDetailResponse{}, err
 	}
 
-	sol, err := svc.queries.GetCounselorCabinSolution(ctx, db.GetCounselorCabinSolutionParams{
+	counselorSol, err := svc.queries.GetCounselorCabinSolution(ctx, db.GetCounselorCabinSolutionParams{
 		ID:              solUUID,
 		CampID:          campUUID,
 		AssignmentRunID: runUUID,
@@ -421,90 +467,79 @@ func (svc *Service) getCounselorSolution(ctx context.Context, campUUID, runUUID 
 		if errors.Is(err, pgx.ErrNoRows) {
 			return SolutionDetailResponse{}, ErrSolutionNotFound
 		}
-		return SolutionDetailResponse{}, fmt.Errorf("error getting solution %s: %w", solutionID, err)
+		return SolutionDetailResponse{}, fmt.Errorf("error getting counselor solution %s: %w", solutionID, err)
 	}
 
-	assignments, err := svc.queries.ListCounselorCabinAssignmentsBySolution(ctx, db.ListCounselorCabinAssignmentsBySolutionParams{
-		SolutionID: solUUID,
-		CampID:     campUUID,
-	})
-	if err != nil {
-		return SolutionDetailResponse{}, fmt.Errorf("error listing assignments for solution %s: %w", solutionID, err)
-	}
-
-	explanations, err := svc.queries.ListCounselorCabinExplanationsBySolution(ctx, db.ListCounselorCabinExplanationsBySolutionParams{
-		SolutionID: solUUID,
-		CampID:     campUUID,
-	})
-	if err != nil {
-		return SolutionDetailResponse{}, fmt.Errorf("error listing explanations for solution %s: %w", solutionID, err)
-	}
-
-	assignmentResponses := make([]AssignmentResponse, len(assignments))
-	for i, a := range assignments {
-		assignmentResponses[i] = toAssignmentResponse(a)
-	}
-
-	explanationResponses := make([]ExplanationResponse, len(explanations))
-	for i, e := range explanations {
-		explanationResponses[i] = toExplanationResponse(e)
-	}
-
-	return SolutionDetailResponse{
-		SolutionSummaryResponse: toSolutionSummaryResponse(sol),
-		Assignments:             assignmentResponses,
-		Explanations:            explanationResponses,
-	}, nil
-}
-
-func (svc *Service) getCamperSolution(ctx context.Context, campUUID, runUUID pgtype.UUID, solutionID string) (SolutionDetailResponse, error) {
-	solUUID, err := api.ParseUUID(solutionID)
-	if err != nil {
-		return SolutionDetailResponse{}, err
-	}
-
-	sol, err := svc.queries.GetCamperCabinSolution(ctx, db.GetCamperCabinSolutionParams{
-		ID:              solUUID,
-		CampID:          campUUID,
+	// Find the camper half with the same solution_index.
+	camperRows, err := svc.queries.ListCamperCabinSolutionsByRun(ctx, db.ListCamperCabinSolutionsByRunParams{
 		AssignmentRunID: runUUID,
+		CampID:          campUUID,
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return SolutionDetailResponse{}, ErrSolutionNotFound
+		return SolutionDetailResponse{}, fmt.Errorf("error listing camper solutions for run: %w", err)
+	}
+	var camperSol db.CamperCabinSolution
+	found := false
+	for _, c := range camperRows {
+		if c.SolutionIndex == counselorSol.SolutionIndex {
+			camperSol = c
+			found = true
+			break
 		}
-		return SolutionDetailResponse{}, fmt.Errorf("error getting camper solution %s: %w", solutionID, err)
+	}
+	if !found {
+		return SolutionDetailResponse{}, fmt.Errorf("error finding camper half for solution_index %d", counselorSol.SolutionIndex)
 	}
 
-	assignments, err := svc.queries.ListCamperCabinAssignmentsBySolution(ctx, db.ListCamperCabinAssignmentsBySolutionParams{
-		SolutionID: solUUID,
+	counselorAssigns, err := svc.queries.ListCounselorCabinAssignmentsBySolution(ctx, db.ListCounselorCabinAssignmentsBySolutionParams{
+		SolutionID: counselorSol.ID,
 		CampID:     campUUID,
 	})
 	if err != nil {
-		return SolutionDetailResponse{}, fmt.Errorf("error listing camper assignments for solution %s: %w", solutionID, err)
+		return SolutionDetailResponse{}, fmt.Errorf("error listing counselor assignments: %w", err)
 	}
-
-	explanations, err := svc.queries.ListCamperCabinExplanationsBySolution(ctx, db.ListCamperCabinExplanationsBySolutionParams{
-		SolutionID: solUUID,
+	counselorExpls, err := svc.queries.ListCounselorCabinExplanationsBySolution(ctx, db.ListCounselorCabinExplanationsBySolutionParams{
+		SolutionID: counselorSol.ID,
 		CampID:     campUUID,
 	})
 	if err != nil {
-		return SolutionDetailResponse{}, fmt.Errorf("error listing camper explanations for solution %s: %w", solutionID, err)
+		return SolutionDetailResponse{}, fmt.Errorf("error listing counselor explanations: %w", err)
+	}
+	camperAssigns, err := svc.queries.ListCamperCabinAssignmentsBySolution(ctx, db.ListCamperCabinAssignmentsBySolutionParams{
+		SolutionID: camperSol.ID,
+		CampID:     campUUID,
+	})
+	if err != nil {
+		return SolutionDetailResponse{}, fmt.Errorf("error listing camper assignments: %w", err)
+	}
+	camperExpls, err := svc.queries.ListCamperCabinExplanationsBySolution(ctx, db.ListCamperCabinExplanationsBySolutionParams{
+		SolutionID: camperSol.ID,
+		CampID:     campUUID,
+	})
+	if err != nil {
+		return SolutionDetailResponse{}, fmt.Errorf("error listing camper explanations: %w", err)
 	}
 
-	assignmentResponses := make([]AssignmentResponse, len(assignments))
-	for i, a := range assignments {
-		assignmentResponses[i] = AssignmentResponse{
+	assignments := make([]AssignmentResponse, 0, len(counselorAssigns)+len(camperAssigns))
+	for _, a := range counselorAssigns {
+		assignments = append(assignments, toAssignmentResponse(a))
+	}
+	for _, a := range camperAssigns {
+		assignments = append(assignments, AssignmentResponse{
 			ID:           api.UUIDToString(a.ID),
 			CamperID:     api.UUIDToString(a.CamperID),
 			CamperName:   a.CamperName,
 			CabinID:      api.UUIDToString(a.CabinID),
 			CabinName:    a.CabinName,
 			AgeGroupName: a.AgeGroupName,
-		}
+		})
 	}
 
-	explanationResponses := make([]ExplanationResponse, len(explanations))
-	for i, e := range explanations {
+	explanations := make([]ExplanationResponse, 0, len(counselorExpls)+len(camperExpls))
+	for _, e := range counselorExpls {
+		explanations = append(explanations, toExplanationResponse(e))
+	}
+	for _, e := range camperExpls {
 		var constraintName *string
 		if e.ConstraintName.Valid {
 			constraintName = &e.ConstraintName.String
@@ -513,7 +548,7 @@ func (svc *Service) getCamperSolution(ctx context.Context, campUUID, runUUID pgt
 		if e.Rank.Valid {
 			rank = &e.Rank.Int32
 		}
-		explanationResponses[i] = ExplanationResponse{
+		explanations = append(explanations, ExplanationResponse{
 			ID:              api.UUIDToString(e.ID),
 			CamperID:        api.UUIDToString(e.CamperID),
 			CamperName:      e.CamperName,
@@ -521,13 +556,21 @@ func (svc *Service) getCamperSolution(ctx context.Context, campUUID, runUUID pgt
 			ConstraintName:  constraintName,
 			Rank:            rank,
 			Message:         e.Message,
-		}
+		})
 	}
 
 	return SolutionDetailResponse{
-		SolutionSummaryResponse: toCamperSolutionSummaryResponse(sol),
-		Assignments:             assignmentResponses,
-		Explanations:            explanationResponses,
+		SolutionSummaryResponse: SolutionSummaryResponse{
+			ID:                   api.UUIDToString(counselorSol.ID),
+			CamperSolutionID:     api.UUIDToString(camperSol.ID),
+			AssignmentRunID:      api.UUIDToString(counselorSol.AssignmentRunID),
+			SolutionIndex:        int(counselorSol.SolutionIndex),
+			Score:                counselorSol.Score + camperSol.Score,
+			ScoreBreakdown:       counselorSol.ScoreBreakdown,
+			CamperScoreBreakdown: camperSol.ScoreBreakdown,
+		},
+		Assignments:  assignments,
+		Explanations: explanations,
 	}, nil
 }
 
@@ -547,7 +590,6 @@ func (svc *Service) SelectSolution(ctx context.Context, campID, runID, solutionI
 		return RunResponse{}, err
 	}
 
-	// Fetch the run to determine its type.
 	run, err := svc.queries.GetAssignmentRun(ctx, db.GetAssignmentRunParams{
 		ID:     runUUID,
 		CampID: campUUID,
@@ -559,10 +601,10 @@ func (svc *Service) SelectSolution(ctx context.Context, campID, runID, solutionI
 		return RunResponse{}, fmt.Errorf("error getting assignment run %s: %w", runID, err)
 	}
 
-	// Verify the solution exists and belongs to this run.
 	switch run.RunType {
-	case "camper_cabin":
-		sol, err := svc.queries.GetCamperCabinSolution(ctx, db.GetCamperCabinSolutionParams{
+	case solver.RunTypeCabin:
+		// For cabin runs, the canonical solution_id is the counselor half.
+		sol, err := svc.queries.GetCounselorCabinSolution(ctx, db.GetCounselorCabinSolutionParams{
 			ID:              solUUID,
 			CampID:          campUUID,
 			AssignmentRunID: runUUID,
@@ -571,7 +613,7 @@ func (svc *Service) SelectSolution(ctx context.Context, campID, runID, solutionI
 			if errors.Is(err, pgx.ErrNoRows) {
 				return RunResponse{}, ErrSolutionNotFound
 			}
-			return RunResponse{}, fmt.Errorf("error getting camper solution %s: %w", solutionID, err)
+			return RunResponse{}, fmt.Errorf("error getting cabin solution %s: %w", solutionID, err)
 		}
 		if sol.AssignmentRunID != runUUID {
 			return RunResponse{}, ErrSolutionNotFound
@@ -592,20 +634,7 @@ func (svc *Service) SelectSolution(ctx context.Context, campID, runID, solutionI
 			return RunResponse{}, ErrSolutionNotFound
 		}
 	default:
-		sol, err := svc.queries.GetCounselorCabinSolution(ctx, db.GetCounselorCabinSolutionParams{
-			ID:              solUUID,
-			CampID:          campUUID,
-			AssignmentRunID: runUUID,
-		})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return RunResponse{}, ErrSolutionNotFound
-			}
-			return RunResponse{}, fmt.Errorf("error getting solution %s: %w", solutionID, err)
-		}
-		if sol.AssignmentRunID != runUUID {
-			return RunResponse{}, ErrSolutionNotFound
-		}
+		return RunResponse{}, fmt.Errorf("unknown run_type %q for run %s", run.RunType, runID)
 	}
 
 	tx, err := svc.pool.Begin(ctx)
@@ -616,9 +645,6 @@ func (svc *Service) SelectSolution(ctx context.Context, campID, runID, solutionI
 
 	qtx := db.New(tx)
 
-	// Lock all assignment_runs rows for this (camp, session, run_type) so a
-	// concurrent SelectSolution on a sibling run can't race past the
-	// conflict check below and trip the unique constraint on insert.
 	if _, err := qtx.LockAssignmentRunsBySessionAndType(ctx, db.LockAssignmentRunsBySessionAndTypeParams{
 		CampID:    campUUID,
 		SessionID: run.SessionID,
@@ -627,8 +653,6 @@ func (svc *Service) SelectSolution(ctx context.Context, campID, runID, solutionI
 		return RunResponse{}, fmt.Errorf("error locking assignment runs for selection: %w", err)
 	}
 
-	// Clear any other selected run of the same type in this session, so that
-	// each (session, solution_type) has at most one selected run.
 	conflictingRunIDs, err := qtx.ListConflictingSelectedRuns(ctx, db.ListConflictingSelectedRunsParams{
 		CampID:    campUUID,
 		SessionID: run.SessionID,
@@ -711,16 +735,6 @@ func toRunResponseFromGet(r db.AssignmentRun, selectedSolutionID *string) RunRes
 	}
 }
 
-func toSolutionSummaryResponse(s db.CounselorCabinSolution) SolutionSummaryResponse {
-	return SolutionSummaryResponse{
-		ID:              api.UUIDToString(s.ID),
-		AssignmentRunID: api.UUIDToString(s.AssignmentRunID),
-		SolutionIndex:   int(s.SolutionIndex),
-		Score:           s.Score,
-		ScoreBreakdown:  s.ScoreBreakdown,
-	}
-}
-
 func toAssignmentResponse(a db.ListCounselorCabinAssignmentsBySolutionRow) AssignmentResponse {
 	return AssignmentResponse{
 		ID:            api.UUIDToString(a.ID),
@@ -750,16 +764,6 @@ func toExplanationResponse(e db.ListCounselorCabinExplanationsBySolutionRow) Exp
 		ConstraintName:  constraintName,
 		Rank:            rank,
 		Message:         e.Message,
-	}
-}
-
-func toCamperSolutionSummaryResponse(s db.CamperCabinSolution) SolutionSummaryResponse {
-	return SolutionSummaryResponse{
-		ID:              api.UUIDToString(s.ID),
-		AssignmentRunID: api.UUIDToString(s.AssignmentRunID),
-		SolutionIndex:   int(s.SolutionIndex),
-		Score:           s.Score,
-		ScoreBreakdown:  s.ScoreBreakdown,
 	}
 }
 

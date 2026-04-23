@@ -9,8 +9,8 @@ func TestSolve(t *testing.T) {
 	t.Run("simple valid assignment", func(t *testing.T) {
 		snapshot := SessionSnapshot{
 			Cabins: []Cabin{
-				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1},
-				{ID: "c2", Name: "Oak", AgeGroupID: "ag2", RequiredCounselors: 1},
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 10},
+				{ID: "c2", Name: "Oak", AgeGroupID: "ag2", RequiredCounselors: 1, Capacity: 10},
 			},
 			Counselors: []Counselor{
 				{ID: "sr1", Name: "Counselor 1", IsJunior: false},
@@ -34,7 +34,7 @@ func TestSolve(t *testing.T) {
 	t.Run("no valid solution with all juniors", func(t *testing.T) {
 		snapshot := SessionSnapshot{
 			Cabins: []Cabin{
-				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1},
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 10},
 			},
 			Counselors: []Counselor{
 				{ID: "jr1", Name: "Junior 1", IsJunior: true},
@@ -50,8 +50,8 @@ func TestSolve(t *testing.T) {
 	t.Run("solutions ranked by descending score", func(t *testing.T) {
 		snapshot := SessionSnapshot{
 			Cabins: []Cabin{
-				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1},
-				{ID: "c2", Name: "Oak", AgeGroupID: "ag2", RequiredCounselors: 1},
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 10},
+				{ID: "c2", Name: "Oak", AgeGroupID: "ag2", RequiredCounselors: 1, Capacity: 10},
 			},
 			Counselors: []Counselor{
 				{ID: "sr1", Name: "Counselor 1", IsJunior: false},
@@ -79,8 +79,8 @@ func TestSolve(t *testing.T) {
 	t.Run("max solutions respected", func(t *testing.T) {
 		snapshot := SessionSnapshot{
 			Cabins: []Cabin{
-				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1},
-				{ID: "c2", Name: "Oak", AgeGroupID: "ag2", RequiredCounselors: 1},
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 10},
+				{ID: "c2", Name: "Oak", AgeGroupID: "ag2", RequiredCounselors: 1, Capacity: 10},
 			},
 			Counselors: []Counselor{
 				{ID: "sr1", Name: "Counselor 1", IsJunior: false},
@@ -100,9 +100,9 @@ func TestSolve(t *testing.T) {
 	t.Run("max iterations terminates search", func(t *testing.T) {
 		snapshot := SessionSnapshot{
 			Cabins: []Cabin{
-				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1},
-				{ID: "c2", Name: "Oak", AgeGroupID: "ag2", RequiredCounselors: 1},
-				{ID: "c3", Name: "Elm", AgeGroupID: "ag1", RequiredCounselors: 1},
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 10},
+				{ID: "c2", Name: "Oak", AgeGroupID: "ag2", RequiredCounselors: 1, Capacity: 10},
+				{ID: "c3", Name: "Elm", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 10},
 			},
 			Counselors: []Counselor{
 				{ID: "sr1", Name: "Counselor 1", IsJunior: false},
@@ -123,7 +123,7 @@ func TestSolve(t *testing.T) {
 	t.Run("extra counselors can be left unassigned", func(t *testing.T) {
 		snapshot := SessionSnapshot{
 			Cabins: []Cabin{
-				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1},
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 10},
 			},
 			Counselors: []Counselor{
 				{ID: "sr1", Name: "Counselor 1", IsJunior: false},
@@ -148,8 +148,8 @@ func TestSolve(t *testing.T) {
 	t.Run("preferences influence best solution", func(t *testing.T) {
 		snapshot := SessionSnapshot{
 			Cabins: []Cabin{
-				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1},
-				{ID: "c2", Name: "Oak", AgeGroupID: "ag2", RequiredCounselors: 1},
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 10},
+				{ID: "c2", Name: "Oak", AgeGroupID: "ag2", RequiredCounselors: 1, Capacity: 10},
 			},
 			Counselors: []Counselor{
 				{ID: "sr1", Name: "Counselor 1", IsJunior: false},
@@ -176,7 +176,7 @@ func TestSolve(t *testing.T) {
 	t.Run("junior plus senior satisfies constraints", func(t *testing.T) {
 		snapshot := SessionSnapshot{
 			Cabins: []Cabin{
-				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 2},
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 2, Capacity: 10},
 			},
 			Counselors: []Counselor{
 				{ID: "sr1", Name: "Counselor 1", IsJunior: false},

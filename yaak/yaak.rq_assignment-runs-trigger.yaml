@@ -2,11 +2,11 @@ type: http_request
 model: http_request
 id: rq_assignment-runs-trigger
 createdAt: "2026-04-13T00:00:00.000000"
-updatedAt: "2026-04-13T00:00:00.000000"
+updatedAt: "2026-04-22T00:00:00.000000"
 workspaceId: wk_camp-scheduler
 folderId: fl_assignment-runs
 name: Trigger Run
-description: ""
+description: 'run_type must be one of: "cabin", "activity_schedule".'
 url: "${[ base_url ]}/sessions/${[ test-session-id ]}/assignment-runs"
 urlParameters: []
 method: POST
@@ -14,6 +14,9 @@ headers: []
 authentication: {}
 authenticationType: null
 body:
-  text: '{}'
+  text: |
+    {
+      "run_type": "cabin"
+    }
 bodyType: application/json
 sortPriority: 0.0

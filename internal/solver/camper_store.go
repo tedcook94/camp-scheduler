@@ -9,52 +9,7 @@ import (
 	"camp-scheduler/internal/db"
 
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-const runTypeCamperCabin = "camper_cabin"
-
-func StoreCamperSolutions(ctx context.Context, pool *pgxpool.Pool, campID, sessionID string, snapshot CamperCabinSnapshot, solutions []CamperSolution) (string, error) {
-	campUUID, err := api.ParseUUID(campID)
-	if err != nil {
-		return "", err
-	}
-
-	sessionUUID, err := api.ParseUUID(sessionID)
-	if err != nil {
-		return "", err
-	}
-
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return "", fmt.Errorf("error beginning transaction: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	qtx := db.New(tx)
-
-	run, err := qtx.CreateAssignmentRun(ctx, db.CreateAssignmentRunParams{
-		CampID:    campUUID,
-		SessionID: sessionUUID,
-		RunType:   runTypeCamperCabin,
-		Status:    "completed",
-	})
-	if err != nil {
-		return "", fmt.Errorf("error creating assignment run: %w", err)
-	}
-
-	for i, solution := range solutions {
-		if err := storeCamperSolution(ctx, qtx, campUUID, run.ID, i, snapshot, solution); err != nil {
-			return "", fmt.Errorf("error storing camper solution %d: %w", i, err)
-		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return "", fmt.Errorf("error committing transaction: %w", err)
-	}
-
-	return api.UUIDToString(run.ID), nil
-}
 
 func storeCamperSolution(ctx context.Context, qtx *db.Queries, campID, runID pgtype.UUID, index int, snapshot CamperCabinSnapshot, solution CamperSolution) error {
 	breakdownJSON, err := json.Marshal(solution.Score.Breakdown)

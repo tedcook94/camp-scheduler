@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -204,6 +205,20 @@ func asMap(v any) map[string]any {
 	return m
 }
 
+// createSeniorCounselors creates n senior counselors of the given gender.
+// Useful for camper-focused tests that still need cabins staffed so the
+// combined cabin run can satisfy required_counselors and senior constraints.
+func createSeniorCounselors(t *testing.T, ts *httptest.Server, token, gender string, n int) {
+	t.Helper()
+	for i := 0; i < n; i++ {
+		mustPost(t, apiURL(ts, "/counselors"), map[string]any{
+			"name":             fmt.Sprintf("Senior %s %d", gender, i+1),
+			"junior_counselor": false,
+			"gender":           gender,
+		}, token)
+	}
+}
+
 func TestSolverIntegration(t *testing.T) {
 	t.Run("simple_camp", testSimpleCamp)
 	t.Run("complex_camp", testComplexCamp)
@@ -238,10 +253,12 @@ func TestAssignmentRunEndpoints(t *testing.T) {
 	t.Run("precondition_no_session_cabins", testPreconditionNoSessionCabins)
 	t.Run("precondition_no_enabled_counselors", testPreconditionNoEnabledCounselors)
 	t.Run("precondition_no_senior_counselors", testPreconditionNoSeniorCounselors)
-	t.Run("precondition_no_enrolled_campers", testPreconditionNoEnrolledCampers)
+	t.Run("cabin_run_without_enrolled_campers", testCabinRunWithoutEnrolledCampers)
 	t.Run("precondition_no_session_activities", testPreconditionNoSessionActivities)
 	t.Run("precondition_counselor_gender_shortfall", testPreconditionCounselorGenderShortfall)
 	t.Run("precondition_camper_gender_capacity", testPreconditionCamperGenderCapacity)
+	t.Run("cabin_run_fails_on_required_exceeding_capacity", testCabinRunFailsOnRequiredExceedingCapacity)
+	t.Run("cabin_run_combined_score_additivity", testCabinRunCombinedScoreAdditivity)
 }
 
 func TestAuth(t *testing.T) {
@@ -879,7 +896,7 @@ func testSimpleCamp(t *testing.T) {
 	}, token)
 
 	runURL := apiURL(ts, "/sessions/"+session2ID+"/assignment-runs")
-	triggerResp := mustPost(t, runURL, nil, token)
+	triggerResp := mustPost(t, runURL, map[string]any{"run_type": "cabin"}, token)
 
 	runID := str(triggerResp, "id")
 	if runID == "" {
@@ -888,8 +905,8 @@ func testSimpleCamp(t *testing.T) {
 	if str(triggerResp, "status") != "completed" {
 		t.Fatalf("expected status 'completed', got %q", str(triggerResp, "status"))
 	}
-	if str(triggerResp, "run_type") != "counselor_cabin" {
-		t.Fatalf("expected run_type 'counselor_cabin', got %q", str(triggerResp, "run_type"))
+	if str(triggerResp, "run_type") != "cabin" {
+		t.Fatalf("expected run_type 'cabin', got %q", str(triggerResp, "run_type"))
 	}
 
 	solutions := list(triggerResp, "solutions")
@@ -1203,6 +1220,7 @@ func testComplexCamp(t *testing.T) {
 
 	runURL := apiURL(ts, "/sessions/"+session2ID+"/assignment-runs")
 	triggerResp := mustPost(t, runURL, map[string]any{
+		"run_type":      "cabin",
 		"max_solutions": 5,
 	}, token)
 
@@ -1330,7 +1348,7 @@ func testComplexCamp(t *testing.T) {
 }
 
 // testBasicCamperAssignment verifies the full camper assignment flow:
-// create camp entities, enroll campers, trigger a camper_cabin run,
+// create camp entities, enroll campers, trigger a cabin run,
 // and verify assignments respect cabin capacity and age group constraints.
 func testBasicCamperAssignment(t *testing.T) {
 	ts, pool := mustSetupServer(t)
@@ -1412,14 +1430,17 @@ func testBasicCamperAssignment(t *testing.T) {
 		}, token)
 	}
 
-	// Trigger camper_cabin run.
+	// Combined cabin runs need counselors to staff the cabins.
+	createSeniorCounselors(t, ts, token, "female", 2)
+
+	// Trigger cabin run.
 	runURL := apiURL(ts, sessionBase+"/assignment-runs")
 	runResp := mustPost(t, runURL, map[string]any{
-		"run_type": "camper_cabin",
+		"run_type": "cabin",
 	}, token)
 
-	if str(runResp, "run_type") != "camper_cabin" {
-		t.Fatalf("expected run_type camper_cabin, got %s", str(runResp, "run_type"))
+	if str(runResp, "run_type") != "cabin" {
+		t.Fatalf("expected run_type cabin, got %s", str(runResp, "run_type"))
 	}
 	if str(runResp, "status") != "completed" {
 		t.Fatalf("expected status completed, got %s", str(runResp, "status"))
@@ -1437,11 +1458,18 @@ func testBasicCamperAssignment(t *testing.T) {
 
 	solDetail := mustGet(t, runURL+"/"+runID+"/solutions/"+topSolutionID, token)
 	assignments := list(solDetail, "assignments")
-	if len(assignments) != 6 {
-		t.Fatalf("expected 6 camper assignments, got %d", len(assignments))
+	camperAssignments := []any{}
+	for _, a := range assignments {
+		if str(asMap(a), "camper_id") != "" {
+			camperAssignments = append(camperAssignments, a)
+		}
+	}
+	if len(camperAssignments) != 6 {
+		t.Fatalf("expected 6 camper assignments, got %d", len(camperAssignments))
 	}
 
-	// Verify assignments respect capacity: no cabin has more than 4.
+	// Verify assignments respect capacity: no cabin has more than 4 occupants
+	// total (counselors + campers).
 	cabinCounts := make(map[string]int)
 	for _, a := range assignments {
 		am := asMap(a)
@@ -1449,7 +1477,7 @@ func testBasicCamperAssignment(t *testing.T) {
 	}
 	for cabinID, count := range cabinCounts {
 		if count > 4 {
-			t.Fatalf("cabin %s has %d campers, exceeding capacity of 4", cabinID, count)
+			t.Fatalf("cabin %s has %d occupants, exceeding capacity of 4", cabinID, count)
 		}
 	}
 
@@ -1553,10 +1581,13 @@ func testCamperFriendPreferences(t *testing.T) {
 		{"preferred_camper_id": danaID, "rank": 1},
 	}, token)
 
+	// Combined cabin runs need counselors to staff the cabins.
+	createSeniorCounselors(t, ts, token, "female", 2)
+
 	// Trigger camper run.
 	runURL := apiURL(ts, sessionBase+"/assignment-runs")
 	runResp := mustPost(t, runURL, map[string]any{
-		"run_type":      "camper_cabin",
+		"run_type":      "cabin",
 		"max_solutions": 3,
 	}, token)
 
@@ -1577,10 +1608,12 @@ func testCamperFriendPreferences(t *testing.T) {
 	topSolutionID := str(topSolution, "id")
 	solDetail := mustGet(t, runURL+"/"+runID+"/solutions/"+topSolutionID, token)
 
-	// Verify score breakdown exists.
-	breakdown := list(solDetail, "score_breakdown")
-	if len(breakdown) == 0 {
-		t.Fatal("expected non-empty score_breakdown")
+	// Verify score breakdown exists. The friend-preference contribution lives
+	// on the camper side of the combined cabin solution.
+	counselorBreakdown := list(solDetail, "score_breakdown")
+	camperBreakdown := list(solDetail, "camper_score_breakdown")
+	if len(counselorBreakdown) == 0 && len(camperBreakdown) == 0 {
+		t.Fatal("expected non-empty score_breakdown or camper_score_breakdown")
 	}
 
 	// Verify Amy and Beth are in the same cabin in the top solution.
@@ -1729,6 +1762,8 @@ func testEnrollmentSessionUniqueness(t *testing.T) {
 
 // testGetSolutionRunOwnership verifies that requesting a solution through a
 // run that doesn't own it returns 404, preventing cross-run data leakage.
+// Uses two sessions because the unique (session_id, run_type) constraint
+// allows only one run per type per session.
 func testGetSolutionRunOwnership(t *testing.T) {
 	ts, pool := mustSetupServer(t)
 
@@ -1747,56 +1782,60 @@ func testGetSolutionRunOwnership(t *testing.T) {
 		"name": "Pine", "default_age_group_id": agID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
-		"gender":                    "female",
+		"gender":                      "female",
 	}, token)
 	cabinID := str(cabin, "id")
 
 	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31"}, token)
 	seasonID := str(season, "id")
 
-	session := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
-		"name": "Week 1", "season_id": seasonID,
-	}, token)
-	sessionID := str(session, "id")
+	createSeniorCounselors(t, ts, token, "female", 1)
 
-	sag := mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/age-groups"), map[string]any{
-		"age_group_id": agID,
-	}, token)
-	sagID := str(sag, "id")
-
-	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
-		"session_age_group_id": sagID, "cabin_id": cabinID,
-		"group_size": 4, "required_counselors": 1,
-	}, token)
-
-	// Create 2 campers and enroll them.
-	for _, name := range []string{"Alice", "Bob"} {
-		c := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": name, "gender": "female"}, token)
-		mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/enrollments"), map[string]any{
-			"camper_id": str(c, "id"), "session_age_group_id": sagID,
+	configureSession := func(name string) (sessionID, runID, solID string) {
+		session := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+			"name": name, "season_id": seasonID,
 		}, token)
+		sessionID = str(session, "id")
+
+		sag := mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/age-groups"), map[string]any{
+			"age_group_id": agID,
+		}, token)
+		sagID := str(sag, "id")
+
+		mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
+			"session_age_group_id": sagID, "cabin_id": cabinID,
+			"group_size": 4, "required_counselors": 1,
+		}, token)
+
+		for _, n := range []string{"Alice", "Bob"} {
+			c := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": n + " " + name, "gender": "female"}, token)
+			mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/enrollments"), map[string]any{
+				"camper_id": str(c, "id"), "session_age_group_id": sagID,
+			}, token)
+		}
+
+		runURL := apiURL(ts, "/sessions/"+sessionID+"/assignment-runs")
+		run := mustPost(t, runURL, map[string]any{"run_type": "cabin"}, token)
+		return sessionID, str(run, "id"), str(asMap(list(run, "solutions")[0]), "id")
 	}
 
-	// Trigger two camper runs to get solutions from different runs.
-	runURL := apiURL(ts, "/sessions/"+sessionID+"/assignment-runs")
-	run1 := mustPost(t, runURL, map[string]any{"run_type": "camper_cabin"}, token)
-	run1ID := str(run1, "id")
-	sol1ID := str(asMap(list(run1, "solutions")[0]), "id")
+	session1ID, run1ID, sol1ID := configureSession("Week 1")
+	session2ID, run2ID, _ := configureSession("Week 2")
 
-	run2 := mustPost(t, runURL, map[string]any{"run_type": "camper_cabin"}, token)
-	run2ID := str(run2, "id")
+	run1URL := apiURL(ts, "/sessions/"+session1ID+"/assignment-runs")
+	run2URL := apiURL(ts, "/sessions/"+session2ID+"/assignment-runs")
 
 	// Getting run1's solution through run1 should succeed.
-	mustGet(t, runURL+"/"+run1ID+"/solutions/"+sol1ID, token)
+	mustGet(t, run1URL+"/"+run1ID+"/solutions/"+sol1ID, token)
 
 	// Getting run1's solution through run2 should return 404.
 	doRawRequest(t, http.MethodGet,
-		runURL+"/"+run2ID+"/solutions/"+sol1ID,
+		run2URL+"/"+run2ID+"/solutions/"+sol1ID,
 		nil, http.StatusNotFound, token)
 
 	// Clean up.
-	mustDelete(t, runURL+"/"+run1ID, token)
-	mustDelete(t, runURL+"/"+run2ID, token)
+	mustDelete(t, run1URL+"/"+run1ID, token)
+	mustDelete(t, run2URL+"/"+run2ID, token)
 }
 
 // testGetSolutionRunNotFound verifies that GetSolution returns 404 (not 500)
@@ -1835,7 +1874,7 @@ func testGetSolutionRunNotFound(t *testing.T) {
 }
 
 // testSelectSolutionCamperRun verifies that SelectSolution works for
-// camper_cabin runs (not just counselor_cabin runs).
+// cabin runs.
 func testSelectSolutionCamperRun(t *testing.T) {
 	ts, pool := mustSetupServer(t)
 
@@ -1885,9 +1924,11 @@ func testSelectSolutionCamperRun(t *testing.T) {
 		}, token)
 	}
 
+	createSeniorCounselors(t, ts, token, "female", 1)
+
 	// Trigger camper run.
 	runURL := apiURL(ts, sessionBase+"/assignment-runs")
-	runResp := mustPost(t, runURL, map[string]any{"run_type": "camper_cabin"}, token)
+	runResp := mustPost(t, runURL, map[string]any{"run_type": "cabin"}, token)
 	runID := str(runResp, "id")
 	topSolutionID := str(asMap(list(runResp, "solutions")[0]), "id")
 
@@ -1913,10 +1954,10 @@ func testSelectSolutionCamperRun(t *testing.T) {
 	mustDelete(t, runURL+"/"+runID, token)
 }
 
-// testSelectSolutionReplacesPriorRunSelection verifies that selecting a
-// solution from a new run of the same type within the same session clears
-// the prior run's selection (the unique constraint on (camp,session,type)
-// allows only one selected run per type).
+// testSelectSolutionReplacesPriorRunSelection verifies that triggering a
+// new cabin run for the same session replaces the previous run entirely,
+// including any selection on it. The unique (session_id, run_type)
+// constraint enforces one run per type per session at the database level.
 func testSelectSolutionReplacesPriorRunSelection(t *testing.T) {
 	ts, pool := mustSetupServer(t)
 
@@ -1935,7 +1976,7 @@ func testSelectSolutionReplacesPriorRunSelection(t *testing.T) {
 		"name": "Hawk", "default_age_group_id": agID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
-		"gender":                    "female",
+		"gender":                      "female",
 	}, token)
 	cabinID := str(cabin, "id")
 
@@ -1965,38 +2006,39 @@ func testSelectSolutionReplacesPriorRunSelection(t *testing.T) {
 		}, token)
 	}
 
+	createSeniorCounselors(t, ts, token, "female", 1)
+
 	runURL := apiURL(ts, sessionBase+"/assignment-runs")
 
 	// Trigger run A and select its top solution.
-	runA := mustPost(t, runURL, map[string]any{"run_type": "camper_cabin"}, token)
+	runA := mustPost(t, runURL, map[string]any{"run_type": "cabin"}, token)
 	runAID := str(runA, "id")
 	runASol := str(asMap(list(runA, "solutions")[0]), "id")
 	doRequest(t, http.MethodPost, runURL+"/"+runAID+"/solutions/"+runASol+"/select", nil, http.StatusOK, token)
 
-	// Trigger run B (same session, same type) and select its top solution.
-	runB := mustPost(t, runURL, map[string]any{"run_type": "camper_cabin"}, token)
+	// Trigger run B in the same session: should replace run A entirely.
+	runB := mustPost(t, runURL, map[string]any{"run_type": "cabin"}, token)
 	runBID := str(runB, "id")
+	if runBID == runAID {
+		t.Fatal("expected new run to have a fresh ID")
+	}
+
+	// Run A no longer exists.
+	doRawRequest(t, http.MethodGet, runURL+"/"+runAID, nil, http.StatusNotFound, token)
+
+	// The selection on run A is gone (cascaded). Selecting on run B works.
 	runBSol := str(asMap(list(runB, "solutions")[0]), "id")
 	selectB := doRequest(t, http.MethodPost, runURL+"/"+runBID+"/solutions/"+runBSol+"/select", nil, http.StatusOK, token)
 	if str(selectB, "status") != "selected" {
 		t.Fatalf("expected run B to be selected, got status %q", str(selectB, "status"))
 	}
 
-	// Run A should now report status "completed" with no selected solution.
-	runAUpdated := mustGet(t, runURL+"/"+runAID, token)
-	if str(runAUpdated, "status") != "completed" {
-		t.Fatalf("expected run A status 'completed', got %q", str(runAUpdated, "status"))
-	}
-	if sel := str(runAUpdated, "selected_solution_id"); sel != "" {
-		t.Fatalf("expected run A selected_solution_id to be cleared, got %q", sel)
-	}
-
 	// Exactly one row should exist in assignment_run_selected_solutions for
-	// (camp,session,solution_type='camper_cabin').
+	// (camp, session, solution_type='cabin').
 	var count int
 	err = pool.QueryRow(context.Background(),
 		`SELECT COUNT(*) FROM assignment_run_selected_solutions
-		 WHERE camp_id = $1 AND session_id = $2 AND solution_type = 'camper_cabin'`,
+		 WHERE camp_id = $1 AND session_id = $2 AND solution_type = 'cabin'`,
 		campID, sessionID).Scan(&count)
 	if err != nil {
 		t.Fatalf("counting selections: %v", err)
@@ -2005,7 +2047,18 @@ func testSelectSolutionReplacesPriorRunSelection(t *testing.T) {
 		t.Fatalf("expected exactly 1 selection row, got %d", count)
 	}
 
-	mustDelete(t, runURL+"/"+runAID, token)
+	// Only one assignment_runs row should exist for this (session, type).
+	var runCount int
+	err = pool.QueryRow(context.Background(),
+		`SELECT COUNT(*) FROM assignment_runs
+		 WHERE session_id = $1 AND run_type = 'cabin'`, sessionID).Scan(&runCount)
+	if err != nil {
+		t.Fatalf("counting runs: %v", err)
+	}
+	if runCount != 1 {
+		t.Fatalf("expected exactly 1 cabin run for the session, got %d", runCount)
+	}
+
 	mustDelete(t, runURL+"/"+runBID, token)
 }
 
@@ -2023,7 +2076,7 @@ func testCamperRunInvalidSession(t *testing.T) {
 	fakeSessionID := "00000000-0000-0000-0000-000000000099"
 	runURL := apiURL(ts, "/sessions/"+fakeSessionID+"/assignment-runs")
 
-	doRawRequest(t, http.MethodPost, runURL, map[string]any{"run_type": "camper_cabin"}, http.StatusNotFound, token)
+	doRawRequest(t, http.MethodPost, runURL, map[string]any{"run_type": "cabin"}, http.StatusNotFound, token)
 }
 
 // testRepeatedUnmetPreferenceBoost exercises the full flow of:
@@ -2145,7 +2198,7 @@ func testRepeatedUnmetPreferenceBoost(t *testing.T) {
 
 	// Trigger session 1 run.
 	run1URL := apiURL(ts, "/sessions/"+session1ID+"/assignment-runs")
-	run1Resp := mustPost(t, run1URL, nil, token)
+	run1Resp := mustPost(t, run1URL, map[string]any{"run_type": "cabin"}, token)
 	run1ID := str(run1Resp, "id")
 
 	solutions1 := list(run1Resp, "solutions")
@@ -2163,7 +2216,7 @@ func testRepeatedUnmetPreferenceBoost(t *testing.T) {
 
 	// Trigger session 2 run.
 	run2URL := apiURL(ts, "/sessions/"+session2ID+"/assignment-runs")
-	run2Resp := mustPost(t, run2URL, nil, token)
+	run2Resp := mustPost(t, run2URL, map[string]any{"run_type": "cabin"}, token)
 	run2ID := str(run2Resp, "id")
 
 	solutions2 := list(run2Resp, "solutions")
@@ -3122,7 +3175,7 @@ func testGetRunById(t *testing.T) {
 	}
 
 	runURL := apiURL(ts, "/sessions/"+sessionID+"/assignment-runs")
-	runResp := mustPost(t, runURL, map[string]any{"run_type": "counselor_cabin"}, token)
+	runResp := mustPost(t, runURL, map[string]any{"run_type": "cabin"}, token)
 	runID := str(runResp, "id")
 
 	byIdResp := mustGet(t, apiURL(ts, "/assignment-runs/"+runID), token)
@@ -3136,8 +3189,8 @@ func testGetRunById(t *testing.T) {
 	if str(byIdResp, "session_id") != sessionID {
 		t.Fatalf("expected session_id %q, got %q", sessionID, str(byIdResp, "session_id"))
 	}
-	if str(byIdResp, "run_type") != "counselor_cabin" {
-		t.Fatalf("expected run_type counselor_cabin, got %q", str(byIdResp, "run_type"))
+	if str(byIdResp, "run_type") != "cabin" {
+		t.Fatalf("expected run_type cabin, got %q", str(byIdResp, "run_type"))
 	}
 	if str(byIdResp, "status") != "completed" {
 		t.Fatalf("expected status completed, got %q", str(byIdResp, "status"))
@@ -3215,7 +3268,7 @@ func testGetRunByIdCrossCampIsolation(t *testing.T) {
 	}
 
 	runURL := apiURL(ts, "/sessions/"+sessionID+"/assignment-runs")
-	runResp := mustPost(t, runURL, map[string]any{"run_type": "counselor_cabin"}, tokenA)
+	runResp := mustPost(t, runURL, map[string]any{"run_type": "cabin"}, tokenA)
 	runID := str(runResp, "id")
 
 	var campB string
@@ -3265,7 +3318,7 @@ func testPreconditionNoSessionCabins(t *testing.T) {
 
 	resp := doRequest(t, http.MethodPost,
 		apiURL(ts, "/sessions/"+sessionID+"/assignment-runs"),
-		map[string]any{"run_type": "counselor_cabin"},
+		map[string]any{"run_type": "cabin"},
 		http.StatusUnprocessableEntity, token)
 	if !strings.Contains(str(resp, "error"), "No cabins configured") {
 		t.Fatalf("expected 'No cabins configured' error, got: %s", str(resp, "error"))
@@ -3318,7 +3371,7 @@ func testPreconditionNoEnabledCounselors(t *testing.T) {
 
 	resp := doRequest(t, http.MethodPost,
 		apiURL(ts, "/sessions/"+sessionID+"/assignment-runs"),
-		map[string]any{"run_type": "counselor_cabin"},
+		map[string]any{"run_type": "cabin"},
 		http.StatusUnprocessableEntity, token)
 	if !strings.Contains(str(resp, "error"), "No enabled counselors") {
 		t.Fatalf("expected 'No enabled counselors' error, got: %s", str(resp, "error"))
@@ -3378,14 +3431,17 @@ func testPreconditionNoSeniorCounselors(t *testing.T) {
 
 	resp := doRequest(t, http.MethodPost,
 		apiURL(ts, "/sessions/"+sessionID+"/assignment-runs"),
-		map[string]any{"run_type": "counselor_cabin"},
+		map[string]any{"run_type": "cabin"},
 		http.StatusUnprocessableEntity, token)
 	if !strings.Contains(str(resp, "error"), "No senior counselors") {
 		t.Fatalf("expected 'No senior counselors' error, got: %s", str(resp, "error"))
 	}
 }
 
-func testPreconditionNoEnrolledCampers(t *testing.T) {
+// testCabinRunWithoutEnrolledCampers verifies that a cabin run can produce
+// counselor-only assignments when the session has no enrolled campers. This
+// is valid under the combined cabin model: campers are optional.
+func testCabinRunWithoutEnrolledCampers(t *testing.T) {
 	ts, pool := mustSetupServer(t)
 
 	var campID string
@@ -3401,11 +3457,11 @@ func testPreconditionNoEnrolledCampers(t *testing.T) {
 	agID := str(ag, "id")
 
 	cabin := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
-		"name":                 "Pine",
-		"default_age_group_id": agID,
+		"name":                        "Pine",
+		"default_age_group_id":        agID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
-		"gender":                    "female",
+		"gender":                      "female",
 	}, token)
 	cabinID := str(cabin, "id")
 
@@ -3429,12 +3485,264 @@ func testPreconditionNoEnrolledCampers(t *testing.T) {
 		"group_size": 8, "required_counselors": 1,
 	}, token)
 
+	createSeniorCounselors(t, ts, token, "female", 1)
+
+	runResp := mustPost(t,
+		apiURL(ts, "/sessions/"+sessionID+"/assignment-runs"),
+		map[string]any{"run_type": "cabin"}, token)
+	if str(runResp, "status") != "completed" {
+		t.Fatalf("expected status 'completed', got %q", str(runResp, "status"))
+	}
+}
+
+// testCabinRunFailsOnRequiredExceedingCapacity verifies that a cabin
+// configured with required_counselors > group_size returns a clear 422
+// naming the offending cabin rather than a generic solver failure.
+func testCabinRunFailsOnRequiredExceedingCapacity(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`,
+		"CampOverPackedCabin").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	ag := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Juniors"}, token)
+	agID := str(ag, "id")
+
+	cabin := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name":                        "Tiny",
+		"default_age_group_id":        agID,
+		"default_group_size":          2,
+		"default_required_counselors": 4,
+		"gender":                      "female",
+	}, token)
+	cabinID := str(cabin, "id")
+
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31",
+	}, token)
+	seasonID := str(season, "id")
+
+	session := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	}, token)
+	sessionID := str(session, "id")
+
+	sag := mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/age-groups"), map[string]any{
+		"age_group_id": agID,
+	}, token)
+	sagID := str(sag, "id")
+
+	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
+		"session_age_group_id": sagID, "cabin_id": cabinID,
+		"group_size": 2, "required_counselors": 4,
+	}, token)
+
+	createSeniorCounselors(t, ts, token, "female", 4)
+
 	resp := doRequest(t, http.MethodPost,
 		apiURL(ts, "/sessions/"+sessionID+"/assignment-runs"),
-		map[string]any{"run_type": "camper_cabin"},
+		map[string]any{"run_type": "cabin"},
 		http.StatusUnprocessableEntity, token)
-	if !strings.Contains(str(resp, "error"), "No campers enrolled") {
-		t.Fatalf("expected 'No campers enrolled' error, got: %s", str(resp, "error"))
+	msg := str(resp, "error")
+	if !strings.Contains(msg, "Tiny") {
+		t.Fatalf("expected error to mention cabin name 'Tiny', got: %s", msg)
+	}
+	if !strings.Contains(msg, "requires 4 counselors") {
+		t.Fatalf("expected error to mention requires 4 counselors, got: %s", msg)
+	}
+	if !strings.Contains(msg, "total capacity 2") {
+		t.Fatalf("expected error to mention total capacity 2, got: %s", msg)
+	}
+}
+
+// testCabinRunCombinedScoreAdditivity exercises the combined cabin solver
+// end-to-end through the HTTP API and asserts the invariants the API
+// contract owes to clients: a multi-solution run is returned, solutions
+// are sorted by combined score in descending order, and each solution's
+// reported `score` equals the sum of the counselor-side `score_breakdown`
+// and the camper-side `camper_score_breakdown`. Cliff coverage for the
+// over-sampling fix lives in TestPairAndRankCabinSolutionsBeatsCounselorFirst.
+func testCabinRunCombinedScoreAdditivity(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`,
+		"Camp Joint Cabin").Scan(&campID)
+	if err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	bears := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Bears"}, token)
+	bearsID := str(bears, "id")
+	eagles := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Eagles"}, token)
+	eaglesID := str(eagles, "id")
+
+	mkCabin := func(name, agID string) string {
+		c := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+			"name":                        name,
+			"default_age_group_id":        agID,
+			"default_group_size":          5,
+			"default_required_counselors": 1,
+			"gender":                      "female",
+		}, token)
+		return str(c, "id")
+	}
+	pineID := mkCabin("Pine", bearsID)
+	oakID := mkCabin("Oak", bearsID)
+	mapleID := mkCabin("Maple", eaglesID)
+	birchID := mkCabin("Birch", eaglesID)
+
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Summer 2026", "start_date": "2026-06-01", "end_date": "2026-08-31",
+	}, token)
+	seasonID := str(season, "id")
+	sess := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	}, token)
+	sessID := str(sess, "id")
+	sessBase := "/sessions/" + sessID
+
+	bearsSAG := str(mustPost(t, apiURL(ts, sessBase+"/age-groups"),
+		map[string]any{"age_group_id": bearsID}, token), "id")
+	eaglesSAG := str(mustPost(t, apiURL(ts, sessBase+"/age-groups"),
+		map[string]any{"age_group_id": eaglesID}, token), "id")
+
+	for _, c := range []struct {
+		cabinID, sagID string
+	}{
+		{pineID, bearsSAG}, {oakID, bearsSAG},
+		{mapleID, eaglesSAG}, {birchID, eaglesSAG},
+	} {
+		mustPost(t, apiURL(ts, sessBase+"/cabins"), map[string]any{
+			"session_age_group_id": c.sagID, "cabin_id": c.cabinID,
+			"group_size": 5, "required_counselors": 1,
+		}, token)
+	}
+
+	mkCounselor := func(name string) string {
+		c := mustPost(t, apiURL(ts, "/counselors"), map[string]any{
+			"name": name, "junior_counselor": false, "gender": "female",
+		}, token)
+		return str(c, "id")
+	}
+	sr1 := mkCounselor("Sr One")
+	sr2 := mkCounselor("Sr Two")
+	sr3 := mkCounselor("Sr Three")
+	sr4 := mkCounselor("Sr Four")
+	mkCounselor("Sr Five")
+	mkCounselor("Sr Six")
+
+	cprefBase := sessBase + "/counselors/"
+	mustPut(t, apiURL(ts, cprefBase+sr1+"/age-group-preferences"),
+		[]map[string]any{{"age_group_id": bearsID, "rank": 1}}, token)
+	mustPut(t, apiURL(ts, cprefBase+sr2+"/age-group-preferences"),
+		[]map[string]any{{"age_group_id": bearsID, "rank": 1}}, token)
+	mustPut(t, apiURL(ts, cprefBase+sr3+"/age-group-preferences"),
+		[]map[string]any{{"age_group_id": eaglesID, "rank": 1}}, token)
+	mustPut(t, apiURL(ts, cprefBase+sr4+"/age-group-preferences"),
+		[]map[string]any{{"age_group_id": eaglesID, "rank": 1}}, token)
+	mustPut(t, apiURL(ts, cprefBase+sr1+"/cocounselor-preferences"),
+		[]map[string]any{{"preferred_counselor_id": sr3, "rank": 1}}, token)
+	mustPut(t, apiURL(ts, cprefBase+sr3+"/cocounselor-preferences"),
+		[]map[string]any{{"preferred_counselor_id": sr1, "rank": 1}}, token)
+
+	mkCamper := func(name string) string {
+		c := mustPost(t, apiURL(ts, "/campers"), map[string]any{
+			"name": name, "gender": "female",
+		}, token)
+		return str(c, "id")
+	}
+	bearsCampers := make([]string, 6)
+	for i := range bearsCampers {
+		bearsCampers[i] = mkCamper(fmt.Sprintf("Bear %d", i+1))
+		mustPost(t, apiURL(ts, sessBase+"/enrollments"), map[string]any{
+			"camper_id": bearsCampers[i], "session_age_group_id": bearsSAG,
+		}, token)
+	}
+	eaglesCampers := make([]string, 6)
+	for i := range eaglesCampers {
+		eaglesCampers[i] = mkCamper(fmt.Sprintf("Eagle %d", i+1))
+		mustPost(t, apiURL(ts, sessBase+"/enrollments"), map[string]any{
+			"camper_id": eaglesCampers[i], "session_age_group_id": eaglesSAG,
+		}, token)
+	}
+
+	pairs := [][2]int{{0, 1}, {2, 3}, {0, 2}, {1, 3}}
+	cprefForFriend := func(camperID, friendID string, rank int) {
+		mustPut(t, apiURL(ts, sessBase+"/campers/"+camperID+"/friend-preferences"),
+			[]map[string]any{{"preferred_camper_id": friendID, "rank": rank}}, token)
+	}
+	for _, p := range pairs {
+		cprefForFriend(bearsCampers[p[0]], bearsCampers[p[1]], 1)
+		cprefForFriend(bearsCampers[p[1]], bearsCampers[p[0]], 1)
+		cprefForFriend(eaglesCampers[p[0]], eaglesCampers[p[1]], 1)
+		cprefForFriend(eaglesCampers[p[1]], eaglesCampers[p[0]], 1)
+	}
+
+	runURL := apiURL(ts, sessBase+"/assignment-runs")
+	runResp := mustPost(t, runURL, map[string]any{
+		"run_type":      "cabin",
+		"max_solutions": 5,
+		"weights": map[string]any{
+			"cocounselor_preference": 20,
+			"age_group_preference":   1,
+		},
+		"camper_weights": map[string]any{
+			"friend_preference": 15,
+		},
+	}, token)
+
+	solutions := list(runResp, "solutions")
+	if len(solutions) < 2 {
+		t.Fatalf("expected >=2 solutions, got %d", len(solutions))
+	}
+
+	sumBreakdown := func(raw any) float64 {
+		entries, ok := raw.([]any)
+		if !ok || entries == nil {
+			return 0
+		}
+		var total float64
+		for _, e := range entries {
+			m, ok := e.(map[string]any)
+			if !ok {
+				continue
+			}
+			// Score breakdown components are marshalled with Go field
+			// names (capitalised), so look up "Score" not "score".
+			if v, ok := m["Score"].(float64); ok {
+				total += v
+			}
+		}
+		return total
+	}
+
+	const eps = 1e-6
+	for i, s := range solutions {
+		sm := asMap(s)
+		score := num(sm, "score")
+
+		if i > 0 {
+			prev := num(asMap(solutions[i-1]), "score")
+			if score > prev+eps {
+				t.Fatalf("solutions not sorted desc: index %d (%.4f) > index %d (%.4f)",
+					i, score, i-1, prev)
+			}
+		}
+
+		counselor := sumBreakdown(sm["score_breakdown"])
+		camper := sumBreakdown(sm["camper_score_breakdown"])
+		if diff := score - (counselor + camper); diff > eps || diff < -eps {
+			t.Fatalf("solution %d score %.6f != counselor %.6f + camper %.6f (diff %.6f)",
+				i, score, counselor, camper, diff)
+		}
 	}
 }
 
@@ -3520,7 +3828,7 @@ func testPreconditionCounselorGenderShortfall(t *testing.T) {
 
 	resp := doRequest(t, http.MethodPost,
 		apiURL(ts, "/sessions/"+sessionID+"/assignment-runs"),
-		map[string]any{"run_type": "counselor_cabin"},
+		map[string]any{"run_type": "cabin"},
 		http.StatusUnprocessableEntity, token)
 	if !strings.Contains(str(resp, "error"), "female counselors") {
 		t.Fatalf("expected female counselor shortfall error, got: %s", str(resp, "error"))
@@ -3578,9 +3886,13 @@ func testPreconditionCamperGenderCapacity(t *testing.T) {
 		}, token)
 	}
 
+	// Add a senior counselor so the counselor-side preconditions pass and
+	// the camper-capacity check is the one that fires.
+	createSeniorCounselors(t, ts, token, "female", 1)
+
 	resp := doRequest(t, http.MethodPost,
 		apiURL(ts, "/sessions/"+sessionID+"/assignment-runs"),
-		map[string]any{"run_type": "camper_cabin"},
+		map[string]any{"run_type": "cabin"},
 		http.StatusUnprocessableEntity, token)
 	errMsg := str(resp, "error")
 	if !strings.Contains(errMsg, "female cabin capacity") || !strings.Contains(errMsg, "Juniors") {

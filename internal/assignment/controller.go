@@ -78,11 +78,13 @@ type RunDetailResponse struct {
 }
 
 type SolutionSummaryResponse struct {
-	ID              string          `json:"id"`
-	AssignmentRunID string          `json:"assignment_run_id"`
-	SolutionIndex   int             `json:"solution_index"`
-	Score           float64         `json:"score"`
-	ScoreBreakdown  json.RawMessage `json:"score_breakdown"`
+	ID                   string          `json:"id"`
+	CamperSolutionID     string          `json:"camper_solution_id,omitempty"`
+	AssignmentRunID      string          `json:"assignment_run_id"`
+	SolutionIndex        int             `json:"solution_index"`
+	Score                float64         `json:"score"`
+	ScoreBreakdown       json.RawMessage `json:"score_breakdown"`
+	CamperScoreBreakdown json.RawMessage `json:"camper_score_breakdown,omitempty"`
 }
 
 type SolutionDetailResponse struct {
@@ -131,33 +133,19 @@ func (ctrl *Controller) TriggerRun(c *gin.Context) {
 
 	runType := req.RunType
 	if runType == "" {
-		runType = "counselor_cabin"
+		c.JSON(http.StatusBadRequest, gin.H{"error": "run_type is required"})
+		return
 	}
 
 	switch runType {
-	case "counselor_cabin":
-		cfg, err := buildSolverConfig(req)
+	case "cabin":
+		cfg, err := buildCabinSolverConfig(req)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		run, err := ctrl.svc.TriggerRun(c.Request.Context(), campID, sessionID, cfg)
-		if err != nil {
-			ctrl.handleTriggerError(c, log, sessionID, err)
-			return
-		}
-
-		c.JSON(http.StatusCreated, run)
-
-	case "camper_cabin":
-		cfg, err := buildCamperSolverConfig(req)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		run, err := ctrl.svc.TriggerCamperRun(c.Request.Context(), campID, sessionID, cfg)
+		run, err := ctrl.svc.TriggerCabinRun(c.Request.Context(), campID, sessionID, cfg)
 		if err != nil {
 			ctrl.handleTriggerError(c, log, sessionID, err)
 			return
@@ -181,7 +169,7 @@ func (ctrl *Controller) TriggerRun(c *gin.Context) {
 		c.JSON(http.StatusCreated, run)
 
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("unknown run_type: %s", runType)})
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("unknown run_type: %s (must be 'cabin' or 'activity_schedule')", runType)})
 	}
 }
 
@@ -373,60 +361,44 @@ func (ctrl *Controller) SelectSolution(c *gin.Context) {
 	c.JSON(http.StatusOK, run)
 }
 
-func buildSolverConfig(req TriggerRunRequest) (solver.SolverConfig, error) {
-	cfg := solver.DefaultSolverConfig()
+func buildCabinSolverConfig(req TriggerRunRequest) (solver.CabinSolverConfig, error) {
+	cfg := solver.DefaultCabinSolverConfig()
 
 	if req.MaxSolutions != nil {
 		if *req.MaxSolutions <= 0 {
 			return cfg, fmt.Errorf("max_solutions must be greater than 0")
 		}
 		cfg.MaxSolutions = *req.MaxSolutions
+		cfg.CounselorConfig.MaxSolutions = *req.MaxSolutions
 	}
 	if req.MaxIterations != nil {
 		if *req.MaxIterations <= 0 {
 			return cfg, fmt.Errorf("max_iterations must be greater than 0")
 		}
 		cfg.MaxIterations = *req.MaxIterations
+		cfg.CounselorConfig.MaxIterations = *req.MaxIterations
+		cfg.CamperConfig.MaxIterations = *req.MaxIterations
 	}
 	if req.Weights != nil {
 		if req.Weights.ReturningAgeGroup != nil {
-			cfg.Weights.ReturningAgeGroup = *req.Weights.ReturningAgeGroup
+			cfg.CounselorConfig.Weights.ReturningAgeGroup = *req.Weights.ReturningAgeGroup
 		}
 		if req.Weights.ReturningCabin != nil {
-			cfg.Weights.ReturningCabin = *req.Weights.ReturningCabin
+			cfg.CounselorConfig.Weights.ReturningCabin = *req.Weights.ReturningCabin
 		}
 		if req.Weights.CocounselorPreference != nil {
-			cfg.Weights.CocounselorPreference = *req.Weights.CocounselorPreference
+			cfg.CounselorConfig.Weights.CocounselorPreference = *req.Weights.CocounselorPreference
 		}
 		if req.Weights.AgeGroupPreference != nil {
-			cfg.Weights.AgeGroupPreference = *req.Weights.AgeGroupPreference
+			cfg.CounselorConfig.Weights.AgeGroupPreference = *req.Weights.AgeGroupPreference
 		}
 		if req.Weights.MultipleSeniors != nil {
-			cfg.Weights.MultipleSeniors = *req.Weights.MultipleSeniors
+			cfg.CounselorConfig.Weights.MultipleSeniors = *req.Weights.MultipleSeniors
 		}
-	}
-
-	return cfg, nil
-}
-
-func buildCamperSolverConfig(req TriggerRunRequest) (solver.CamperSolverConfig, error) {
-	cfg := solver.DefaultCamperSolverConfig()
-
-	if req.MaxSolutions != nil {
-		if *req.MaxSolutions <= 0 {
-			return cfg, fmt.Errorf("max_solutions must be greater than 0")
-		}
-		cfg.MaxSolutions = *req.MaxSolutions
-	}
-	if req.MaxIterations != nil {
-		if *req.MaxIterations <= 0 {
-			return cfg, fmt.Errorf("max_iterations must be greater than 0")
-		}
-		cfg.MaxIterations = *req.MaxIterations
 	}
 	if req.CamperWeights != nil {
 		if req.CamperWeights.FriendPreference != nil {
-			cfg.Weights.FriendPreference = *req.CamperWeights.FriendPreference
+			cfg.CamperConfig.Weights.FriendPreference = *req.CamperWeights.FriendPreference
 		}
 	}
 

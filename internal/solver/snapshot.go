@@ -84,7 +84,7 @@ func BuildSnapshot(ctx context.Context, queries *db.Queries, campID, sessionID s
 }
 
 func loadCabins(ctx context.Context, queries *db.Queries, sessionID, campID pgtype.UUID) ([]Cabin, error) {
-	rows, err := queries.ListSessionCabins(ctx, db.ListSessionCabinsParams{
+	rows, err := queries.ListSessionCabinsWithCapacity(ctx, db.ListSessionCabinsWithCapacityParams{
 		SessionID: sessionID,
 		CampID:    campID,
 	})
@@ -101,6 +101,7 @@ func loadCabins(ctx context.Context, queries *db.Queries, sessionID, campID pgty
 			AgeGroupName:           r.AgeGroupName,
 			SessionAgeGroupCabinID: api.UUIDToString(r.SessionAgeGroupCabinID),
 			RequiredCounselors:     int(r.RequiredCounselors),
+			Capacity:               int(r.GroupSize),
 			Gender:                 r.Gender,
 		}
 	}

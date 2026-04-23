@@ -67,6 +67,7 @@ func loadCamperCabins(ctx context.Context, queries *db.Queries, sessionID, campI
 			ID:                     api.UUIDToString(r.ID),
 			Name:                   r.CabinName,
 			AgeGroupID:             api.UUIDToString(r.AgeGroupID),
+			AgeGroupName:           r.AgeGroupName,
 			SessionAgeGroupCabinID: api.UUIDToString(r.SessionAgeGroupCabinID),
 			Capacity:               int(r.GroupSize),
 			Gender:                 r.Gender,

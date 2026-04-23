@@ -774,7 +774,7 @@ func setCounselorHistory(ctx context.Context, q *db.Queries, campID pgtype.UUID,
 	}
 	histories := []history{
 		{"Sarah Johnson", "Bears", "Pine Lodge"},
-		{"Mike Chen", "Wolves", "Oak Lodge"},
+		{"Mike Chen", "Wolves", "Elm Lodge"},
 		{"Emily Davis", "Eagles", "Maple Lodge"},
 		{"James Wilson", "Bears", "Cedar Lodge"},
 	}

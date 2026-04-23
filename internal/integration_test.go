@@ -240,6 +240,8 @@ func TestAssignmentRunEndpoints(t *testing.T) {
 	t.Run("precondition_no_senior_counselors", testPreconditionNoSeniorCounselors)
 	t.Run("precondition_no_enrolled_campers", testPreconditionNoEnrolledCampers)
 	t.Run("precondition_no_session_activities", testPreconditionNoSessionActivities)
+	t.Run("precondition_counselor_gender_shortfall", testPreconditionCounselorGenderShortfall)
+	t.Run("precondition_camper_gender_capacity", testPreconditionCamperGenderCapacity)
 }
 
 func TestAuth(t *testing.T) {
@@ -494,6 +496,7 @@ func testActivityScheduling(t *testing.T) {
 		resp := mustPost(t, apiURL(ts, "/counselors"), map[string]any{
 			"name":             c.name,
 			"junior_counselor": c.junior,
+			"gender":          "female",
 		}, token)
 		counselors[i] = counselorInfo{id: str(resp, "id"), name: c.name}
 	}
@@ -723,6 +726,7 @@ func testSimpleCamp(t *testing.T) {
 		"default_age_group_id": juniorsID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, token)
 	pineID := str(pine, "id")
 	if got := str(pine, "default_age_group_name"); got != "Juniors" {
@@ -734,6 +738,7 @@ func testSimpleCamp(t *testing.T) {
 		"default_age_group_id": juniorsID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, token)
 	oakID := str(oak, "id")
 	if got := str(oak, "default_age_group_name"); got != "Juniors" {
@@ -745,6 +750,7 @@ func testSimpleCamp(t *testing.T) {
 		"default_age_group_id": seniorsID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, token)
 	mapleID := str(maple, "id")
 	if got := str(maple, "default_age_group_name"); got != "Seniors" {
@@ -756,6 +762,7 @@ func testSimpleCamp(t *testing.T) {
 		"default_age_group_id": seniorsID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, token)
 	cedarID := str(cedar, "id")
 	if got := str(cedar, "default_age_group_name"); got != "Seniors" {
@@ -801,6 +808,7 @@ func testSimpleCamp(t *testing.T) {
 		resp := mustPost(t, apiURL(ts, "/counselors"), map[string]any{
 			"name":             c.name,
 			"junior_counselor": c.junior,
+			"gender":          "female",
 		}, token)
 		counselors = append(counselors, counselorInfo{id: str(resp, "id"), name: c.name})
 	}
@@ -1050,6 +1058,7 @@ func testComplexCamp(t *testing.T) {
 			"default_age_group_id": cd.ageGroupID,
 			"default_group_size":          8,
 			"default_required_counselors": 1,
+			"gender":                    "female",
 		}, token)
 		cabins[i] = cabinInfo{id: str(resp, "id"), name: cd.name}
 	}
@@ -1099,6 +1108,7 @@ func testComplexCamp(t *testing.T) {
 		resp := mustPost(t, apiURL(ts, "/counselors"), map[string]any{
 			"name":             c.name,
 			"junior_counselor": c.junior,
+			"gender":          "female",
 		}, token)
 		allCounselors[i] = counselorInfo{
 			id:       str(resp, "id"),
@@ -1342,6 +1352,7 @@ func testBasicCamperAssignment(t *testing.T) {
 		"name": "Birch", "default_age_group_id": juniorsID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, token)
 	cabinAID := str(cabinA, "id")
 	if got := str(cabinA, "default_age_group_name"); got != "Young" {
@@ -1352,6 +1363,7 @@ func testBasicCamperAssignment(t *testing.T) {
 		"name": "Elm", "default_age_group_id": juniorsID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, token)
 	cabinBID := str(cabinB, "id")
 	if got := str(cabinB, "default_age_group_name"); got != "Young" {
@@ -1389,7 +1401,7 @@ func testBasicCamperAssignment(t *testing.T) {
 	camperNames := []string{"Alice", "Bob", "Charlie", "Diana", "Eve", "Frank"}
 	camperIDs := make([]string, len(camperNames))
 	for i, name := range camperNames {
-		resp := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": name}, token)
+		resp := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": name, "gender": "female"}, token)
 		camperIDs[i] = str(resp, "id")
 	}
 
@@ -1466,6 +1478,7 @@ func testCamperFriendPreferences(t *testing.T) {
 		"name": "Hawk", "default_age_group_id": teensID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, token)
 	cabin1ID := str(cabin1, "id")
 	if got := str(cabin1, "default_age_group_name"); got != "Teens" {
@@ -1476,6 +1489,7 @@ func testCamperFriendPreferences(t *testing.T) {
 		"name": "Eagle", "default_age_group_id": teensID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, token)
 	cabin2ID := str(cabin2, "id")
 	if got := str(cabin2, "default_age_group_name"); got != "Teens" {
@@ -1510,13 +1524,13 @@ func testCamperFriendPreferences(t *testing.T) {
 	}, token)
 
 	// Create 4 campers: Amy, Beth, Carol, Dana.
-	amy := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": "Amy"}, token)
+	amy := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": "Amy", "gender": "female"}, token)
 	amyID := str(amy, "id")
-	beth := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": "Beth"}, token)
+	beth := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": "Beth", "gender": "female"}, token)
 	bethID := str(beth, "id")
-	carol := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": "Carol"}, token)
+	carol := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": "Carol", "gender": "female"}, token)
 	carolID := str(carol, "id")
-	dana := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": "Dana"}, token)
+	dana := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": "Dana", "gender": "female"}, token)
 	danaID := str(dana, "id")
 
 	// Enroll all.
@@ -1637,7 +1651,7 @@ func testEnrollmentSessionScoping(t *testing.T) {
 	}, token)
 	sagID := str(sag, "id")
 
-	camper := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": "Test Camper"}, token)
+	camper := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": "Test Camper", "gender": "female"}, token)
 	camperID := str(camper, "id")
 
 	enrollment := mustPost(t, apiURL(ts, "/sessions/"+s1ID+"/enrollments"), map[string]any{
@@ -1697,7 +1711,7 @@ func testEnrollmentSessionUniqueness(t *testing.T) {
 	}, token)
 	sag2ID := str(sag2, "id")
 
-	camper := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": "Duplicate Dan"}, token)
+	camper := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": "Duplicate Dan", "gender": "female"}, token)
 	camperID := str(camper, "id")
 
 	// First enrollment succeeds.
@@ -1733,6 +1747,7 @@ func testGetSolutionRunOwnership(t *testing.T) {
 		"name": "Pine", "default_age_group_id": agID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, token)
 	cabinID := str(cabin, "id")
 
@@ -1756,7 +1771,7 @@ func testGetSolutionRunOwnership(t *testing.T) {
 
 	// Create 2 campers and enroll them.
 	for _, name := range []string{"Alice", "Bob"} {
-		c := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": name}, token)
+		c := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": name, "gender": "female"}, token)
 		mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/enrollments"), map[string]any{
 			"camper_id": str(c, "id"), "session_age_group_id": sagID,
 		}, token)
@@ -1839,6 +1854,7 @@ func testSelectSolutionCamperRun(t *testing.T) {
 		"name": "Hawk", "default_age_group_id": agID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, token)
 	cabinID := str(cabin, "id")
 
@@ -1863,7 +1879,7 @@ func testSelectSolutionCamperRun(t *testing.T) {
 
 	// Create and enroll 2 campers.
 	for _, name := range []string{"Alice", "Bob"} {
-		c := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": name}, token)
+		c := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": name, "gender": "female"}, token)
 		mustPost(t, apiURL(ts, sessionBase+"/enrollments"), map[string]any{
 			"camper_id": str(c, "id"), "session_age_group_id": sagID,
 		}, token)
@@ -1919,6 +1935,7 @@ func testSelectSolutionReplacesPriorRunSelection(t *testing.T) {
 		"name": "Hawk", "default_age_group_id": agID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, token)
 	cabinID := str(cabin, "id")
 
@@ -1942,7 +1959,7 @@ func testSelectSolutionReplacesPriorRunSelection(t *testing.T) {
 	}, token)
 
 	for _, name := range []string{"Alice", "Bob"} {
-		c := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": name}, token)
+		c := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": name, "gender": "female"}, token)
 		mustPost(t, apiURL(ts, sessionBase+"/enrollments"), map[string]any{
 			"camper_id": str(c, "id"), "session_age_group_id": sagID,
 		}, token)
@@ -2041,6 +2058,7 @@ func testRepeatedUnmetPreferenceBoost(t *testing.T) {
 		"name": "Pine", "default_age_group_id": youngID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, token)
 	pineID := str(pine, "id")
 
@@ -2048,6 +2066,7 @@ func testRepeatedUnmetPreferenceBoost(t *testing.T) {
 		"name": "Oak", "default_age_group_id": oldID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, token)
 	oakID := str(oak, "id")
 
@@ -2080,6 +2099,7 @@ func testRepeatedUnmetPreferenceBoost(t *testing.T) {
 		resp := mustPost(t, apiURL(ts, "/counselors"), map[string]any{
 			"name":             name,
 			"junior_counselor": false,
+			"gender":          "female",
 		}, token)
 		counselors = append(counselors, counselorInfo{id: str(resp, "id"), name: name})
 	}
@@ -2214,11 +2234,12 @@ func testCrossCampIsolation(t *testing.T) {
 		"name": "Pine", "default_age_group_id": ageGroupID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, tokenA)
 	cabinID := str(cabin, "id")
 
 	counselor := mustPost(t, apiURL(ts, "/counselors"), map[string]any{
-		"name": "Alice", "junior_counselor": false,
+		"name": "Alice", "junior_counselor": false, "gender": "female",
 	}, tokenA)
 	counselorID := str(counselor, "id")
 
@@ -3070,6 +3091,7 @@ func testGetRunById(t *testing.T) {
 		"default_age_group_id": agID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, token)
 	cabinID := str(cabin, "id")
 
@@ -3095,7 +3117,7 @@ func testGetRunById(t *testing.T) {
 
 	for _, name := range []string{"Alice", "Bob"} {
 		mustPost(t, apiURL(ts, "/counselors"), map[string]any{
-			"name": name, "is_junior": false,
+			"name": name, "junior_counselor": false, "gender": "female",
 		}, token)
 	}
 
@@ -3162,6 +3184,7 @@ func testGetRunByIdCrossCampIsolation(t *testing.T) {
 		"default_age_group_id": agID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, tokenA)
 	cabinID := str(cabin, "id")
 
@@ -3187,7 +3210,7 @@ func testGetRunByIdCrossCampIsolation(t *testing.T) {
 
 	for _, name := range []string{"Alice", "Bob"} {
 		mustPost(t, apiURL(ts, "/counselors"), map[string]any{
-			"name": name, "is_junior": false,
+			"name": name, "junior_counselor": false, "gender": "female",
 		}, tokenA)
 	}
 
@@ -3237,7 +3260,7 @@ func testPreconditionNoSessionCabins(t *testing.T) {
 	}, token)
 
 	mustPost(t, apiURL(ts, "/counselors"), map[string]any{
-		"name": "Alice", "is_junior": false,
+		"name": "Alice", "junior_counselor": false, "gender": "female",
 	}, token)
 
 	resp := doRequest(t, http.MethodPost,
@@ -3269,6 +3292,7 @@ func testPreconditionNoEnabledCounselors(t *testing.T) {
 		"default_age_group_id": agID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, token)
 	cabinID := str(cabin, "id")
 
@@ -3321,6 +3345,7 @@ func testPreconditionNoSeniorCounselors(t *testing.T) {
 		"default_age_group_id": agID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, token)
 	cabinID := str(cabin, "id")
 
@@ -3345,10 +3370,10 @@ func testPreconditionNoSeniorCounselors(t *testing.T) {
 	}, token)
 
 	mustPost(t, apiURL(ts, "/counselors"), map[string]any{
-		"name": "Junior1", "junior_counselor": true,
+		"name": "Junior1", "junior_counselor": true, "gender": "female",
 	}, token)
 	mustPost(t, apiURL(ts, "/counselors"), map[string]any{
-		"name": "Junior2", "junior_counselor": true,
+		"name": "Junior2", "junior_counselor": true, "gender": "female",
 	}, token)
 
 	resp := doRequest(t, http.MethodPost,
@@ -3380,6 +3405,7 @@ func testPreconditionNoEnrolledCampers(t *testing.T) {
 		"default_age_group_id": agID,
 		"default_group_size":          8,
 		"default_required_counselors": 1,
+		"gender":                    "female",
 	}, token)
 	cabinID := str(cabin, "id")
 
@@ -3443,6 +3469,125 @@ func testPreconditionNoSessionActivities(t *testing.T) {
 	}
 }
 
+func testPreconditionCounselorGenderShortfall(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	if err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`,
+		"CampGenderCounselorShortfall").Scan(&campID); err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	ag := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Juniors"}, token)
+	agID := str(ag, "id")
+
+	cabin := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name":                        "Pine",
+		"default_age_group_id":        agID,
+		"default_group_size":          8,
+		"default_required_counselors": 1,
+		"gender":                      "female",
+	}, token)
+	cabinID := str(cabin, "id")
+
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31",
+	}, token)
+	seasonID := str(season, "id")
+	session := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	}, token)
+	sessionID := str(session, "id")
+
+	sag := mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/age-groups"), map[string]any{
+		"age_group_id": agID,
+	}, token)
+	sagID := str(sag, "id")
+
+	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
+		"session_age_group_id": sagID, "cabin_id": cabinID,
+		"group_size": 8, "required_counselors": 1,
+	}, token)
+
+	mustPost(t, apiURL(ts, "/counselors"), map[string]any{
+		"name": "Mike", "junior_counselor": false, "gender": "male",
+	}, token)
+	mustPost(t, apiURL(ts, "/counselors"), map[string]any{
+		"name": "Dave", "junior_counselor": false, "gender": "male",
+	}, token)
+
+	resp := doRequest(t, http.MethodPost,
+		apiURL(ts, "/sessions/"+sessionID+"/assignment-runs"),
+		map[string]any{"run_type": "counselor_cabin"},
+		http.StatusUnprocessableEntity, token)
+	if !strings.Contains(str(resp, "error"), "female counselors") {
+		t.Fatalf("expected female counselor shortfall error, got: %s", str(resp, "error"))
+	}
+}
+
+func testPreconditionCamperGenderCapacity(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	if err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`,
+		"CampGenderCamperCapacity").Scan(&campID); err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	ag := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Juniors"}, token)
+	agID := str(ag, "id")
+
+	cabin := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name":                        "Pine",
+		"default_age_group_id":        agID,
+		"default_group_size":          2,
+		"default_required_counselors": 1,
+		"gender":                      "female",
+	}, token)
+	cabinID := str(cabin, "id")
+
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31",
+	}, token)
+	seasonID := str(season, "id")
+	session := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Week 1", "season_id": seasonID,
+	}, token)
+	sessionID := str(session, "id")
+
+	sag := mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/age-groups"), map[string]any{
+		"age_group_id": agID,
+	}, token)
+	sagID := str(sag, "id")
+
+	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
+		"session_age_group_id": sagID, "cabin_id": cabinID,
+		"group_size": 2, "required_counselors": 1,
+	}, token)
+
+	for _, name := range []string{"Amy", "Beth", "Carol"} {
+		c := mustPost(t, apiURL(ts, "/campers"), map[string]any{
+			"name": name, "gender": "female",
+		}, token)
+		mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/enrollments"), map[string]any{
+			"camper_id": str(c, "id"), "session_age_group_id": sagID,
+		}, token)
+	}
+
+	resp := doRequest(t, http.MethodPost,
+		apiURL(ts, "/sessions/"+sessionID+"/assignment-runs"),
+		map[string]any{"run_type": "camper_cabin"},
+		http.StatusUnprocessableEntity, token)
+	errMsg := str(resp, "error")
+	if !strings.Contains(errMsg, "female cabin capacity") || !strings.Contains(errMsg, "Juniors") {
+		t.Fatalf("expected female cabin capacity error mentioning Juniors, got: %s", errMsg)
+	}
+}
+
 // TestCopySession exercises a structural session copy: age groups, cabins,
 // time slots, and activities are cloned from a source session into a fresh
 // session in the same camp, with new row IDs but preserved configuration.
@@ -3474,11 +3619,11 @@ func TestCopySession(t *testing.T) {
 
 	pine := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
 		"name": "Pine", "default_age_group_id": juniorsID,
-		"default_group_size": 8, "default_required_counselors": 1,
+		"default_group_size": 8, "default_required_counselors": 1, "gender": "female",
 	}, token)
 	oak := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
 		"name": "Oak", "default_age_group_id": seniorsID,
-		"default_group_size": 10, "default_required_counselors": 2,
+		"default_group_size": 10, "default_required_counselors": 2, "gender": "female",
 	}, token)
 	pineID := str(pine, "id")
 	oakID := str(oak, "id")
@@ -3695,16 +3840,16 @@ func TestSessionCounselorRosterDisableInteraction(t *testing.T) {
 	token := mustLogin(t, ts, pool, campID)
 
 	counselor := mustPost(t, apiURL(ts, "/counselors"), map[string]any{
-		"name": "Rachel", "junior_counselor": false,
+		"name": "Rachel", "junior_counselor": false, "gender": "female",
 	}, token)
 	counselorID := str(counselor, "id")
 
 	disabled := mustPost(t, apiURL(ts, "/counselors"), map[string]any{
-		"name": "Disabled Dan", "junior_counselor": false,
+		"name": "Disabled Dan", "junior_counselor": false, "gender": "female",
 	}, token)
 	disabledID := str(disabled, "id")
 	mustPut(t, apiURL(ts, "/counselors/"+disabledID), map[string]any{
-		"name": "Disabled Dan", "junior_counselor": false, "enabled": false,
+		"name": "Disabled Dan", "junior_counselor": false, "enabled": false, "gender": "female",
 	}, token)
 
 	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
@@ -3739,7 +3884,7 @@ func TestSessionCounselorRosterDisableInteraction(t *testing.T) {
 
 	t.Run("disabling rostered counselor removes from rosters", func(t *testing.T) {
 		mustPut(t, apiURL(ts, "/counselors/"+counselorID), map[string]any{
-			"name": "Rachel", "junior_counselor": false, "enabled": false,
+			"name": "Rachel", "junior_counselor": false, "enabled": false, "gender": "female",
 		}, token)
 
 		roster := mustGetList(t, rosterURL, token)
@@ -3752,7 +3897,7 @@ func TestSessionCounselorRosterDisableInteraction(t *testing.T) {
 
 	t.Run("re-enabling does not auto-restore roster membership", func(t *testing.T) {
 		mustPut(t, apiURL(ts, "/counselors/"+counselorID), map[string]any{
-			"name": "Rachel", "junior_counselor": false, "enabled": true,
+			"name": "Rachel", "junior_counselor": false, "enabled": true, "gender": "female",
 		}, token)
 
 		roster := mustGetList(t, rosterURL, token)

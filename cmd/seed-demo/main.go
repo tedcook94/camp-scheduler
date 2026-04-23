@@ -794,18 +794,22 @@ func createCampers(ctx context.Context, q *db.Queries, campID pgtype.UUID, ageGr
 	eagles := []string{"Aiden", "Charlotte", "Benjamin", "Harper", "Daniel", "Amelia", "Henry", "Evelyn", "Jack", "Abigail", "Owen", "Grace"}
 	wolves := []string{"Logan", "Chloe", "Caleb", "Zoe", "Nathan", "Lily", "Ryan", "Hannah", "Connor", "Maya", "Dylan", "Stella"}
 
-	// Each age group's name list alternates female/male starting with female,
-	// giving 6 of each gender per age group to match the 6+6 cabin capacity
-	// split (one female and one male cabin per age group).
-	camperGender := map[string]string{}
-	for _, names := range [][]string{bears, eagles, wolves} {
-		for i, name := range names {
-			if i%2 == 0 {
-				camperGender[name] = "female"
-			} else {
-				camperGender[name] = "male"
-			}
-		}
+	// Explicit per-name gender keeps demo names realistic. Each age group
+	// contributes 6 female and 6 male campers, matching the one-female and
+	// one-male cabin per age group.
+	camperGender := map[string]string{
+		// bears
+		"Emma": "female", "Liam": "male", "Olivia": "female", "Noah": "male",
+		"Ava": "female", "William": "male", "Sophia": "female", "Mason": "male",
+		"Isabella": "female", "Lucas": "male", "Mia": "female", "Ethan": "male",
+		// eagles
+		"Aiden": "male", "Charlotte": "female", "Benjamin": "male", "Harper": "female",
+		"Daniel": "male", "Amelia": "female", "Henry": "male", "Evelyn": "female",
+		"Jack": "male", "Abigail": "female", "Owen": "male", "Grace": "female",
+		// wolves
+		"Logan": "male", "Chloe": "female", "Caleb": "male", "Zoe": "female",
+		"Nathan": "male", "Lily": "female", "Ryan": "male", "Hannah": "female",
+		"Connor": "male", "Maya": "female", "Dylan": "male", "Stella": "female",
 	}
 
 	allNames := append(append(bears, eagles...), wolves...)

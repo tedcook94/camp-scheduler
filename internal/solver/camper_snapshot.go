@@ -69,6 +69,7 @@ func loadCamperCabins(ctx context.Context, queries *db.Queries, sessionID, campI
 			AgeGroupID:             api.UUIDToString(r.AgeGroupID),
 			SessionAgeGroupCabinID: api.UUIDToString(r.SessionAgeGroupCabinID),
 			Capacity:               int(r.GroupSize),
+			Gender:                 r.Gender,
 		}
 	}
 	return cabins, nil
@@ -91,6 +92,7 @@ func loadCampers(ctx context.Context, queries *db.Queries, sessionID, campID pgt
 			ID:         api.UUIDToString(r.CamperID),
 			Name:       r.CamperName,
 			AgeGroupID: api.UUIDToString(r.AgeGroupID),
+			Gender:     r.Gender,
 		}
 	}
 	return campers, nil

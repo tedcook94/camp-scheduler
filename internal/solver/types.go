@@ -7,12 +7,14 @@ type Cabin struct {
 	AgeGroupName           string
 	SessionAgeGroupCabinID string
 	RequiredCounselors     int
+	Gender                 string
 }
 
 type Counselor struct {
 	ID       string
 	Name     string
 	IsJunior bool
+	Gender   string
 }
 
 type CounselorPreviousPlacement struct {

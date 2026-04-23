@@ -6,12 +6,14 @@ type CamperCabin struct {
 	AgeGroupID             string
 	SessionAgeGroupCabinID string
 	Capacity               int
+	Gender                 string
 }
 
 type Camper struct {
 	ID         string
 	Name       string
 	AgeGroupID string
+	Gender     string
 }
 
 type CamperCabinSnapshot struct {

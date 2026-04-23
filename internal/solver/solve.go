@@ -14,12 +14,14 @@ func Solve(snapshot SessionSnapshot, config SolverConfig) []Solution {
 		config:         config,
 		counselorsByID: counselorsByID,
 		cabinIDs:       make([]string, len(snapshot.Cabins)),
+		cabinIndexByID: make(map[string]int, len(snapshot.Cabins)),
 		assignment:     make(map[string][]string, len(snapshot.Cabins)),
 		iterations:     0,
 	}
 
 	for i, c := range snapshot.Cabins {
 		s.cabinIDs[i] = c.ID
+		s.cabinIndexByID[c.ID] = i
 	}
 
 	counselors := orderCounselors(snapshot)
@@ -33,13 +35,14 @@ func Solve(snapshot SessionSnapshot, config SolverConfig) []Solution {
 }
 
 type searchState struct {
-	snapshot       SessionSnapshot
-	config         SolverConfig
-	counselorsByID map[string]Counselor
-	cabinIDs       []string
-	assignment     map[string][]string
-	solutions      []Solution
-	iterations     int
+	snapshot        SessionSnapshot
+	config          SolverConfig
+	counselorsByID  map[string]Counselor
+	cabinIDs        []string
+	cabinIndexByID  map[string]int
+	assignment      map[string][]string
+	solutions       []Solution
+	iterations      int
 }
 
 func (s *searchState) search(counselors []Counselor, index int) {
@@ -57,6 +60,9 @@ func (s *searchState) search(counselors []Counselor, index int) {
 	counselor := remaining[0]
 
 	for _, cabinID := range s.cabinIDs {
+		if s.snapshot.Cabins[s.cabinIndexByID[cabinID]].Gender != counselor.Gender {
+			continue
+		}
 		s.assignment[cabinID] = append(s.assignment[cabinID], counselor.ID)
 
 		if s.feasible(remaining[1:]) {

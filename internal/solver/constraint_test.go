@@ -276,3 +276,60 @@ func TestCheckHardConstraints(t *testing.T) {
 		}
 	})
 }
+
+func TestCheckCabinGenderMatchCounselors(t *testing.T) {
+	snapshot := SessionSnapshot{
+		Counselors: []Counselor{
+			{ID: "fc1", Name: "Female Counselor 1", Gender: "female"},
+			{ID: "fc2", Name: "Female Counselor 2", Gender: "female"},
+			{ID: "mc1", Name: "Male Counselor 1", Gender: "male"},
+		},
+		Cabins: []Cabin{
+			{ID: "fcab", Name: "Pine", Gender: "female"},
+			{ID: "mcab", Name: "Cedar", Gender: "male"},
+		},
+	}
+
+	t.Run("matching genders pass", func(t *testing.T) {
+		assignment := Assignment{
+			CabinCounselors: map[string][]string{
+				"fcab": {"fc1", "fc2"},
+				"mcab": {"mc1"},
+			},
+		}
+		v := checkCabinGenderMatchCounselors(snapshot, assignment)
+		if len(v) != 0 {
+			t.Fatalf("got %d violations, want 0", len(v))
+		}
+	})
+
+	t.Run("male counselor in female cabin violates", func(t *testing.T) {
+		assignment := Assignment{
+			CabinCounselors: map[string][]string{
+				"fcab": {"fc1", "mc1"},
+			},
+		}
+		v := checkCabinGenderMatchCounselors(snapshot, assignment)
+		if len(v) != 1 {
+			t.Fatalf("got %d violations, want 1", len(v))
+		}
+		if v[0].Constraint != "cabin_gender_mismatch" {
+			t.Errorf("got constraint %q, want cabin_gender_mismatch", v[0].Constraint)
+		}
+		if v[0].CounselorID != "mc1" || v[0].CabinID != "fcab" {
+			t.Errorf("got counselor=%q cabin=%q", v[0].CounselorID, v[0].CabinID)
+		}
+	})
+
+	t.Run("female counselor in male cabin violates", func(t *testing.T) {
+		assignment := Assignment{
+			CabinCounselors: map[string][]string{
+				"mcab": {"fc1"},
+			},
+		}
+		v := checkCabinGenderMatchCounselors(snapshot, assignment)
+		if len(v) != 1 {
+			t.Fatalf("got %d violations, want 1", len(v))
+		}
+	})
+}

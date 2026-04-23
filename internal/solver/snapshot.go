@@ -66,7 +66,7 @@ func BuildSnapshot(ctx context.Context, queries *db.Queries, campID, sessionID s
 	// This means a counselor removed from the roster (or with stale prefs from
 	// a prior roster membership) is invisible to the solver and explainer.
 	ageGroupPrefs = filterMapByRoster(ageGroupPrefs, rosterSet)
-	cocounselorPrefs = filterCocounselorPrefsByRoster(cocounselorPrefs, rosterSet)
+	cocounselorPrefs = filterCocounselorPrefsBySource(cocounselorPrefs, rosterSet)
 	placements = filterMapByRoster(placements, rosterSet)
 	unmetAG = filterMapByRoster(unmetAG, rosterSet)
 	unmetCo = filterCocounselorUnmetByRoster(unmetCo, rosterSet)
@@ -152,10 +152,11 @@ func filterMapByRoster[V any](m map[string]V, roster map[string]bool) map[string
 	return out
 }
 
-// filterCocounselorPrefsByRoster drops both keys and target IDs that are not
-// on the roster. The values of the cocounselor preference map are themselves
-// references to other counselors, so off-roster targets must also be pruned.
-func filterCocounselorPrefsByRoster(m map[string][]RankedPreference, roster map[string]bool) map[string][]RankedPreference {
+// filterCocounselorPrefsBySource drops outer keys (source counselors) that are
+// not on the roster. Target IDs are kept regardless so the explainer can flag
+// off-roster targets as ineligible preferences instead of silently dropping
+// them.
+func filterCocounselorPrefsBySource(m map[string][]RankedPreference, roster map[string]bool) map[string][]RankedPreference {
 	if len(m) == 0 {
 		return m
 	}
@@ -164,13 +165,7 @@ func filterCocounselorPrefsByRoster(m map[string][]RankedPreference, roster map[
 		if !roster[k] {
 			continue
 		}
-		kept := prefs[:0:0]
-		for _, p := range prefs {
-			if roster[p.TargetID] {
-				kept = append(kept, p)
-			}
-		}
-		out[k] = kept
+		out[k] = prefs
 	}
 	return out
 }

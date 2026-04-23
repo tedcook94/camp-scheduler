@@ -36,7 +36,10 @@ func Explain(snapshot SessionSnapshot, solution Solution) Explanation {
 	unmet = append(unmet, findUnmetAgeGroupPreferences(snapshot, counselorCabin, cabinsByID, ageGroupNames)...)
 	unmet = append(unmet, findUnmetReturningAgeGroup(snapshot, counselorCabin, cabinsByID, ageGroupNames)...)
 	unmet = append(unmet, findUnmetReturningCabin(snapshot, counselorCabin, cabinsByID)...)
-	unmet = append(unmet, findUnmetCocounselorPreferences(snapshot, counselorCabin, counselorsByID)...)
+
+	rosterSet := buildRosterSet(snapshot.Counselors)
+	unmetCo, ineligibleCo := findUnmetCocounselorPreferences(snapshot, counselorCabin, counselorsByID, rosterSet)
+	unmet = append(unmet, unmetCo...)
 
 	sort.Slice(unmet, func(i, j int) bool {
 		if unmet[i].CounselorID != unmet[j].CounselorID {
@@ -48,9 +51,20 @@ func Explain(snapshot SessionSnapshot, solution Solution) Explanation {
 		return unmet[i].Message < unmet[j].Message
 	})
 
+	sort.Slice(ineligibleCo, func(i, j int) bool {
+		if ineligibleCo[i].CounselorID != ineligibleCo[j].CounselorID {
+			return ineligibleCo[i].CounselorID < ineligibleCo[j].CounselorID
+		}
+		if ineligibleCo[i].Constraint != ineligibleCo[j].Constraint {
+			return ineligibleCo[i].Constraint < ineligibleCo[j].Constraint
+		}
+		return ineligibleCo[i].Message < ineligibleCo[j].Message
+	})
+
 	return Explanation{
-		Assignments:      assignments,
-		UnmetPreferences: unmet,
+		Assignments:           assignments,
+		UnmetPreferences:      unmet,
+		IneligiblePreferences: ineligibleCo,
 	}
 }
 
@@ -197,26 +211,59 @@ func findUnmetReturningCabin(snapshot SessionSnapshot, counselorCabin map[string
 	return unmet
 }
 
-func findUnmetCocounselorPreferences(snapshot SessionSnapshot, counselorCabin map[string]string, counselorsByID map[string]Counselor) []UnmetPreference {
+func findUnmetCocounselorPreferences(snapshot SessionSnapshot, counselorCabin map[string]string, counselorsByID map[string]Counselor, rosterSet map[string]bool) ([]UnmetPreference, []IneligiblePreference) {
 	var unmet []UnmetPreference
+	var ineligible []IneligiblePreference
 	for counselorID, prefs := range snapshot.CocounselorPreferences {
+		source, sourceKnown := counselorsByID[counselorID]
 		cabinID := counselorCabin[counselorID]
 
 		for _, pref := range prefs {
+			target, targetKnown := counselorsByID[pref.TargetID]
+
+			if !targetKnown || !rosterSet[pref.TargetID] {
+				prefName := pref.TargetID
+				if targetKnown && target.Name != "" {
+					prefName = target.Name
+				}
+				ineligible = append(ineligible, IneligiblePreference{
+					CounselorID: counselorID,
+					Constraint:  "cocounselor_preference_ineligible",
+					Rank:        pref.Rank,
+					Message: fmt.Sprintf(
+						"preferred co-counselor %q is not on this session's roster",
+						prefName,
+					),
+				})
+				continue
+			}
+
+			if sourceKnown && source.Gender != "" && target.Gender != "" && source.Gender != target.Gender {
+				ineligible = append(ineligible, IneligiblePreference{
+					CounselorID: counselorID,
+					Constraint:  "cocounselor_preference_ineligible",
+					Rank:        pref.Rank,
+					Message: fmt.Sprintf(
+						"preferred co-counselor %q cannot share a cabin (gender mismatch)",
+						target.Name,
+					),
+				})
+				continue
+			}
+
 			prefCabinID := counselorCabin[pref.TargetID]
 			if cabinID == "" || prefCabinID == "" || prefCabinID != cabinID {
-				prefName := counselorsByID[pref.TargetID].Name
 				unmet = append(unmet, UnmetPreference{
 					CounselorID: counselorID,
 					Constraint:  "cocounselor_preference",
 					Rank:        pref.Rank,
 					Message: fmt.Sprintf(
 						"preferred co-counselor %q but not placed together",
-						prefName,
+						target.Name,
 					),
 				})
 			}
 		}
 	}
-	return unmet
+	return unmet, ineligible
 }

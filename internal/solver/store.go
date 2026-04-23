@@ -119,5 +119,25 @@ func storeExplanations(ctx context.Context, qtx *db.Queries, campID, solutionID 
 		}
 	}
 
+	for _, ip := range explanation.IneligiblePreferences {
+		counselorUUID, err := api.ParseUUID(ip.CounselorID)
+		if err != nil {
+			return err
+		}
+
+		_, err = qtx.CreateCounselorCabinExplanation(ctx, db.CreateCounselorCabinExplanationParams{
+			CampID:          campID,
+			SolutionID:      solutionID,
+			CounselorID:     counselorUUID,
+			ExplanationType: "ineligible_preference",
+			ConstraintName:  pgtype.Text{String: ip.Constraint, Valid: true},
+			Rank:            pgtype.Int4{Int32: int32(ip.Rank), Valid: ip.Rank > 0},
+			Message:         ip.Message,
+		})
+		if err != nil {
+			return fmt.Errorf("error creating ineligible preference explanation for counselor %s: %w", ip.CounselorID, err)
+		}
+	}
+
 	return nil
 }

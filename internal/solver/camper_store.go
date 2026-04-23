@@ -119,5 +119,25 @@ func storeCamperExplanations(ctx context.Context, qtx *db.Queries, campID, solut
 		}
 	}
 
+	for _, ip := range explanation.IneligiblePreferences {
+		camperUUID, err := api.ParseUUID(ip.CamperID)
+		if err != nil {
+			return err
+		}
+
+		_, err = qtx.CreateCamperCabinExplanation(ctx, db.CreateCamperCabinExplanationParams{
+			CampID:          campID,
+			SolutionID:      solutionID,
+			CamperID:        camperUUID,
+			ExplanationType: "ineligible_preference",
+			ConstraintName:  pgtype.Text{String: ip.Constraint, Valid: true},
+			Rank:            pgtype.Int4{Int32: int32(ip.Rank), Valid: ip.Rank > 0},
+			Message:         ip.Message,
+		})
+		if err != nil {
+			return fmt.Errorf("error creating ineligible preference explanation for camper %s: %w", ip.CamperID, err)
+		}
+	}
+
 	return nil
 }

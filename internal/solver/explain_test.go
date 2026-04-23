@@ -330,4 +330,89 @@ func TestExplain(t *testing.T) {
 			t.Error("expected unmet age group preference for unassigned counselor sr2")
 		}
 	})
+
+	t.Run("cross-gender cocounselor preference is ineligible", func(t *testing.T) {
+		snapshot := SessionSnapshot{
+			Cabins: []Cabin{
+				{ID: "cf", AgeGroupID: "ag", Gender: "female", RequiredCounselors: 1, Capacity: 4},
+				{ID: "cm", AgeGroupID: "ag", Gender: "male", RequiredCounselors: 1, Capacity: 4},
+			},
+			Counselors: []Counselor{
+				{ID: "f1", Name: "Sarah", Gender: "female"},
+				{ID: "m1", Name: "Mike", Gender: "male"},
+			},
+			CocounselorPreferences: map[string][]RankedPreference{
+				"f1": {{TargetID: "m1", Rank: 1}},
+			},
+		}
+
+		assignment := Assignment{
+			CabinCounselors: map[string][]string{
+				"cf": {"f1"},
+				"cm": {"m1"},
+			},
+		}
+		score := ScoreSoftConstraints(snapshot, assignment, DefaultWeights())
+		explanation := Explain(snapshot, Solution{Assignment: assignment, Score: score})
+
+		for _, u := range explanation.UnmetPreferences {
+			if u.CounselorID == "f1" && u.Constraint == "cocounselor_preference" {
+				t.Errorf("did not expect unmet cocounselor entry for cross-gender pref, got %v", u)
+			}
+		}
+
+		var ip IneligiblePreference
+		for _, x := range explanation.IneligiblePreferences {
+			if x.CounselorID == "f1" {
+				ip = x
+				break
+			}
+		}
+		if ip.Constraint != "cocounselor_preference_ineligible" {
+			t.Fatalf("expected cocounselor_preference_ineligible for f1, got %v", explanation.IneligiblePreferences)
+		}
+		if !strings.Contains(ip.Message, "Mike") || !strings.Contains(ip.Message, "gender mismatch") {
+			t.Errorf("unexpected message: %q", ip.Message)
+		}
+	})
+
+	t.Run("cocounselor preference target off roster is ineligible", func(t *testing.T) {
+		snapshot := SessionSnapshot{
+			Cabins: []Cabin{
+				{ID: "cf", AgeGroupID: "ag", Gender: "female", RequiredCounselors: 1, Capacity: 4},
+			},
+			Counselors: []Counselor{
+				{ID: "f1", Name: "Sarah", Gender: "female"},
+			},
+			CocounselorPreferences: map[string][]RankedPreference{
+				"f1": {{TargetID: "ghost", Rank: 1}},
+			},
+		}
+
+		assignment := Assignment{
+			CabinCounselors: map[string][]string{"cf": {"f1"}},
+		}
+		score := ScoreSoftConstraints(snapshot, assignment, DefaultWeights())
+		explanation := Explain(snapshot, Solution{Assignment: assignment, Score: score})
+
+		for _, u := range explanation.UnmetPreferences {
+			if u.CounselorID == "f1" && u.Constraint == "cocounselor_preference" {
+				t.Errorf("did not expect unmet cocounselor entry for off-roster target, got %v", u)
+			}
+		}
+
+		var ip IneligiblePreference
+		for _, x := range explanation.IneligiblePreferences {
+			if x.CounselorID == "f1" {
+				ip = x
+				break
+			}
+		}
+		if ip.Constraint != "cocounselor_preference_ineligible" {
+			t.Fatalf("expected cocounselor_preference_ineligible for f1, got %v", explanation.IneligiblePreferences)
+		}
+		if !strings.Contains(ip.Message, "not on this session's roster") {
+			t.Errorf("unexpected message: %q", ip.Message)
+		}
+	})
 }

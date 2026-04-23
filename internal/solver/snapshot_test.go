@@ -33,7 +33,7 @@ func TestFilterMapByRoster(t *testing.T) {
 	})
 }
 
-func TestFilterCocounselorPrefsByRoster(t *testing.T) {
+func TestFilterCocounselorPrefsBySource(t *testing.T) {
 	roster := map[string]bool{"a": true, "b": true}
 
 	in := map[string][]RankedPreference{
@@ -45,7 +45,7 @@ func TestFilterCocounselorPrefsByRoster(t *testing.T) {
 			{TargetID: "a", Rank: 1},
 		},
 	}
-	out := filterCocounselorPrefsByRoster(in, roster)
+	out := filterCocounselorPrefsBySource(in, roster)
 
 	if _, ok := out["c"]; ok {
 		t.Errorf("expected off-roster owner c to be dropped")
@@ -54,9 +54,12 @@ func TestFilterCocounselorPrefsByRoster(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected on-roster owner a to be kept")
 	}
-	want := []RankedPreference{{TargetID: "b", Rank: 1}}
+	want := []RankedPreference{
+		{TargetID: "b", Rank: 1},
+		{TargetID: "c", Rank: 2},
+	}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("expected off-roster targets pruned, got %v want %v", got, want)
+		t.Errorf("expected off-roster targets retained for ineligibility classification, got %v want %v", got, want)
 	}
 }
 

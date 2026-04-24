@@ -153,7 +153,7 @@ viable configurations and understand trade-offs.
 - [x] Filter camper preference options to session-enrolled campers
 - [x] Enforce gender for cabins
 - [x] Assign counselors and campers to cabin at once (respect max cabin size of campers + counselors)
-- [ ] Assign all counselors for cabins/activities
+- [x] Assign all counselors for cabins/activities
 - [ ] Reports
 - [ ] "Dirty" flag for when changes have been made since assignment run
 - [ ] Archive (soft delete) objects

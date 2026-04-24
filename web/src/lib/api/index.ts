@@ -57,6 +57,8 @@ export {
 
 export { assignmentApi } from "./assignment";
 
+export { reportApi } from "./report";
+
 export const authApi = {
 	login: (username: string, password: string) =>
 		api.post<TokenResponse>("/api/v1/auth/login", { username, password }),

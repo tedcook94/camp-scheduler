@@ -70,16 +70,14 @@ async function request<T>(
 ): Promise<T> {
 	const hasAuth = await ensureValidToken();
 
-	const headers: Record<string, string> = {
-		...(options.headers as Record<string, string>),
-	};
+	const headers = new Headers(options.headers);
 
 	if (hasAuth && auth.accessToken) {
-		headers["Authorization"] = `Bearer ${auth.accessToken}`;
+		headers.set("Authorization", `Bearer ${auth.accessToken}`);
 	}
 
-	if (options.body && !headers["Content-Type"]) {
-		headers["Content-Type"] = "application/json";
+	if (options.body && !headers.has("Content-Type")) {
+		headers.set("Content-Type", "application/json");
 	}
 
 	const res = await fetch(path, { ...options, headers });
@@ -87,8 +85,8 @@ async function request<T>(
 	if (res.status === 401 && hasAuth) {
 		// Token might have expired between check and request — try refresh once
 		const refreshed = await refreshTokens();
-		if (refreshed) {
-			headers["Authorization"] = `Bearer ${auth.accessToken}`;
+		if (refreshed && auth.accessToken) {
+			headers.set("Authorization", `Bearer ${auth.accessToken}`);
 			const retryRes = await fetch(path, { ...options, headers });
 			return handleResponse<T>(retryRes);
 		}
@@ -137,4 +135,53 @@ export const api = {
 
 	delete: <T>(path: string, options?: RequestInit) =>
 		request<T>(path, { ...options, method: "DELETE" }),
+
+	// download issues an authenticated GET and returns the response Blob along
+	// with the suggested filename parsed from Content-Disposition (when present).
+	download: async (
+		path: string,
+		options?: RequestInit,
+	): Promise<{ blob: Blob; filename: string | null }> => {
+		const hasAuth = await ensureValidToken();
+		const headers = new Headers(options?.headers);
+		if (hasAuth && auth.accessToken) {
+			headers.set("Authorization", `Bearer ${auth.accessToken}`);
+		}
+
+		let res = await fetch(path, { ...options, method: "GET", headers });
+		if (res.status === 401 && hasAuth) {
+			const refreshed = await refreshTokens();
+			if (refreshed && auth.accessToken) {
+				headers.set("Authorization", `Bearer ${auth.accessToken}`);
+				res = await fetch(path, { ...options, method: "GET", headers });
+			}
+		}
+		if (!res.ok) {
+			let message = `download failed with status ${res.status}`;
+			try {
+				const body = await res.json();
+				if (body?.error) message = body.error;
+			} catch {
+				// not json
+			}
+			throw new ApiClientError(res.status, message);
+		}
+		const blob = await res.blob();
+		const cd = res.headers.get("Content-Disposition") || "";
+		let filename: string | null = null;
+		// RFC 5987: filename*=charset'lang'percent-encoded-value (UTF-8 / escaped).
+		const star = /filename\*=[^']*'[^']*'([^;]+)/i.exec(cd);
+		if (star) {
+			try {
+				filename = decodeURIComponent(star[1].trim());
+			} catch {
+				filename = null;
+			}
+		}
+		if (!filename) {
+			const plain = /filename="?([^";]+)"?/i.exec(cd);
+			if (plain) filename = plain[1];
+		}
+		return { blob, filename };
+	},
 };

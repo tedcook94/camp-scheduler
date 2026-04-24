@@ -154,13 +154,14 @@ viable configurations and understand trade-offs.
 - [x] Enforce gender for cabins
 - [x] Assign counselors and campers to cabin at once (respect max cabin size of campers + counselors)
 - [x] Assign all counselors for cabins/activities
-- [ ] Reports
+- [x] Reports
+- [ ] First and last name for campers
 - [ ] "Dirty" flag for when changes have been made since assignment run
 - [ ] Archive (soft delete) objects
 - [ ] Overrides (locking assignments before solver runs)
 - [ ] Data import (CSV/spreadsheet)
-- [ ] Auditing
 - [ ] Migrate auth to BetterAuth (camps as orgs, enable MFA)
 - [ ] Reimplement solver in Prolog
+- [ ] Auditing
 - [ ] External system integration (Campminder, etc.)
 - [ ] LLM conversational layer (MCP) for "why was X assigned to Y?" queries

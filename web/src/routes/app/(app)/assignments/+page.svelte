@@ -4,7 +4,7 @@
 	import { goto } from "$app/navigation";
 	import { toast } from "svelte-sonner";
 	import { ApiClientError } from "$lib/api/client";
-	import { assignmentApi, sessionApi, seasonApi } from "$lib/api";
+	import { assignmentApi, sessionApi, seasonApi, reportApi } from "$lib/api";
 	import {
 		groupByTimeSlotActivity,
 		groupByAgeGroupCabin,
@@ -21,6 +21,7 @@
 	} from "$lib/api/types";
 	import { Button } from "$lib/components/ui/button";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog";
+	import * as Dialog from "$lib/components/ui/dialog";
 	import * as Card from "$lib/components/ui/card";
 	import * as Select from "$lib/components/ui/select";
 	import { Badge } from "$lib/components/ui/badge";
@@ -35,6 +36,7 @@
 	import DumbbellIcon from "@lucide/svelte/icons/dumbbell";
 	import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
 	import BanIcon from "@lucide/svelte/icons/ban";
+	import DownloadIcon from "@lucide/svelte/icons/download";
 
 	interface CardSpec {
 		runType: RunType;
@@ -144,6 +146,11 @@
 	let expandedIneligible = $state<Set<string>>(new Set());
 
 	let triggering = $state<RunType | null>(null);
+	let exporting = $state<RunType | null>(null);
+	let exportDialogOpen = $state(false);
+	let exportRunType = $state<RunType | null>(null);
+	let exportFormat = $state<"pdf" | "csv">("pdf");
+	let exportIncludeUnassigned = $state(true);
 	let confirmRunOpen = $state(false);
 	let pendingRunType = $state<RunType | null>(null);
 
@@ -304,6 +311,56 @@
 			confirmRunOpen = true;
 		} else {
 			void triggerRun(runType);
+		}
+	}
+
+	function openExportDialog(runType: RunType) {
+		exportRunType = runType;
+		exportFormat = "pdf";
+		exportIncludeUnassigned = true;
+		exportDialogOpen = true;
+	}
+
+	async function runExport() {
+		if (!selectedSessionId || !exportRunType) return;
+		const runType = exportRunType;
+		const format = exportFormat;
+		const opts = { includeUnassigned: exportIncludeUnassigned };
+		exporting = runType;
+		try {
+			let result;
+			if (runType === "cabin" && format === "pdf") {
+				result = await reportApi.downloadCabinPDF(selectedSessionId, opts);
+			} else if (runType === "cabin") {
+				result = await reportApi.downloadCabinCSV(selectedSessionId, opts);
+			} else if (format === "pdf") {
+				result = await reportApi.downloadActivityPDF(selectedSessionId, opts);
+			} else {
+				result = await reportApi.downloadActivityCSV(selectedSessionId, opts);
+			}
+			let url: string | null = null;
+			let a: HTMLAnchorElement | null = null;
+			try {
+				url = URL.createObjectURL(result.blob);
+				a = document.createElement("a");
+				a.href = url;
+				a.download = result.filename ?? `${runType}-report.${format}`;
+				document.body.appendChild(a);
+				a.click();
+				exportDialogOpen = false;
+			} finally {
+				a?.remove();
+				if (url) {
+					const revokeUrl = url;
+					setTimeout(() => URL.revokeObjectURL(revokeUrl), 0);
+				}
+			}
+		} catch (err) {
+			const message =
+				err instanceof ApiClientError ? err.message : "Failed to export report";
+			toast.error(message);
+		} finally {
+			exporting = null;
 		}
 	}
 
@@ -800,16 +857,27 @@
 									— no runs yet
 								{/if}
 							</span>
-							{#if run?.status !== "selected"}
-								<span
-									title="No assignments selected"
-									class="ml-auto inline-flex items-center text-amber-600 dark:text-amber-400"
-								>
-									<TriangleAlertIcon class="size-5" />
-									<span class="sr-only">No assignments selected</span>
-								</span>
-							{/if}
 						</button>
+						{#if run?.status === "selected"}
+							<Button
+								size="sm"
+								variant="outline"
+								class="mr-2"
+								disabled={exporting !== null}
+								onclick={() => openExportDialog(card.runType)}
+							>
+								<DownloadIcon class="mr-2 size-4" />
+								Export
+							</Button>
+						{:else}
+							<span
+								title="No assignments selected"
+								class="mr-3 inline-flex items-center text-amber-600 dark:text-amber-400"
+							>
+								<TriangleAlertIcon class="size-5" />
+								<span class="sr-only">No assignments selected</span>
+							</span>
+						{/if}
 						<Button
 							size="sm"
 							class="mr-4"
@@ -972,3 +1040,76 @@
 		</AlertDialog.AlertDialogFooter>
 	</AlertDialog.AlertDialogContent>
 </AlertDialog.AlertDialog>
+
+<Dialog.Dialog bind:open={exportDialogOpen}>
+	<Dialog.DialogContent>
+		<Dialog.DialogHeader>
+			<Dialog.DialogTitle>
+				Export {exportRunType === "cabin" ? "Cabin" : "Activity"} Assignments
+			</Dialog.DialogTitle>
+			<Dialog.DialogDescription>
+				Choose a format and what to include.
+			</Dialog.DialogDescription>
+		</Dialog.DialogHeader>
+		<form
+			class="grid gap-4"
+			onsubmit={(e) => {
+				e.preventDefault();
+				void runExport();
+			}}
+		>
+			<fieldset class="grid gap-2">
+				<legend class="text-sm font-medium">Format</legend>
+				<label class="flex items-center gap-2 text-sm">
+					<input
+						type="radio"
+						name="export-format"
+						value="pdf"
+						checked={exportFormat === "pdf"}
+						onchange={() => (exportFormat = "pdf")}
+						disabled={exporting !== null}
+					/>
+					PDF
+				</label>
+				<label class="flex items-center gap-2 text-sm">
+					<input
+						type="radio"
+						name="export-format"
+						value="csv"
+						checked={exportFormat === "csv"}
+						onchange={() => (exportFormat = "csv")}
+						disabled={exporting !== null}
+					/>
+					CSV
+				</label>
+			</fieldset>
+			<label class="flex items-center gap-2 text-sm">
+				<input
+					type="checkbox"
+					bind:checked={exportIncludeUnassigned}
+					disabled={exporting !== null}
+				/>
+				Include unassigned section
+			</label>
+			<Dialog.DialogFooter>
+				<Button
+					type="button"
+					variant="outline"
+					disabled={exporting !== null}
+					onclick={() => (exportDialogOpen = false)}
+				>
+					Cancel
+				</Button>
+				<Button type="submit" disabled={exporting !== null}>
+					{#if exporting !== null}
+						<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+						Exporting...
+					{:else}
+						<DownloadIcon class="mr-2 size-4" />
+						Export
+					{/if}
+				</Button>
+			</Dialog.DialogFooter>
+		</form>
+	</Dialog.DialogContent>
+</Dialog.Dialog>

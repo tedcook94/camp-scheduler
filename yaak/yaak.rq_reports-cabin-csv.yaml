@@ -1,0 +1,18 @@
+type: http_request
+model: http_request
+id: rq_reports-cabin-csv
+createdAt: "2026-04-23T00:00:00.000000"
+updatedAt: "2026-04-23T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_reports
+name: Cabin Report (CSV)
+description: ""
+url: "${[ base_url ]}/sessions/${[ test-session-id ]}/reports/cabin?format=csv&include_unassigned=true"
+urlParameters: []
+method: GET
+headers: []
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+sortPriority: 2.0

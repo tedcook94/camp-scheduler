@@ -3,11 +3,13 @@ import type { ApiError, TokenResponse } from "./types";
 
 class ApiClientError extends Error {
 	status: number;
+	data?: Record<string, unknown>;
 
-	constructor(status: number, message: string) {
+	constructor(status: number, message: string, data?: Record<string, unknown>) {
 		super(message.charAt(0).toUpperCase() + message.slice(1));
 		this.name = "ApiClientError";
 		this.status = status;
+		this.data = data;
 	}
 }
 
@@ -103,14 +105,16 @@ async function handleResponse<T>(res: Response): Promise<T> {
 	}
 
 	let message = `request failed with status ${res.status}`;
+	let data: Record<string, unknown> | undefined;
 	try {
-		const body: ApiError = await res.json();
+		const body: ApiError & Record<string, unknown> = await res.json();
 		if (body.error) message = body.error;
+		data = body;
 	} catch {
 		// Response wasn't JSON
 	}
 
-	throw new ApiClientError(res.status, message);
+	throw new ApiClientError(res.status, message, data);
 }
 
 export const api = {

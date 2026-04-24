@@ -198,13 +198,19 @@ func (ctrl *Controller) handleTriggerError(c *gin.Context, log *slog.Logger, ses
 	}
 	var camperErr *CamperUnassignedError
 	if errors.As(err, &camperErr) {
-		campers := make([]gin.H, len(camperErr.Campers))
-		for i, cm := range camperErr.Campers {
-			campers[i] = gin.H{"id": cm.ID, "name": cm.Name}
+		shortages := make([]gin.H, len(camperErr.Shortages))
+		for i, s := range camperErr.Shortages {
+			shortages[i] = gin.H{
+				"age_group_id":   s.AgeGroupID,
+				"age_group_name": s.AgeGroupName,
+				"gender":         s.Gender,
+				"count":          s.Count,
+				"reason":         string(s.Reason),
+			}
 		}
 		c.JSON(http.StatusUnprocessableEntity, gin.H{
-			"error":              camperErr.Error(),
-			"unassigned_campers": campers,
+			"error":            camperErr.Error(),
+			"camper_shortages": shortages,
 		})
 		return
 	}

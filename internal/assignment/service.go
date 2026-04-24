@@ -21,39 +21,43 @@ var (
 	ErrNoSolutions      = errors.New("solver produced no valid solutions")
 )
 
-// CamperUnassignedError is returned when a cabin run fails because one or
-// more enrolled campers cannot be placed in any cabin. The diagnostic is
-// computed via greedy fill against the camper snapshot, so it surfaces
-// the campers that genuinely have no eligible cabin (capacity, age group,
-// or gender mismatch) rather than a transient solver dead-end.
+// CamperUnassignedError is returned when a cabin run fails because cabin
+// capacity is insufficient for the enrolled campers, given the counselor
+// occupancy each cabin must reserve. Diagnostics are bucketed by
+// (age group, gender) rather than naming individual campers, since a
+// pure capacity shortage doesn't single out specific people.
 type CamperUnassignedError struct {
-	Campers []UnassignedCamper
-}
-
-type UnassignedCamper struct {
-	ID   string
-	Name string
+	Shortages []solver.CamperShortage
 }
 
 func (e *CamperUnassignedError) Error() string {
-	if len(e.Campers) == 0 {
+	if len(e.Shortages) == 0 {
 		return "one or more campers could not be assigned to any cabin"
 	}
-	names := make([]string, len(e.Campers))
-	for i, c := range e.Campers {
-		names[i] = c.Name
+	total := 0
+	parts := make([]string, len(e.Shortages))
+	for i, s := range e.Shortages {
+		total += s.Count
+		switch s.Reason {
+		case solver.ShortageNoMatchingCabin:
+			parts[i] = fmt.Sprintf("%s (%s) has no matching cabin (%d camper(s))", s.AgeGroupName, s.Gender, s.Count)
+		case solver.ShortageOverCapacity:
+			parts[i] = fmt.Sprintf("%s (%s) is over capacity by %d", s.AgeGroupName, s.Gender, s.Count)
+		default:
+			parts[i] = fmt.Sprintf("%s (%s): %d camper(s)", s.AgeGroupName, s.Gender, s.Count)
+		}
 	}
-	return fmt.Sprintf("%d camper(s) could not be assigned to any cabin: %s",
-		len(e.Campers), joinNames(names))
+	return fmt.Sprintf("%d camper(s) cannot be placed in any cabin: %s",
+		total, joinShortageParts(parts))
 }
 
-func joinNames(names []string) string {
-	if len(names) == 0 {
+func joinShortageParts(parts []string) string {
+	if len(parts) == 0 {
 		return ""
 	}
-	out := names[0]
-	for i := 1; i < len(names); i++ {
-		out += ", " + names[i]
+	out := parts[0]
+	for i := 1; i < len(parts); i++ {
+		out += "; " + parts[i]
 	}
 	return out
 }
@@ -94,12 +98,8 @@ func (svc *Service) TriggerCabinRun(ctx context.Context, campID, sessionID strin
 
 	solutions := solver.SolveCabin(snapshot, cfg)
 	if len(solutions) == 0 {
-		if unassignable := solver.UnassignableCampers(snapshot.Camper); len(unassignable) > 0 {
-			out := make([]UnassignedCamper, len(unassignable))
-			for i, c := range unassignable {
-				out[i] = UnassignedCamper{ID: c.ID, Name: c.Name}
-			}
-			return RunDetailResponse{}, &CamperUnassignedError{Campers: out}
+		if shortages := solver.CamperShortages(reduceCamperCapacityForCounselors(snapshot)); len(shortages) > 0 {
+			return RunDetailResponse{}, &CamperUnassignedError{Shortages: shortages}
 		}
 		return RunDetailResponse{}, ErrNoSolutions
 	}
@@ -257,6 +257,30 @@ func validateCamperSideWithCounselors(snapshot solver.CabinSnapshot) string {
 	}
 
 	return ""
+}
+
+// reduceCamperCapacityForCounselors returns a copy of the cabin snapshot's
+// camper side with each cabin's capacity reduced by the minimum required
+// counselor reservation. This is a best-case / necessary-condition precheck
+// for camper capacity only: the combined cabin solver reduces camper
+// capacity by the actual number of counselors placed in each cabin, which
+// may be greater than the required minimum.
+func reduceCamperCapacityForCounselors(snapshot solver.CabinSnapshot) solver.CamperCabinSnapshot {
+	requiredByCabin := map[string]int{}
+	for _, c := range snapshot.Counselor.Cabins {
+		requiredByCabin[c.ID] = c.RequiredCounselors
+	}
+	reduced := snapshot.Camper
+	cabins := make([]solver.CamperCabin, len(snapshot.Camper.Cabins))
+	for i, c := range snapshot.Camper.Cabins {
+		c.Capacity -= requiredByCabin[c.ID]
+		if c.Capacity < 0 {
+			c.Capacity = 0
+		}
+		cabins[i] = c
+	}
+	reduced.Cabins = cabins
+	return reduced
 }
 
 func (svc *Service) ListRuns(ctx context.Context, campID, sessionID string) ([]RunResponse, error) {

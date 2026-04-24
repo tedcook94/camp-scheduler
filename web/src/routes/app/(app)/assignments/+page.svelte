@@ -220,7 +220,14 @@
 
 	let errorDialogOpen = $state(false);
 	let errorDialogMessage = $state("");
-	let errorDialogUnassignedCampers = $state<{ id: string; name: string }[]>([]);
+	type CamperShortage = {
+		age_group_id: string;
+		age_group_name: string;
+		gender: string;
+		count: number;
+		reason: "no_matching_cabin" | "over_capacity" | string;
+	};
+	let errorDialogShortages = $state<CamperShortage[]>([]);
 
 	let runsByType = $derived.by(() => {
 		const map = new Map<RunType, RunResponse | null>();
@@ -388,10 +395,8 @@
 		} catch (err) {
 			if (err instanceof ApiClientError && err.status === 422) {
 				errorDialogMessage = err.message;
-				const raw = err.data?.unassigned_campers;
-				errorDialogUnassignedCampers = Array.isArray(raw)
-					? (raw as { id: string; name: string }[])
-					: [];
+				const raw = err.data?.camper_shortages;
+				errorDialogShortages = Array.isArray(raw) ? (raw as CamperShortage[]) : [];
 				errorDialogOpen = true;
 			} else {
 				const message =
@@ -973,12 +978,21 @@
 				{errorDialogMessage}
 			</AlertDialog.AlertDialogDescription>
 		</AlertDialog.AlertDialogHeader>
-		{#if errorDialogUnassignedCampers.length > 0}
+		{#if errorDialogShortages.length > 0}
 			<div class="max-h-60 overflow-y-auto rounded-md border bg-muted/30 p-3">
-				<div class="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Unassigned campers</div>
+				<div class="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Camper shortages</div>
 				<ul class="grid gap-0.5">
-					{#each errorDialogUnassignedCampers as camper}
-						<li class="text-sm">{camper.name}</li>
+					{#each errorDialogShortages as s}
+						<li class="text-sm">
+							{s.age_group_name} ({s.gender}) —
+							{#if s.reason === "no_matching_cabin"}
+								no matching cabin ({s.count} camper{s.count === 1 ? "" : "s"})
+							{:else if s.reason === "over_capacity"}
+								over capacity by {s.count}
+							{:else}
+								{s.count} camper{s.count === 1 ? "" : "s"}
+							{/if}
+						</li>
 					{/each}
 				</ul>
 			</div>

@@ -34,10 +34,31 @@ func storeSolution(ctx context.Context, qtx *db.Queries, campID, runID pgtype.UU
 		return err
 	}
 
+	if err := storeUnassignedCounselors(ctx, qtx, campID, sol.ID, solution); err != nil {
+		return err
+	}
+
 	if err := storeExplanations(ctx, qtx, campID, sol.ID, explanation); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+func storeUnassignedCounselors(ctx context.Context, qtx *db.Queries, campID, solutionID pgtype.UUID, solution Solution) error {
+	for _, counselorID := range solution.UnassignedCounselors {
+		counselorUUID, err := api.ParseUUID(counselorID)
+		if err != nil {
+			return err
+		}
+		if _, err := qtx.CreateCounselorCabinUnassigned(ctx, db.CreateCounselorCabinUnassignedParams{
+			CampID:      campID,
+			SolutionID:  solutionID,
+			CounselorID: counselorUUID,
+		}); err != nil {
+			return fmt.Errorf("error recording unassigned counselor %s: %w", counselorID, err)
+		}
+	}
 	return nil
 }
 

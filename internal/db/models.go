@@ -166,6 +166,20 @@ type CounselorActivityPreference struct {
 	Rank        int32
 }
 
+type CounselorActivityUnassigned struct {
+	ID          pgtype.UUID
+	CampID      pgtype.UUID
+	SolutionID  pgtype.UUID
+	CounselorID pgtype.UUID
+}
+
+type CounselorActivityUnassignedSlot struct {
+	ID                pgtype.UUID
+	CampID            pgtype.UUID
+	UnassignedID      pgtype.UUID
+	SessionTimeSlotID pgtype.UUID
+}
+
 type CounselorAgeGroupPreference struct {
 	ID          pgtype.UUID
 	CampID      pgtype.UUID
@@ -201,6 +215,13 @@ type CounselorCabinSolution struct {
 	SolutionIndex   int32
 	Score           float64
 	ScoreBreakdown  []byte
+}
+
+type CounselorCabinUnassigned struct {
+	ID          pgtype.UUID
+	CampID      pgtype.UUID
+	SolutionID  pgtype.UUID
+	CounselorID pgtype.UUID
 }
 
 type CounselorCertification struct {

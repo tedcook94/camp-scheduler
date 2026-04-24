@@ -87,10 +87,48 @@ func storeActivitySolution(ctx context.Context, qtx *db.Queries, campID, runID p
 		return err
 	}
 
+	if err := storeActivityUnassignedCounselors(ctx, qtx, campID, sol.ID, solution); err != nil {
+		return err
+	}
+
 	if err := storeActivityExplanations(ctx, qtx, campID, sol.ID, explanation); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+// storeActivityUnassignedCounselors persists per-counselor missing time
+// slots. ActivitySlot.TimeSlotID is the session_time_slot.id, so it's used
+// directly as the FK target.
+func storeActivityUnassignedCounselors(ctx context.Context, qtx *db.Queries, campID, solutionID pgtype.UUID, solution ActivitySolution) error {
+	for _, uc := range solution.UnassignedCounselors {
+		counselorUUID, err := api.ParseUUID(uc.CounselorID)
+		if err != nil {
+			return err
+		}
+		parent, err := qtx.CreateCounselorActivityUnassigned(ctx, db.CreateCounselorActivityUnassignedParams{
+			CampID:      campID,
+			SolutionID:  solutionID,
+			CounselorID: counselorUUID,
+		})
+		if err != nil {
+			return fmt.Errorf("error recording unassigned counselor %s: %w", uc.CounselorID, err)
+		}
+		for _, tsID := range uc.MissingTimeSlotIDs {
+			tsUUID, err := api.ParseUUID(tsID)
+			if err != nil {
+				return err
+			}
+			if _, err := qtx.CreateCounselorActivityUnassignedSlot(ctx, db.CreateCounselorActivityUnassignedSlotParams{
+				CampID:            campID,
+				UnassignedID:      parent.ID,
+				SessionTimeSlotID: tsUUID,
+			}); err != nil {
+				return fmt.Errorf("error recording missing time slot %s for counselor %s: %w", tsID, uc.CounselorID, err)
+			}
+		}
+	}
 	return nil
 }
 

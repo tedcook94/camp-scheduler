@@ -1,6 +1,8 @@
 package solver
 
-import "sort"
+import (
+	"sort"
+)
 
 // SolveCamperCabin assigns campers to cabins using a hybrid approach:
 // preference-bearing campers are placed first via backtracking search,
@@ -264,27 +266,91 @@ func orderCampersByConstraints(campers []Camper, snapshot CamperCabinSnapshot) [
 	return result
 }
 
-// UnassignableCampers reports campers that cannot be placed in any cabin
-// even via greedy fill against the supplied snapshot. Intended as a
-// diagnostic when SolveCabin returns no solutions: it surfaces which
-// specific campers (by ID and name) are blocked by capacity or by having
-// no eligible cabin in their age group / gender.
-func UnassignableCampers(snapshot CamperCabinSnapshot) []Camper {
-	cabinsByAgeGroup := groupCabinsByAgeGroup(snapshot)
-	filled := fillRemaining(CamperAssignment{CabinCampers: map[string][]string{}}, snapshot.Campers, snapshot, cabinsByAgeGroup)
+// ShortageReason categorizes why a (age group, gender) bucket has more
+// campers than placeable cabin capacity.
+type ShortageReason string
 
-	assigned := make(map[string]bool)
-	for _, ids := range filled.CabinCampers {
-		for _, id := range ids {
-			assigned[id] = true
+const (
+	// ShortageNoMatchingCabin: no cabin in the bucket's age group matches
+	// the bucket's gender (so every camper in the bucket is structurally
+	// blocked).
+	ShortageNoMatchingCabin ShortageReason = "no_matching_cabin"
+	// ShortageOverCapacity: matching cabins exist but their total capacity
+	// is smaller than the camper count in the bucket.
+	ShortageOverCapacity ShortageReason = "over_capacity"
+)
+
+// CamperShortage describes a per-(age group, gender) capacity gap in a
+// camper-cabin snapshot. Returned by CamperShortages as a structured
+// diagnostic when the solver cannot place every camper.
+type CamperShortage struct {
+	AgeGroupID   string
+	AgeGroupName string
+	Gender       string
+	Count        int
+	Reason       ShortageReason
+}
+
+// CamperShortages reports per-(age group, gender) buckets that cannot fit
+// all enrolled campers given the snapshot's cabin capacities. Buckets with
+// no matching cabin report all campers in the bucket; buckets with
+// matching cabins report only the overflow. Results are sorted by
+// (age group name, gender) for stable output.
+func CamperShortages(snapshot CamperCabinSnapshot) []CamperShortage {
+	type key struct{ ageGroup, gender string }
+
+	capByKey := map[key]int{}
+	demandByKey := map[key]int{}
+	ageGroupNames := map[string]string{}
+	matchingCabins := map[key]int{}
+
+	for _, c := range snapshot.Cabins {
+		k := key{c.AgeGroupID, c.Gender}
+		capByKey[k] += c.Capacity
+		matchingCabins[k]++
+		if ageGroupNames[c.AgeGroupID] == "" {
+			ageGroupNames[c.AgeGroupID] = c.AgeGroupName
 		}
 	}
 
-	var unassigned []Camper
 	for _, c := range snapshot.Campers {
-		if !assigned[c.ID] {
-			unassigned = append(unassigned, c)
+		k := key{c.AgeGroupID, c.Gender}
+		demandByKey[k]++
+	}
+
+	var shortages []CamperShortage
+	for k, demand := range demandByKey {
+		matching := matchingCabins[k]
+		capacity := capByKey[k]
+		name := ageGroupNames[k.ageGroup]
+		if name == "" {
+			name = k.ageGroup
+		}
+		switch {
+		case matching == 0:
+			shortages = append(shortages, CamperShortage{
+				AgeGroupID:   k.ageGroup,
+				AgeGroupName: name,
+				Gender:       k.gender,
+				Count:        demand,
+				Reason:       ShortageNoMatchingCabin,
+			})
+		case demand > capacity:
+			shortages = append(shortages, CamperShortage{
+				AgeGroupID:   k.ageGroup,
+				AgeGroupName: name,
+				Gender:       k.gender,
+				Count:        demand - capacity,
+				Reason:       ShortageOverCapacity,
+			})
 		}
 	}
-	return unassigned
+
+	sort.Slice(shortages, func(i, j int) bool {
+		if shortages[i].AgeGroupName != shortages[j].AgeGroupName {
+			return shortages[i].AgeGroupName < shortages[j].AgeGroupName
+		}
+		return shortages[i].Gender < shortages[j].Gender
+	})
+	return shortages
 }

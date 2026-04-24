@@ -21,6 +21,43 @@ var (
 	ErrNoSolutions      = errors.New("solver produced no valid solutions")
 )
 
+// CamperUnassignedError is returned when a cabin run fails because one or
+// more enrolled campers cannot be placed in any cabin. The diagnostic is
+// computed via greedy fill against the camper snapshot, so it surfaces
+// the campers that genuinely have no eligible cabin (capacity, age group,
+// or gender mismatch) rather than a transient solver dead-end.
+type CamperUnassignedError struct {
+	Campers []UnassignedCamper
+}
+
+type UnassignedCamper struct {
+	ID   string
+	Name string
+}
+
+func (e *CamperUnassignedError) Error() string {
+	if len(e.Campers) == 0 {
+		return "one or more campers could not be assigned to any cabin"
+	}
+	names := make([]string, len(e.Campers))
+	for i, c := range e.Campers {
+		names[i] = c.Name
+	}
+	return fmt.Sprintf("%d camper(s) could not be assigned to any cabin: %s",
+		len(e.Campers), joinNames(names))
+}
+
+func joinNames(names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	out := names[0]
+	for i := 1; i < len(names); i++ {
+		out += ", " + names[i]
+	}
+	return out
+}
+
 type PreconditionError struct {
 	msg string
 }
@@ -57,6 +94,13 @@ func (svc *Service) TriggerCabinRun(ctx context.Context, campID, sessionID strin
 
 	solutions := solver.SolveCabin(snapshot, cfg)
 	if len(solutions) == 0 {
+		if unassignable := solver.UnassignableCampers(snapshot.Camper); len(unassignable) > 0 {
+			out := make([]UnassignedCamper, len(unassignable))
+			for i, c := range unassignable {
+				out[i] = UnassignedCamper{ID: c.ID, Name: c.Name}
+			}
+			return RunDetailResponse{}, &CamperUnassignedError{Campers: out}
+		}
 		return RunDetailResponse{}, ErrNoSolutions
 	}
 
@@ -520,6 +564,14 @@ func (svc *Service) getCabinSolution(ctx context.Context, campUUID, runUUID pgty
 		return SolutionDetailResponse{}, fmt.Errorf("error listing camper explanations: %w", err)
 	}
 
+	unassignedRows, err := svc.queries.ListCounselorCabinUnassignedBySolution(ctx, db.ListCounselorCabinUnassignedBySolutionParams{
+		SolutionID: counselorSol.ID,
+		CampID:     campUUID,
+	})
+	if err != nil {
+		return SolutionDetailResponse{}, fmt.Errorf("error listing unassigned counselors: %w", err)
+	}
+
 	assignments := make([]AssignmentResponse, 0, len(counselorAssigns)+len(camperAssigns))
 	for _, a := range counselorAssigns {
 		assignments = append(assignments, toAssignmentResponse(a))
@@ -569,8 +621,9 @@ func (svc *Service) getCabinSolution(ctx context.Context, campUUID, runUUID pgty
 			ScoreBreakdown:       counselorSol.ScoreBreakdown,
 			CamperScoreBreakdown: camperSol.ScoreBreakdown,
 		},
-		Assignments:  assignments,
-		Explanations: explanations,
+		Assignments:          assignments,
+		Explanations:         explanations,
+		UnassignedCounselors: toCabinUnassignedCounselorResponses(unassignedRows),
 	}, nil
 }
 
@@ -811,6 +864,22 @@ func (svc *Service) getActivitySolution(ctx context.Context, campUUID, runUUID p
 		return SolutionDetailResponse{}, fmt.Errorf("error listing activity explanations for solution %s: %w", solutionID, err)
 	}
 
+	unassignedRows, err := svc.queries.ListCounselorActivityUnassignedBySolution(ctx, db.ListCounselorActivityUnassignedBySolutionParams{
+		SolutionID: solUUID,
+		CampID:     campUUID,
+	})
+	if err != nil {
+		return SolutionDetailResponse{}, fmt.Errorf("error listing unassigned counselors for solution %s: %w", solutionID, err)
+	}
+	unassignedSlotRows, err := svc.queries.ListCounselorActivityUnassignedSlotsBySolution(ctx, db.ListCounselorActivityUnassignedSlotsBySolutionParams{
+		SolutionID: solUUID,
+		CampID:     campUUID,
+	})
+	if err != nil {
+		return SolutionDetailResponse{}, fmt.Errorf("error listing unassigned counselor slots for solution %s: %w", solutionID, err)
+	}
+	unassignedResponses := toActivityUnassignedCounselorResponses(unassignedRows, unassignedSlotRows)
+
 	assignmentResponses := make([]AssignmentResponse, len(assignments))
 	for i, a := range assignments {
 		assignmentResponses[i] = AssignmentResponse{
@@ -849,5 +918,41 @@ func (svc *Service) getActivitySolution(ctx context.Context, campUUID, runUUID p
 		SolutionSummaryResponse: toActivitySolutionSummaryResponse(sol),
 		Assignments:             assignmentResponses,
 		Explanations:            explanationResponses,
+		UnassignedCounselors:    unassignedResponses,
 	}, nil
+}
+
+func toCabinUnassignedCounselorResponses(rows []db.ListCounselorCabinUnassignedBySolutionRow) []UnassignedCounselorResponse {
+	out := make([]UnassignedCounselorResponse, len(rows))
+	for i, r := range rows {
+		out[i] = UnassignedCounselorResponse{
+			CounselorID:   api.UUIDToString(r.CounselorID),
+			CounselorName: r.CounselorName,
+		}
+	}
+	return out
+}
+
+func toActivityUnassignedCounselorResponses(
+	rows []db.ListCounselorActivityUnassignedBySolutionRow,
+	slotRows []db.ListCounselorActivityUnassignedSlotsBySolutionRow,
+) []UnassignedCounselorResponse {
+	slotsByCounselor := make(map[string][]UnassignedTimeSlotRef)
+	for _, sr := range slotRows {
+		cID := api.UUIDToString(sr.CounselorID)
+		slotsByCounselor[cID] = append(slotsByCounselor[cID], UnassignedTimeSlotRef{
+			SessionTimeSlotID: api.UUIDToString(sr.SessionTimeSlotID),
+			TimeSlotName:      sr.TimeSlotName,
+		})
+	}
+	out := make([]UnassignedCounselorResponse, len(rows))
+	for i, r := range rows {
+		cID := api.UUIDToString(r.CounselorID)
+		out[i] = UnassignedCounselorResponse{
+			CounselorID:      cID,
+			CounselorName:    r.CounselorName,
+			MissingTimeSlots: slotsByCounselor[cID],
+		}
+	}
+	return out
 }

@@ -444,6 +444,17 @@ export interface ExplanationDetail {
 	message: string;
 }
 
+export interface UnassignedTimeSlotRef {
+	session_time_slot_id: string;
+	time_slot_name: string;
+}
+
+export interface UnassignedCounselor {
+	counselor_id: string;
+	counselor_name: string;
+	missing_time_slots?: UnassignedTimeSlotRef[];
+}
+
 export interface SolutionDetailResponse {
 	id: string;
 	camper_solution_id?: string;
@@ -454,6 +465,7 @@ export interface SolutionDetailResponse {
 	camper_score_breakdown?: ScoreBreakdown[];
 	assignments: AssignmentDetail[];
 	explanations: ExplanationDetail[];
+	unassigned_counselors: UnassignedCounselor[];
 }
 
 export interface SolutionResponse {

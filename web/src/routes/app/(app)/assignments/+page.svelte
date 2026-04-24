@@ -220,6 +220,7 @@
 
 	let errorDialogOpen = $state(false);
 	let errorDialogMessage = $state("");
+	let errorDialogUnassignedCampers = $state<{ id: string; name: string }[]>([]);
 
 	let runsByType = $derived.by(() => {
 		const map = new Map<RunType, RunResponse | null>();
@@ -387,6 +388,10 @@
 		} catch (err) {
 			if (err instanceof ApiClientError && err.status === 422) {
 				errorDialogMessage = err.message;
+				const raw = err.data?.unassigned_campers;
+				errorDialogUnassignedCampers = Array.isArray(raw)
+					? (raw as { id: string; name: string }[])
+					: [];
 				errorDialogOpen = true;
 			} else {
 				const message =
@@ -739,6 +744,34 @@
 								{/if}
 							</div>
 
+							{#if details.unassigned_counselors && details.unassigned_counselors.length > 0}
+								<div class="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30">
+									<h3 class="mb-2 text-sm font-medium text-amber-900 dark:text-amber-200">Unassigned counselors</h3>
+									{#if runType === "cabin"}
+										<p class="mb-2 text-xs text-amber-800 dark:text-amber-300">These counselors were not assigned to any cabin.</p>
+										<ul class="grid gap-1 pl-2">
+											{#each details.unassigned_counselors as uc}
+												<li class="text-sm">{uc.counselor_name}</li>
+											{/each}
+										</ul>
+									{:else}
+										<p class="mb-2 text-xs text-amber-800 dark:text-amber-300">These counselors were not assigned for one or more time slots.</p>
+										<div class="grid gap-2 pl-2">
+											{#each details.unassigned_counselors as uc}
+												<div>
+													<div class="text-sm font-medium">{uc.counselor_name}</div>
+													{#if uc.missing_time_slots && uc.missing_time_slots.length > 0}
+														<div class="pl-3 text-xs text-muted-foreground">
+															Missing: {uc.missing_time_slots.map((s) => s.time_slot_name).join(", ")}
+														</div>
+													{/if}
+												</div>
+											{/each}
+										</div>
+									{/if}
+								</div>
+							{/if}
+
 							{#if details.explanations.length > 0}
 								{#if runType === "cabin"}
 									{@const counselorExplanations = details.explanations.filter(isCounselorExplanation)}
@@ -940,6 +973,16 @@
 				{errorDialogMessage}
 			</AlertDialog.AlertDialogDescription>
 		</AlertDialog.AlertDialogHeader>
+		{#if errorDialogUnassignedCampers.length > 0}
+			<div class="max-h-60 overflow-y-auto rounded-md border bg-muted/30 p-3">
+				<div class="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Unassigned campers</div>
+				<ul class="grid gap-0.5">
+					{#each errorDialogUnassignedCampers as camper}
+						<li class="text-sm">{camper.name}</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
 		<AlertDialog.AlertDialogFooter>
 			<AlertDialog.AlertDialogAction onclick={() => (errorDialogOpen = false)}>
 				Close

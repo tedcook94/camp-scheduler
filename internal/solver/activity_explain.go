@@ -46,7 +46,6 @@ func ExplainActivity(snapshot ActivitySnapshot, solution ActivitySolution) Activ
 	var unmet []ActivityUnmetPreference
 	eligibleUnmet, ineligible := findUnmetActivityPreferences(snapshot, counselorSlots, slotsByID)
 	unmet = append(unmet, eligibleUnmet...)
-	unmet = append(unmet, findUnassignedCounselors(snapshot, counselorSlots)...)
 
 	sort.Slice(unmet, func(i, j int) bool {
 		if unmet[i].CounselorID != unmet[j].CounselorID {
@@ -346,21 +345,4 @@ func findUnmetActivityPreferences(snapshot ActivitySnapshot, counselorSlots map[
 		}
 	}
 	return eligibleUnmet, ineligible
-}
-
-func findUnassignedCounselors(snapshot ActivitySnapshot, counselorSlots map[string][]string) []ActivityUnmetPreference {
-	var unmet []ActivityUnmetPreference
-	for _, c := range snapshot.Counselors {
-		if len(counselorSlots[c.ID]) == 0 {
-			unmet = append(unmet, ActivityUnmetPreference{
-				CounselorID: c.ID,
-				Constraint:  "unassigned",
-				Message: fmt.Sprintf(
-					"counselor %q not assigned to any activity",
-					c.Name,
-				),
-			})
-		}
-	}
-	return unmet
 }

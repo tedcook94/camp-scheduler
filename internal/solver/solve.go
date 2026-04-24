@@ -152,11 +152,13 @@ func (s *searchState) evaluateSolution() {
 	}
 
 	score := ScoreSoftConstraints(s.snapshot, assignment, s.config.Weights)
+	unassigned := computeUnassignedCounselors(s.snapshot, assignment)
 
 	if len(s.solutions) < s.config.MaxSolutions {
 		s.solutions = append(s.solutions, Solution{
-			Assignment: assignment,
-			Score:      score,
+			Assignment:           assignment,
+			Score:                score,
+			UnassignedCounselors: unassigned,
 		})
 		return
 	}
@@ -169,10 +171,30 @@ func (s *searchState) evaluateSolution() {
 	}
 	if score.Total > s.solutions[worstIdx].Score.Total {
 		s.solutions[worstIdx] = Solution{
-			Assignment: assignment,
-			Score:      score,
+			Assignment:           assignment,
+			Score:                score,
+			UnassignedCounselors: unassigned,
 		}
 	}
+}
+
+// computeUnassignedCounselors returns the IDs of counselors in the snapshot
+// that were not placed in any cabin by the assignment, in the order they
+// appear in snapshot.Counselors for deterministic output.
+func computeUnassignedCounselors(snapshot SessionSnapshot, assignment Assignment) []string {
+	assigned := make(map[string]bool)
+	for _, counselorIDs := range assignment.CabinCounselors {
+		for _, id := range counselorIDs {
+			assigned[id] = true
+		}
+	}
+	var unassigned []string
+	for _, c := range snapshot.Counselors {
+		if !assigned[c.ID] {
+			unassigned = append(unassigned, c.ID)
+		}
+	}
+	return unassigned
 }
 
 func (s *searchState) cloneAssignment() Assignment {

@@ -263,3 +263,28 @@ func orderCampersByConstraints(campers []Camper, snapshot CamperCabinSnapshot) [
 	}
 	return result
 }
+
+// UnassignableCampers reports campers that cannot be placed in any cabin
+// even via greedy fill against the supplied snapshot. Intended as a
+// diagnostic when SolveCabin returns no solutions: it surfaces which
+// specific campers (by ID and name) are blocked by capacity or by having
+// no eligible cabin in their age group / gender.
+func UnassignableCampers(snapshot CamperCabinSnapshot) []Camper {
+	cabinsByAgeGroup := groupCabinsByAgeGroup(snapshot)
+	filled := fillRemaining(CamperAssignment{CabinCampers: map[string][]string{}}, snapshot.Campers, snapshot, cabinsByAgeGroup)
+
+	assigned := make(map[string]bool)
+	for _, ids := range filled.CabinCampers {
+		for _, id := range ids {
+			assigned[id] = true
+		}
+	}
+
+	var unassigned []Camper
+	for _, c := range snapshot.Campers {
+		if !assigned[c.ID] {
+			unassigned = append(unassigned, c)
+		}
+	}
+	return unassigned
+}

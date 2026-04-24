@@ -58,8 +58,21 @@ func DefaultActivitySolverConfig() ActivitySolverConfig {
 }
 
 type ActivitySolution struct {
-	Assignment ActivityAssignment
-	Score      ScoreResult
+	Assignment           ActivityAssignment
+	Score                ScoreResult
+	UnassignedCounselors []UnassignedCounselorSlots
+}
+
+// UnassignedCounselorSlots records a counselor that the activity solver
+// could not place in every time slot they were eligible for. MissingTimeSlotIDs
+// is the ordered list of session time slot IDs the counselor was not
+// assigned to despite having at least one eligible activity slot in that
+// time slot. A counselor with zero eligible time slots (e.g. lacking every
+// required certification) does not appear here -- there was nothing the
+// solver could do for them.
+type UnassignedCounselorSlots struct {
+	CounselorID        string
+	MissingTimeSlotIDs []string
 }
 
 type ActivityExplanation struct {

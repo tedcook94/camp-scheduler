@@ -105,8 +105,9 @@ func DefaultSolverConfig() SolverConfig {
 }
 
 type Solution struct {
-	Assignment Assignment
-	Score      ScoreResult
+	Assignment           Assignment
+	Score                ScoreResult
+	UnassignedCounselors []string
 }
 
 type Explanation struct {

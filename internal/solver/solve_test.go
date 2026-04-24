@@ -142,6 +142,25 @@ func TestSolve(t *testing.T) {
 			if len(violations) > 0 {
 				t.Errorf("solution has hard constraint violations: %v", violations)
 			}
+
+			placed := map[string]bool{}
+			for _, ids := range sol.Assignment.CabinCounselors {
+				for _, id := range ids {
+					placed[id] = true
+				}
+			}
+			expected := []string{}
+			for _, c := range snapshot.Counselors {
+				if !placed[c.ID] {
+					expected = append(expected, c.ID)
+				}
+			}
+			slices.Sort(expected)
+			got := append([]string{}, sol.UnassignedCounselors...)
+			slices.Sort(got)
+			if !slices.Equal(got, expected) {
+				t.Errorf("UnassignedCounselors mismatch: got %v, want %v", got, expected)
+			}
 		}
 	})
 

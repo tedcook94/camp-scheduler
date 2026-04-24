@@ -203,11 +203,13 @@ func (s *activitySearchState) evaluateSolution() {
 	}
 
 	score := ScoreActivitySoftConstraints(s.snapshot, assignment, s.config.Weights)
+	unassigned := computeActivityUnassignedCounselors(s.snapshot, assignment, s.eligibleByTimeSlot, s.timeSlotOrder, s.slotsByID)
 
 	if len(s.solutions) < s.config.MaxSolutions {
 		s.solutions = append(s.solutions, ActivitySolution{
-			Assignment: assignment,
-			Score:      score,
+			Assignment:           assignment,
+			Score:                score,
+			UnassignedCounselors: unassigned,
 		})
 		return
 	}
@@ -220,10 +222,56 @@ func (s *activitySearchState) evaluateSolution() {
 	}
 	if score.Total > s.solutions[worstIdx].Score.Total {
 		s.solutions[worstIdx] = ActivitySolution{
-			Assignment: assignment,
-			Score:      score,
+			Assignment:           assignment,
+			Score:                score,
+			UnassignedCounselors: unassigned,
 		}
 	}
+}
+
+// computeActivityUnassignedCounselors flags every counselor that was not
+// placed in each time slot they had an eligible activity slot for. The
+// "expected" time slots per counselor are those where eligibleByTimeSlot
+// is non-empty -- counselors with zero eligibility in a time slot are not
+// flagged for it because the solver had no valid placement to make.
+func computeActivityUnassignedCounselors(
+	snapshot ActivitySnapshot,
+	assignment ActivityAssignment,
+	eligibleByTimeSlot map[string]map[string][]string,
+	timeSlotOrder []string,
+	slotsByID map[string]ActivitySlot,
+) []UnassignedCounselorSlots {
+	counselorTimeSlots := make(map[string]map[string]bool)
+	for slotID, counselorIDs := range assignment.SlotCounselors {
+		tsID := slotsByID[slotID].TimeSlotID
+		for _, cID := range counselorIDs {
+			if counselorTimeSlots[cID] == nil {
+				counselorTimeSlots[cID] = make(map[string]bool)
+			}
+			counselorTimeSlots[cID][tsID] = true
+		}
+	}
+
+	var result []UnassignedCounselorSlots
+	for _, c := range snapshot.Counselors {
+		eligible := eligibleByTimeSlot[c.ID]
+		var missing []string
+		for _, tsID := range timeSlotOrder {
+			if len(eligible[tsID]) == 0 {
+				continue
+			}
+			if !counselorTimeSlots[c.ID][tsID] {
+				missing = append(missing, tsID)
+			}
+		}
+		if len(missing) > 0 {
+			result = append(result, UnassignedCounselorSlots{
+				CounselorID:        c.ID,
+				MissingTimeSlotIDs: missing,
+			})
+		}
+	}
+	return result
 }
 
 func (s *activitySearchState) cloneAssignment() ActivityAssignment {

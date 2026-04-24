@@ -89,8 +89,25 @@ type SolutionSummaryResponse struct {
 
 type SolutionDetailResponse struct {
 	SolutionSummaryResponse
-	Assignments  []AssignmentResponse  `json:"assignments"`
-	Explanations []ExplanationResponse `json:"explanations"`
+	Assignments          []AssignmentResponse           `json:"assignments"`
+	Explanations         []ExplanationResponse          `json:"explanations"`
+	UnassignedCounselors []UnassignedCounselorResponse  `json:"unassigned_counselors"`
+}
+
+// UnassignedCounselorResponse identifies a counselor that the solver could
+// not place. For cabin runs, MissingTimeSlots is empty (the counselor has
+// no cabin assignment at all). For activity runs, MissingTimeSlots lists
+// the time slots the counselor was not assigned to despite having at least
+// one eligible activity slot in that time slot.
+type UnassignedCounselorResponse struct {
+	CounselorID      string                  `json:"counselor_id"`
+	CounselorName    string                  `json:"counselor_name"`
+	MissingTimeSlots []UnassignedTimeSlotRef `json:"missing_time_slots,omitempty"`
+}
+
+type UnassignedTimeSlotRef struct {
+	SessionTimeSlotID string `json:"session_time_slot_id"`
+	TimeSlotName      string `json:"time_slot_name"`
 }
 
 type AssignmentResponse struct {
@@ -177,6 +194,18 @@ func (ctrl *Controller) handleTriggerError(c *gin.Context, log *slog.Logger, ses
 	var preconditionErr *PreconditionError
 	if errors.As(err, &preconditionErr) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": preconditionErr.Error()})
+		return
+	}
+	var camperErr *CamperUnassignedError
+	if errors.As(err, &camperErr) {
+		campers := make([]gin.H, len(camperErr.Campers))
+		for i, cm := range camperErr.Campers {
+			campers[i] = gin.H{"id": cm.ID, "name": cm.Name}
+		}
+		c.JSON(http.StatusUnprocessableEntity, gin.H{
+			"error":              camperErr.Error(),
+			"unassigned_campers": campers,
+		})
 		return
 	}
 	if errors.Is(err, ErrNoSolutions) {

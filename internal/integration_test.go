@@ -5,6 +5,7 @@ package internal_test
 import (
 	"bytes"
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -4230,4 +4231,295 @@ func TestSessionCounselorRosterDisableInteraction(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestReports(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	if err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Reports").Scan(&campID); err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	// Shared season.
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Summer 2026", "start_date": "2026-06-01", "end_date": "2026-08-31",
+	}, token)
+	seasonID := str(season, "id")
+
+	// === Cabin session setup ===
+	ageGroup := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Juniors"}, token)
+	ageGroupID := str(ageGroup, "id")
+
+	cabin1 := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name": "Birch", "default_age_group_id": ageGroupID,
+		"default_group_size": 8, "default_required_counselors": 1, "gender": "female",
+	}, token)
+	cabin1ID := str(cabin1, "id")
+	cabin2 := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name": "Elm", "default_age_group_id": ageGroupID,
+		"default_group_size": 8, "default_required_counselors": 1, "gender": "female",
+	}, token)
+	cabin2ID := str(cabin2, "id")
+
+	cabinSession := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Cabin Week", "season_id": seasonID,
+	}, token)
+	cabinSessionID := str(cabinSession, "id")
+	cabinBase := "/sessions/" + cabinSessionID
+
+	cabinSag := mustPost(t, apiURL(ts, cabinBase+"/age-groups"), map[string]any{
+		"age_group_id": ageGroupID,
+	}, token)
+	cabinSagID := str(cabinSag, "id")
+
+	mustPost(t, apiURL(ts, cabinBase+"/cabins"), map[string]any{
+		"session_age_group_id": cabinSagID, "cabin_id": cabin1ID,
+		"group_size": 4, "required_counselors": 1,
+	}, token)
+	mustPost(t, apiURL(ts, cabinBase+"/cabins"), map[string]any{
+		"session_age_group_id": cabinSagID, "cabin_id": cabin2ID,
+		"group_size": 4, "required_counselors": 1,
+	}, token)
+
+	// Campers.
+	for _, name := range []string{"Anna", "Beth", "Cara", "Dora", "Ella", "Fran"} {
+		c := mustPost(t, apiURL(ts, "/campers"), map[string]any{"name": name, "gender": "female"}, token)
+		mustPost(t, apiURL(ts, cabinBase+"/enrollments"), map[string]any{
+			"camper_id": str(c, "id"), "session_age_group_id": cabinSagID,
+		}, token)
+	}
+
+	// Counselors to staff the cabins.
+	createSeniorCounselors(t, ts, token, "female", 2)
+
+	// Trigger cabin run + select.
+	cabinRunURL := apiURL(ts, cabinBase+"/assignment-runs")
+	cabinRun := mustPost(t, cabinRunURL, map[string]any{"run_type": "cabin"}, token)
+	cabinRunID := str(cabinRun, "id")
+	cabinSolutions := list(cabinRun, "solutions")
+	if len(cabinSolutions) == 0 {
+		t.Fatal("expected cabin solutions")
+	}
+	cabinSolutionID := str(asMap(cabinSolutions[0]), "id")
+	doRequest(t, http.MethodPost,
+		cabinRunURL+"/"+cabinRunID+"/solutions/"+cabinSolutionID+"/select",
+		nil, http.StatusOK, token)
+
+	// === Activity session setup ===
+	swimming := mustPost(t, apiURL(ts, "/activities"), map[string]any{"name": "Swimming"}, token)
+	swimmingID := str(swimming, "id")
+	archery := mustPost(t, apiURL(ts, "/activities"), map[string]any{"name": "Archery"}, token)
+	archeryID := str(archery, "id")
+	crafts := mustPost(t, apiURL(ts, "/activities"), map[string]any{"name": "Crafts"}, token)
+	craftsID := str(crafts, "id")
+	hiking := mustPost(t, apiURL(ts, "/activities"), map[string]any{"name": "Hiking"}, token)
+	hikingID := str(hiking, "id")
+
+	activitySession := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Activity Week", "season_id": seasonID,
+	}, token)
+	activitySessionID := str(activitySession, "id")
+	activityBase := "/sessions/" + activitySessionID
+
+	period1 := mustPost(t, apiURL(ts, "/time-slots"), map[string]any{"name": "Morning"}, token)
+	period1ID := str(period1, "id")
+	period2 := mustPost(t, apiURL(ts, "/time-slots"), map[string]any{"name": "Afternoon"}, token)
+	period2ID := str(period2, "id")
+
+	sts1 := mustPost(t, apiURL(ts, activityBase+"/time-slots"), map[string]any{
+		"time_slot_id": period1ID, "sort_order": 1,
+	}, token)
+	sts1ID := str(sts1, "id")
+	sts2 := mustPost(t, apiURL(ts, activityBase+"/time-slots"), map[string]any{
+		"time_slot_id": period2ID, "sort_order": 2,
+	}, token)
+	sts2ID := str(sts2, "id")
+
+	// 4 activities × 2 slots = 8 cells, each with required_counselors=1.
+	// Combined with our 4 counselors (2 fresh + 2 carried over from the
+	// cabin run), the activity solver fills every cell exactly once.
+	for _, sid := range []string{sts1ID, sts2ID} {
+		for _, aid := range []string{swimmingID, archeryID, craftsID, hikingID} {
+			mustPost(t, apiURL(ts, activityBase+"/time-slots/"+sid+"/activities"), map[string]any{
+				"activity_id": aid, "capacity": 2, "required_counselors": 1,
+			}, token)
+		}
+	}
+
+	// Two counselors for activity assignments. Make them session-scoped so
+	// the activity solver picks them up.
+	actCounselor1 := mustPost(t, apiURL(ts, "/counselors"), map[string]any{
+		"name": "Activity Alice", "junior_counselor": false, "gender": "female",
+	}, token)
+	actCounselor1ID := str(actCounselor1, "id")
+	actCounselor2 := mustPost(t, apiURL(ts, "/counselors"), map[string]any{
+		"name": "Activity Bob", "junior_counselor": false, "gender": "male",
+	}, token)
+	actCounselor2ID := str(actCounselor2, "id")
+
+	mustPut(t, apiURL(ts, activityBase+"/counselors/"+actCounselor1ID+"/activity-preferences"),
+		[]map[string]any{{"activity_id": swimmingID, "rank": 1}}, token)
+	mustPut(t, apiURL(ts, activityBase+"/counselors/"+actCounselor2ID+"/activity-preferences"),
+		[]map[string]any{{"activity_id": archeryID, "rank": 1}}, token)
+
+	activityRunURL := apiURL(ts, activityBase+"/assignment-runs")
+	activityRun := mustPost(t, activityRunURL, map[string]any{"run_type": "activity_schedule"}, token)
+	activityRunID := str(activityRun, "id")
+	activitySolutions := list(activityRun, "solutions")
+	if len(activitySolutions) == 0 {
+		t.Fatal("expected activity solutions")
+	}
+	activitySolutionID := str(asMap(activitySolutions[0]), "id")
+	doRequest(t, http.MethodPost,
+		activityRunURL+"/"+activityRunID+"/solutions/"+activitySolutionID+"/select",
+		nil, http.StatusOK, token)
+
+	// Empty session for "no selected" + "session not found" tests.
+	emptySession := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Empty", "season_id": seasonID,
+	}, token)
+	emptySessionID := str(emptySession, "id")
+
+	t.Run("cabin_csv_with_unassigned", func(t *testing.T) {
+		body, ct, cd := getReport(t, ts, token, cabinSessionID, "cabin",
+			"format=csv&include_unassigned=true", http.StatusOK)
+		if !strings.HasPrefix(ct, "text/csv") {
+			t.Fatalf("expected text/csv, got %q", ct)
+		}
+		if !strings.Contains(cd, "cabin-report-") || !strings.Contains(cd, ".csv") {
+			t.Fatalf("unexpected Content-Disposition: %q", cd)
+		}
+		rows, err := csv.NewReader(bytes.NewReader(body)).ReadAll()
+		if err != nil {
+			t.Fatalf("csv parse: %v\nbody: %s", err, body)
+		}
+		if len(rows) < 2 {
+			t.Fatalf("expected header + at least one row, got %d", len(rows))
+		}
+		if rows[0][0] != "Age Group" {
+			t.Fatalf("unexpected header row: %v", rows[0])
+		}
+		sawCounselor := false
+		sawCamper := false
+		for _, r := range rows[1:] {
+			if len(r) < 4 {
+				continue
+			}
+			switch r[2] {
+			case "Counselor":
+				sawCounselor = true
+			case "Camper":
+				sawCamper = true
+			}
+		}
+		if !sawCounselor || !sawCamper {
+			t.Fatalf("expected both Counselor and Camper rows; got counselor=%v camper=%v", sawCounselor, sawCamper)
+		}
+	})
+
+	t.Run("cabin_pdf", func(t *testing.T) {
+		body, ct, _ := getReport(t, ts, token, cabinSessionID, "cabin",
+			"format=pdf&include_unassigned=true", http.StatusOK)
+		if ct != "application/pdf" {
+			t.Fatalf("expected application/pdf, got %q", ct)
+		}
+		if !bytes.HasPrefix(body, []byte("%PDF-")) {
+			t.Fatalf("expected PDF magic prefix, got %x", body[:8])
+		}
+	})
+
+	t.Run("activity_csv", func(t *testing.T) {
+		body, ct, _ := getReport(t, ts, token, activitySessionID, "activities",
+			"format=csv&include_unassigned=true", http.StatusOK)
+		if !strings.HasPrefix(ct, "text/csv") {
+			t.Fatalf("expected text/csv, got %q", ct)
+		}
+		rows, err := csv.NewReader(bytes.NewReader(body)).ReadAll()
+		if err != nil {
+			t.Fatalf("csv parse: %v\nbody: %s", err, body)
+		}
+		if len(rows) < 2 || rows[0][0] != "Time Slot" {
+			t.Fatalf("unexpected header row: %v", rows[0])
+		}
+		// Sanity: every counselor in our small fixture should appear at
+		// least once across the assignment rows.
+		text := string(body)
+		for _, name := range []string{"Activity Alice", "Activity Bob"} {
+			if !strings.Contains(text, name) {
+				t.Fatalf("expected %q in activity CSV; body:\n%s", name, text)
+			}
+		}
+	})
+
+	t.Run("activity_pdf", func(t *testing.T) {
+		body, ct, _ := getReport(t, ts, token, activitySessionID, "activities",
+			"format=pdf&include_unassigned=false", http.StatusOK)
+		if ct != "application/pdf" {
+			t.Fatalf("expected application/pdf, got %q", ct)
+		}
+		if !bytes.HasPrefix(body, []byte("%PDF-")) {
+			t.Fatalf("expected PDF magic prefix, got %x", body[:8])
+		}
+	})
+
+	t.Run("no_selected_solution", func(t *testing.T) {
+		body, _, _ := getReport(t, ts, token, emptySessionID, "cabin",
+			"format=csv", http.StatusNotFound)
+		if !strings.Contains(string(body), "no selected cabin assignment") {
+			t.Fatalf("expected 'no selected cabin assignment' message, got: %s", body)
+		}
+	})
+
+	t.Run("bad_format_param", func(t *testing.T) {
+		body, _, _ := getReport(t, ts, token, cabinSessionID, "cabin",
+			"format=xml", http.StatusBadRequest)
+		if !strings.Contains(string(body), "format must be 'csv' or 'pdf'") {
+			t.Fatalf("expected format validation message, got: %s", body)
+		}
+	})
+
+	t.Run("bad_include_unassigned", func(t *testing.T) {
+		body, _, _ := getReport(t, ts, token, cabinSessionID, "cabin",
+			"format=csv&include_unassigned=maybe", http.StatusBadRequest)
+		if !strings.Contains(string(body), "include_unassigned must be") {
+			t.Fatalf("expected include_unassigned validation message, got: %s", body)
+		}
+	})
+
+	t.Run("session_not_found", func(t *testing.T) {
+		bogus := "00000000-0000-0000-0000-000000000000"
+		body, _, _ := getReport(t, ts, token, bogus, "cabin",
+			"format=csv", http.StatusNotFound)
+		if !strings.Contains(string(body), "session not found") {
+			t.Fatalf("expected 'session not found' message, got: %s", body)
+		}
+	})
+}
+
+// getReport fetches a report and returns (body, content-type, content-disposition).
+func getReport(t *testing.T, ts *httptest.Server, token, sessionID, kind, query string, expectedStatus int) ([]byte, string, string) {
+	t.Helper()
+	url := apiURL(ts, "/sessions/"+sessionID+"/reports/"+kind+"?"+query)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatalf("creating request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("executing GET %s: %v", url, err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("reading response: %v", err)
+	}
+	if resp.StatusCode != expectedStatus {
+		t.Fatalf("GET %s: expected status %d, got %d\nbody: %s",
+			url, expectedStatus, resp.StatusCode, body)
+	}
+	return body, resp.Header.Get("Content-Type"), resp.Header.Get("Content-Disposition")
 }

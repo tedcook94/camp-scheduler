@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const runTypeActivitySchedule = "activity_schedule"
+const RunTypeActivitySchedule = "activity_schedule"
 
 func StoreActivitySolutions(ctx context.Context, pool *pgxpool.Pool, campID, sessionID string, snapshot ActivitySnapshot, solutions []ActivitySolution) (string, error) {
 	campUUID, err := api.ParseUUID(campID)
@@ -36,7 +36,7 @@ func StoreActivitySolutions(ctx context.Context, pool *pgxpool.Pool, campID, ses
 	if _, err := qtx.DeleteAssignmentRunsBySessionAndType(ctx, db.DeleteAssignmentRunsBySessionAndTypeParams{
 		CampID:    campUUID,
 		SessionID: sessionUUID,
-		RunType:   runTypeActivitySchedule,
+		RunType:   RunTypeActivitySchedule,
 	}); err != nil {
 		return "", fmt.Errorf("error deleting prior activity runs: %w", err)
 	}
@@ -44,7 +44,7 @@ func StoreActivitySolutions(ctx context.Context, pool *pgxpool.Pool, campID, ses
 	run, err := qtx.CreateAssignmentRun(ctx, db.CreateAssignmentRunParams{
 		CampID:    campUUID,
 		SessionID: sessionUUID,
-		RunType:   runTypeActivitySchedule,
+		RunType:   RunTypeActivitySchedule,
 		Status:    "completed",
 	})
 	if err != nil {

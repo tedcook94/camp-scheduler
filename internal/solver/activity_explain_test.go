@@ -53,8 +53,7 @@ func TestExplainActivityIneligibility(t *testing.T) {
 		if len(exp.IneligiblePreferences) != 0 {
 			t.Errorf("expected 0 ineligible, got %d: %v", len(exp.IneligiblePreferences), exp.IneligiblePreferences)
 		}
-		// Should be in unmet (also includes "unassigned counselor"), so at
-		// least one entry should be activity_preference.
+		// Should appear in unmet preferences as activity_preference.
 		foundUnmet := false
 		for _, u := range exp.UnmetPreferences {
 			if u.Constraint == "activity_preference" {

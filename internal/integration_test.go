@@ -3895,8 +3895,19 @@ func testPreconditionCamperGenderCapacity(t *testing.T) {
 		map[string]any{"run_type": "cabin"},
 		http.StatusUnprocessableEntity, token)
 	errMsg := str(resp, "error")
-	if !strings.Contains(errMsg, "female cabin capacity") || !strings.Contains(errMsg, "Juniors") {
-		t.Fatalf("expected female cabin capacity error mentioning Juniors, got: %s", errMsg)
+	if !strings.Contains(errMsg, "Juniors") || !strings.Contains(errMsg, "female") {
+		t.Fatalf("expected camper shortage error mentioning Juniors and female, got: %s", errMsg)
+	}
+	shortages, ok := resp["camper_shortages"].([]any)
+	if !ok || len(shortages) == 0 {
+		t.Fatalf("expected camper_shortages array in response, got: %#v", resp["camper_shortages"])
+	}
+	first, _ := shortages[0].(map[string]any)
+	if first["reason"] != "over_capacity" {
+		t.Fatalf("expected first shortage reason over_capacity, got: %#v", first)
+	}
+	if first["age_group_name"] != "Juniors" || first["gender"] != "female" {
+		t.Fatalf("expected Juniors/female bucket, got: %#v", first)
 	}
 }
 

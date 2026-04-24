@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
@@ -96,11 +95,12 @@ func (svc *Service) TriggerCabinRun(ctx context.Context, campID, sessionID strin
 		return RunDetailResponse{}, NewPreconditionError(msg)
 	}
 
+	if shortages := solver.CamperShortages(reduceCamperCapacityForCounselors(snapshot)); len(shortages) > 0 {
+		return RunDetailResponse{}, &CamperUnassignedError{Shortages: shortages}
+	}
+
 	solutions := solver.SolveCabin(snapshot, cfg)
 	if len(solutions) == 0 {
-		if shortages := solver.CamperShortages(reduceCamperCapacityForCounselors(snapshot)); len(shortages) > 0 {
-			return RunDetailResponse{}, &CamperUnassignedError{Shortages: shortages}
-		}
 		return RunDetailResponse{}, ErrNoSolutions
 	}
 
@@ -113,9 +113,10 @@ func (svc *Service) TriggerCabinRun(ctx context.Context, campID, sessionID strin
 }
 
 // validateCabin checks preconditions for a combined cabin run: the session
-// must have cabins, the counselor side must satisfy minimum and gender-feasibility
-// requirements, and per-(age group, gender) cabin capacity (after subtracting
-// required counselors) must accommodate enrolled campers.
+// must have cabins and the counselor side must satisfy minimum and
+// gender-feasibility requirements. Per-(age group, gender) camper capacity
+// shortages are surfaced separately via CamperShortages so the error
+// payload carries structured bucket information.
 func validateCabin(snapshot solver.CabinSnapshot) string {
 	if len(snapshot.Counselor.Cabins) == 0 {
 		return "No cabins configured for this session"
@@ -125,9 +126,6 @@ func validateCabin(snapshot solver.CabinSnapshot) string {
 		return msg
 	}
 	if msg := validateCounselorSide(snapshot.Counselor); msg != "" {
-		return msg
-	}
-	if msg := validateCamperSideWithCounselors(snapshot); msg != "" {
 		return msg
 	}
 	return ""
@@ -195,64 +193,6 @@ func validateCounselorSide(snapshot solver.SessionSnapshot) string {
 		}
 		if seniorsByGender[gender] < cabinsByGender[gender] {
 			return fmt.Sprintf("Not enough senior %s counselors (%d) to seat one in each of the %d staffed %s cabin(s)", gender, seniorsByGender[gender], cabinsByGender[gender], gender)
-		}
-	}
-
-	return ""
-}
-
-// validateCamperSideWithCounselors checks per-(age group, gender) capacity
-// for campers, after subtracting the cabin's required counselor count from
-// each cabin's total capacity. This catches the case where group_size leaves
-// no room for the required counselors plus the enrolled campers.
-func validateCamperSideWithCounselors(snapshot solver.CabinSnapshot) string {
-	if len(snapshot.Camper.Campers) == 0 {
-		return ""
-	}
-
-	type key struct{ ageGroup, gender string }
-	camperCapByKey := map[key]int{}
-	ageGroupNames := map[string]string{}
-	requiredByCabin := map[string]int{}
-	for _, c := range snapshot.Counselor.Cabins {
-		requiredByCabin[c.ID] = c.RequiredCounselors
-	}
-	for _, c := range snapshot.Camper.Cabins {
-		// Subtract required counselors (which the counselor solver will
-		// place) from the cabin's total capacity to get the worst-case
-		// remaining capacity available for campers.
-		req := requiredByCabin[c.ID]
-		remaining := c.Capacity - req
-		if remaining < 0 {
-			remaining = 0
-		}
-		camperCapByKey[key{c.AgeGroupID, c.Gender}] += remaining
-		ageGroupNames[c.AgeGroupID] = c.AgeGroupName
-	}
-
-	demandByKey := map[key]int{}
-	for _, c := range snapshot.Camper.Campers {
-		demandByKey[key{c.AgeGroupID, c.Gender}]++
-	}
-
-	keys := make([]key, 0, len(demandByKey))
-	for k := range demandByKey {
-		keys = append(keys, k)
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		if keys[i].ageGroup != keys[j].ageGroup {
-			return keys[i].ageGroup < keys[j].ageGroup
-		}
-		return keys[i].gender < keys[j].gender
-	})
-	for _, k := range keys {
-		demand := demandByKey[k]
-		if camperCapByKey[k] < demand {
-			ageGroup := ageGroupNames[k.ageGroup]
-			if ageGroup == "" {
-				ageGroup = k.ageGroup
-			}
-			return fmt.Sprintf("Not enough %s cabin capacity (%d available for campers after required counselors) for %d %s camper(s) in age group %q", k.gender, camperCapByKey[k], demand, k.gender, ageGroup)
 		}
 	}
 

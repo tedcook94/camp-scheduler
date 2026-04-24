@@ -24,6 +24,7 @@ import (
 	"camp-scheduler/internal/enrollment"
 	"camp-scheduler/internal/history"
 	"camp-scheduler/internal/preferences"
+	"camp-scheduler/internal/report"
 	"camp-scheduler/internal/season"
 	"camp-scheduler/internal/session"
 	"camp-scheduler/internal/sessionconfig"
@@ -195,6 +196,10 @@ func (s *Server) routes() {
 	assignmentService := assignment.NewService(queries, s.pool)
 	assignmentController := assignment.NewController(assignmentService)
 	assignmentController.RegisterRoutes(protected)
+
+	reportService := report.NewService(queries)
+	reportController := report.NewController(reportService)
+	reportController.RegisterRoutes(protected)
 
 	superAdmin := v1.Group("/admin")
 	superAdmin.Use(auth.Middleware(authenticator))

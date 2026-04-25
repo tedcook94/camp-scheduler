@@ -13,8 +13,11 @@
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import TrashIcon from "@lucide/svelte/icons/trash";
+	import ArchiveIcon from "@lucide/svelte/icons/archive";
+	import ArchiveRestoreIcon from "@lucide/svelte/icons/archive-restore";
 	import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
 	import SortableTableHead from "$lib/components/sortable-table-head.svelte";
+	import ArchivedSection from "$lib/components/archived-section.svelte";
 	import { sortItems, type SortDirection } from "$lib/utils";
 
 	const getCampDisabled = getContext<() => boolean>("campDisabled");
@@ -62,6 +65,34 @@
 	let deleteOpen = $state(false);
 	let deleteTarget = $state<Season | null>(null);
 	let deleting = $state(false);
+
+	let archivingId = $state<string | null>(null);
+	let archivedSection = $state<ArchivedSection<Season> | null>(null);
+
+	async function handleArchive(season: Season) {
+		archivingId = season.id;
+		try {
+			await seasonApi.archive(season.id);
+			seasons = seasons.filter((s) => s.id !== season.id);
+			archivedSection?.addArchived({ ...season, archived: true });
+			toast.success("Season archived");
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to archive season";
+			toast.error(message);
+		} finally {
+			archivingId = null;
+		}
+	}
+
+	async function handleUnarchive(id: string) {
+		await seasonApi.unarchive(id);
+		try {
+			seasons = await seasonApi.list();
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to refresh season list";
+			toast.error(message);
+		}
+	}
 
 	onMount(async () => {
 		try {
@@ -162,8 +193,23 @@
 			deleteOpen = false;
 			deleteTarget = null;
 		} catch (err) {
-			const message = err instanceof ApiClientError ? err.message : "Failed to delete season";
-			toast.error(message);
+			if (err instanceof ApiClientError && err.status === 409) {
+				const target = deleteTarget;
+				deleteOpen = false;
+				deleteTarget = null;
+				toast.message("Season has dependent records and cannot be deleted.", {
+					description: "Archive it instead?",
+					action: {
+						label: "Archive",
+						onClick: () => {
+							if (target) handleArchive(target);
+						},
+					},
+				});
+			} else {
+				const message = err instanceof ApiClientError ? err.message : "Failed to delete season";
+				toast.error(message);
+			}
 		} finally {
 			deleting = false;
 		}
@@ -234,6 +280,20 @@
 								<Button
 									variant="ghost"
 									size="icon-sm"
+									title="Archive"
+									disabled={disabled || archivingId === season.id}
+									onclick={() => handleArchive(season)}
+								>
+									{#if archivingId === season.id}
+										<LoaderCircleIcon class="size-4 animate-spin" />
+									{:else}
+										<ArchiveIcon class="size-4" />
+									{/if}
+									<span class="sr-only">Archive</span>
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon-sm"
 									disabled={disabled}
 									title="Delete"
 									onclick={() => confirmDelete(season)}
@@ -247,6 +307,40 @@
 				{/each}
 			</Table.TableBody>
 		</Table.Table>
+	{/if}
+
+	{#if camp}
+		<ArchivedSection
+			bind:this={archivedSection}
+			resourceName="Season"
+			listArchivedFn={seasonApi.listArchived}
+			unarchiveFn={handleUnarchive}
+		>
+			{#snippet row({ item, unarchive, busy })}
+				<div class="flex items-center justify-between border-b py-2 last:border-b-0">
+					<span class="text-sm">
+						{item.name}
+						<span class="text-muted-foreground ml-2">
+							{formatDate(item.start_date)} – {formatDate(item.end_date)}
+						</span>
+					</span>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						title="Restore"
+						disabled={disabled || busy}
+						onclick={unarchive}
+					>
+						{#if busy}
+							<LoaderCircleIcon class="size-4 animate-spin" />
+						{:else}
+							<ArchiveRestoreIcon class="size-4" />
+						{/if}
+						<span class="sr-only">Restore</span>
+					</Button>
+				</div>
+			{/snippet}
+		</ArchivedSection>
 	{/if}
 </div>
 

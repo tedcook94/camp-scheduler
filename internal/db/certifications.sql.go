@@ -75,10 +75,74 @@ func (q *Queries) GetCertification(ctx context.Context, arg GetCertificationPara
 	return i, err
 }
 
-const listCertifications = `-- name: ListCertifications :many
+const listAllCertifications = `-- name: ListAllCertifications :many
 SELECT id, camp_id, certification_name, archived
 FROM certifications
 WHERE camp_id = $1
+ORDER BY certification_name
+`
+
+func (q *Queries) ListAllCertifications(ctx context.Context, campID pgtype.UUID) ([]Certification, error) {
+	rows, err := q.db.Query(ctx, listAllCertifications, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Certification
+	for rows.Next() {
+		var i Certification
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.CertificationName,
+			&i.Archived,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listArchivedCertifications = `-- name: ListArchivedCertifications :many
+SELECT id, camp_id, certification_name, archived
+FROM certifications
+WHERE camp_id = $1 AND archived = true
+ORDER BY certification_name
+`
+
+func (q *Queries) ListArchivedCertifications(ctx context.Context, campID pgtype.UUID) ([]Certification, error) {
+	rows, err := q.db.Query(ctx, listArchivedCertifications, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Certification
+	for rows.Next() {
+		var i Certification
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.CertificationName,
+			&i.Archived,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCertifications = `-- name: ListCertifications :many
+SELECT id, camp_id, certification_name, archived
+FROM certifications
+WHERE camp_id = $1 AND archived = false
 ORDER BY certification_name
 `
 

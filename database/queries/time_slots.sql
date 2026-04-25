@@ -1,7 +1,19 @@
 -- name: ListTimeSlots :many
 SELECT id, camp_id, time_slot_name, archived
 FROM time_slots
+WHERE camp_id = $1 AND archived = false
+ORDER BY time_slot_name;
+
+-- name: ListAllTimeSlots :many
+SELECT id, camp_id, time_slot_name, archived
+FROM time_slots
 WHERE camp_id = $1
+ORDER BY time_slot_name;
+
+-- name: ListArchivedTimeSlots :many
+SELECT id, camp_id, time_slot_name, archived
+FROM time_slots
+WHERE camp_id = $1 AND archived = true
 ORDER BY time_slot_name;
 
 -- name: GetTimeSlot :one

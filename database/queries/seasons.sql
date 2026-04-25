@@ -1,7 +1,19 @@
 -- name: ListSeasons :many
 SELECT id, camp_id, season_name, start_date, end_date, archived
 FROM seasons
+WHERE camp_id = $1 AND archived = false
+ORDER BY start_date DESC, id DESC;
+
+-- name: ListAllSeasons :many
+SELECT id, camp_id, season_name, start_date, end_date, archived
+FROM seasons
 WHERE camp_id = $1
+ORDER BY start_date DESC, id DESC;
+
+-- name: ListArchivedSeasons :many
+SELECT id, camp_id, season_name, start_date, end_date, archived
+FROM seasons
+WHERE camp_id = $1 AND archived = true
 ORDER BY start_date DESC, id DESC;
 
 -- name: GetSeason :one
@@ -27,6 +39,6 @@ WHERE id = $1 AND camp_id = $2;
 -- name: GetMostRecentSeason :one
 SELECT id, camp_id, season_name, start_date, end_date, archived
 FROM seasons
-WHERE camp_id = $1
+WHERE camp_id = $1 AND archived = false
 ORDER BY start_date DESC, id DESC
 LIMIT 1;

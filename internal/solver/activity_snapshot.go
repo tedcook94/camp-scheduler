@@ -96,10 +96,14 @@ func loadActivitySlots(ctx context.Context, queries *db.Queries, sessionID, camp
 		certNames[certID] = r.CertificationName
 	}
 
-	slots := make([]ActivitySlot, len(rows))
-	for i, r := range rows {
+	slots := make([]ActivitySlot, 0, len(rows))
+	for _, r := range rows {
+		// Skip activities and time slots archived after session config setup.
+		if r.ActivityArchived || r.TimeSlotArchived {
+			continue
+		}
 		slotID := api.UUIDToString(r.SessionActivityID)
-		slots[i] = ActivitySlot{
+		slots = append(slots, ActivitySlot{
 			ID:                     slotID,
 			ActivityID:             api.UUIDToString(r.ActivityID),
 			ActivityName:           r.ActivityName,
@@ -108,7 +112,7 @@ func loadActivitySlots(ctx context.Context, queries *db.Queries, sessionID, camp
 			RequiredCounselors:     int(r.RequiredCounselors),
 			Capacity:               int(r.Capacity),
 			RequiredCertifications: certsBySlot[slotID],
-		}
+		})
 	}
 	return slots, certNames, nil
 }

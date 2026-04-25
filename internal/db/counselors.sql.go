@@ -110,10 +110,100 @@ func (q *Queries) GetCounselor(ctx context.Context, arg GetCounselorParams) (Get
 	return i, err
 }
 
-const listCounselors = `-- name: ListCounselors :many
+const listAllCounselors = `-- name: ListAllCounselors :many
 SELECT id, camp_id, first_name, last_name, junior_counselor, archived, gender
 FROM counselors
 WHERE camp_id = $1
+ORDER BY last_name, first_name
+`
+
+type ListAllCounselorsRow struct {
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	FirstName       string
+	LastName        string
+	JuniorCounselor bool
+	Archived        bool
+	Gender          string
+}
+
+func (q *Queries) ListAllCounselors(ctx context.Context, campID pgtype.UUID) ([]ListAllCounselorsRow, error) {
+	rows, err := q.db.Query(ctx, listAllCounselors, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAllCounselorsRow
+	for rows.Next() {
+		var i ListAllCounselorsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.FirstName,
+			&i.LastName,
+			&i.JuniorCounselor,
+			&i.Archived,
+			&i.Gender,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listArchivedCounselors = `-- name: ListArchivedCounselors :many
+SELECT id, camp_id, first_name, last_name, junior_counselor, archived, gender
+FROM counselors
+WHERE camp_id = $1 AND archived = true
+ORDER BY last_name, first_name
+`
+
+type ListArchivedCounselorsRow struct {
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	FirstName       string
+	LastName        string
+	JuniorCounselor bool
+	Archived        bool
+	Gender          string
+}
+
+func (q *Queries) ListArchivedCounselors(ctx context.Context, campID pgtype.UUID) ([]ListArchivedCounselorsRow, error) {
+	rows, err := q.db.Query(ctx, listArchivedCounselors, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListArchivedCounselorsRow
+	for rows.Next() {
+		var i ListArchivedCounselorsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.FirstName,
+			&i.LastName,
+			&i.JuniorCounselor,
+			&i.Archived,
+			&i.Gender,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCounselors = `-- name: ListCounselors :many
+SELECT id, camp_id, first_name, last_name, junior_counselor, archived, gender
+FROM counselors
+WHERE camp_id = $1 AND archived = false
 ORDER BY last_name, first_name
 `
 

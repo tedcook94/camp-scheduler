@@ -92,9 +92,14 @@ func loadCabins(ctx context.Context, queries *db.Queries, sessionID, campID pgty
 		return nil, fmt.Errorf("error listing session cabins: %w", err)
 	}
 
-	cabins := make([]Cabin, len(rows))
-	for i, r := range rows {
-		cabins[i] = Cabin{
+	cabins := make([]Cabin, 0, len(rows))
+	for _, r := range rows {
+		// Skip cabins (or their age groups) that have been archived since the
+		// session config was set up. Admins clean these up via the session config UI.
+		if r.CabinArchived || r.AgeGroupArchived {
+			continue
+		}
+		cabins = append(cabins, Cabin{
 			ID:                     api.UUIDToString(r.ID),
 			Name:                   r.CabinName,
 			AgeGroupID:             api.UUIDToString(r.AgeGroupID),
@@ -103,7 +108,7 @@ func loadCabins(ctx context.Context, queries *db.Queries, sessionID, campID pgty
 			RequiredCounselors:     int(r.RequiredCounselors),
 			Capacity:               int(r.GroupSize),
 			Gender:                 r.Gender,
-		}
+		})
 	}
 	return cabins, nil
 }

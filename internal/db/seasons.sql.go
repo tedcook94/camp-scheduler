@@ -64,7 +64,7 @@ func (q *Queries) DeleteSeason(ctx context.Context, arg DeleteSeasonParams) (int
 const getMostRecentSeason = `-- name: GetMostRecentSeason :one
 SELECT id, camp_id, season_name, start_date, end_date, archived
 FROM seasons
-WHERE camp_id = $1
+WHERE camp_id = $1 AND archived = false
 ORDER BY start_date DESC, id DESC
 LIMIT 1
 `
@@ -108,10 +108,78 @@ func (q *Queries) GetSeason(ctx context.Context, arg GetSeasonParams) (Season, e
 	return i, err
 }
 
-const listSeasons = `-- name: ListSeasons :many
+const listAllSeasons = `-- name: ListAllSeasons :many
 SELECT id, camp_id, season_name, start_date, end_date, archived
 FROM seasons
 WHERE camp_id = $1
+ORDER BY start_date DESC, id DESC
+`
+
+func (q *Queries) ListAllSeasons(ctx context.Context, campID pgtype.UUID) ([]Season, error) {
+	rows, err := q.db.Query(ctx, listAllSeasons, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Season
+	for rows.Next() {
+		var i Season
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.SeasonName,
+			&i.StartDate,
+			&i.EndDate,
+			&i.Archived,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listArchivedSeasons = `-- name: ListArchivedSeasons :many
+SELECT id, camp_id, season_name, start_date, end_date, archived
+FROM seasons
+WHERE camp_id = $1 AND archived = true
+ORDER BY start_date DESC, id DESC
+`
+
+func (q *Queries) ListArchivedSeasons(ctx context.Context, campID pgtype.UUID) ([]Season, error) {
+	rows, err := q.db.Query(ctx, listArchivedSeasons, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Season
+	for rows.Next() {
+		var i Season
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.SeasonName,
+			&i.StartDate,
+			&i.EndDate,
+			&i.Archived,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSeasons = `-- name: ListSeasons :many
+SELECT id, camp_id, season_name, start_date, end_date, archived
+FROM seasons
+WHERE camp_id = $1 AND archived = false
 ORDER BY start_date DESC, id DESC
 `
 

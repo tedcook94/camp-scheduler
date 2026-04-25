@@ -4,7 +4,25 @@ SELECT c.id, c.camp_id, c.default_age_group_id, c.cabin_name,
        ag.age_group_name AS default_age_group_name
 FROM cabins c
 JOIN age_groups ag ON ag.id = c.default_age_group_id
+WHERE c.camp_id = $1 AND c.archived = false
+ORDER BY c.cabin_name;
+
+-- name: ListAllCabins :many
+SELECT c.id, c.camp_id, c.default_age_group_id, c.cabin_name,
+       c.default_group_size, c.default_required_counselors, c.gender, c.archived,
+       ag.age_group_name AS default_age_group_name
+FROM cabins c
+JOIN age_groups ag ON ag.id = c.default_age_group_id
 WHERE c.camp_id = $1
+ORDER BY c.cabin_name;
+
+-- name: ListArchivedCabins :many
+SELECT c.id, c.camp_id, c.default_age_group_id, c.cabin_name,
+       c.default_group_size, c.default_required_counselors, c.gender, c.archived,
+       ag.age_group_name AS default_age_group_name
+FROM cabins c
+JOIN age_groups ag ON ag.id = c.default_age_group_id
+WHERE c.camp_id = $1 AND c.archived = true
 ORDER BY c.cabin_name;
 
 -- name: GetCabin :one

@@ -132,13 +132,117 @@ func (q *Queries) GetCabin(ctx context.Context, arg GetCabinParams) (GetCabinRow
 	return i, err
 }
 
-const listCabins = `-- name: ListCabins :many
+const listAllCabins = `-- name: ListAllCabins :many
 SELECT c.id, c.camp_id, c.default_age_group_id, c.cabin_name,
        c.default_group_size, c.default_required_counselors, c.gender, c.archived,
        ag.age_group_name AS default_age_group_name
 FROM cabins c
 JOIN age_groups ag ON ag.id = c.default_age_group_id
 WHERE c.camp_id = $1
+ORDER BY c.cabin_name
+`
+
+type ListAllCabinsRow struct {
+	ID                        pgtype.UUID
+	CampID                    pgtype.UUID
+	DefaultAgeGroupID         pgtype.UUID
+	CabinName                 string
+	DefaultGroupSize          int32
+	DefaultRequiredCounselors int32
+	Gender                    string
+	Archived                  bool
+	DefaultAgeGroupName       string
+}
+
+func (q *Queries) ListAllCabins(ctx context.Context, campID pgtype.UUID) ([]ListAllCabinsRow, error) {
+	rows, err := q.db.Query(ctx, listAllCabins, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAllCabinsRow
+	for rows.Next() {
+		var i ListAllCabinsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.DefaultAgeGroupID,
+			&i.CabinName,
+			&i.DefaultGroupSize,
+			&i.DefaultRequiredCounselors,
+			&i.Gender,
+			&i.Archived,
+			&i.DefaultAgeGroupName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listArchivedCabins = `-- name: ListArchivedCabins :many
+SELECT c.id, c.camp_id, c.default_age_group_id, c.cabin_name,
+       c.default_group_size, c.default_required_counselors, c.gender, c.archived,
+       ag.age_group_name AS default_age_group_name
+FROM cabins c
+JOIN age_groups ag ON ag.id = c.default_age_group_id
+WHERE c.camp_id = $1 AND c.archived = true
+ORDER BY c.cabin_name
+`
+
+type ListArchivedCabinsRow struct {
+	ID                        pgtype.UUID
+	CampID                    pgtype.UUID
+	DefaultAgeGroupID         pgtype.UUID
+	CabinName                 string
+	DefaultGroupSize          int32
+	DefaultRequiredCounselors int32
+	Gender                    string
+	Archived                  bool
+	DefaultAgeGroupName       string
+}
+
+func (q *Queries) ListArchivedCabins(ctx context.Context, campID pgtype.UUID) ([]ListArchivedCabinsRow, error) {
+	rows, err := q.db.Query(ctx, listArchivedCabins, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListArchivedCabinsRow
+	for rows.Next() {
+		var i ListArchivedCabinsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.DefaultAgeGroupID,
+			&i.CabinName,
+			&i.DefaultGroupSize,
+			&i.DefaultRequiredCounselors,
+			&i.Gender,
+			&i.Archived,
+			&i.DefaultAgeGroupName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCabins = `-- name: ListCabins :many
+SELECT c.id, c.camp_id, c.default_age_group_id, c.cabin_name,
+       c.default_group_size, c.default_required_counselors, c.gender, c.archived,
+       ag.age_group_name AS default_age_group_name
+FROM cabins c
+JOIN age_groups ag ON ag.id = c.default_age_group_id
+WHERE c.camp_id = $1 AND c.archived = false
 ORDER BY c.cabin_name
 `
 

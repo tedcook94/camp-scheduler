@@ -241,9 +241,11 @@ SELECT
     sa.required_counselors,
     a.id AS activity_id,
     a.activity_name,
+    a.archived AS activity_archived,
     sts.id AS session_time_slot_id,
     sts.time_slot_id,
     ts.time_slot_name,
+    ts.archived AS time_slot_archived,
     sts.sort_order
 FROM session_activities sa
 JOIN activities a ON a.id = sa.activity_id
@@ -264,9 +266,11 @@ type ListSessionActivitiesWithDetailsRow struct {
 	RequiredCounselors int32
 	ActivityID         pgtype.UUID
 	ActivityName       string
+	ActivityArchived   bool
 	SessionTimeSlotID  pgtype.UUID
 	TimeSlotID         pgtype.UUID
 	TimeSlotName       string
+	TimeSlotArchived   bool
 	SortOrder          int32
 }
 
@@ -285,9 +289,11 @@ func (q *Queries) ListSessionActivitiesWithDetails(ctx context.Context, arg List
 			&i.RequiredCounselors,
 			&i.ActivityID,
 			&i.ActivityName,
+			&i.ActivityArchived,
 			&i.SessionTimeSlotID,
 			&i.TimeSlotID,
 			&i.TimeSlotName,
+			&i.TimeSlotArchived,
 			&i.SortOrder,
 		); err != nil {
 			return nil, err

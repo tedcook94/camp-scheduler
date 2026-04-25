@@ -255,6 +255,7 @@ SELECT
     c.last_name AS camper_last_name,
     btrim(c.first_name || ' ' || c.last_name)::text AS camper_name,
     c.gender,
+    c.archived AS camper_archived,
     sag.session_id,
     sag.age_group_id
 FROM camper_session_enrollments e
@@ -278,6 +279,7 @@ type ListSessionEnrollmentsRow struct {
 	CamperLastName    string
 	CamperName        string
 	Gender            string
+	CamperArchived    bool
 	SessionID         pgtype.UUID
 	AgeGroupID        pgtype.UUID
 }
@@ -300,6 +302,7 @@ func (q *Queries) ListSessionEnrollments(ctx context.Context, arg ListSessionEnr
 			&i.CamperLastName,
 			&i.CamperName,
 			&i.Gender,
+			&i.CamperArchived,
 			&i.SessionID,
 			&i.AgeGroupID,
 		); err != nil {

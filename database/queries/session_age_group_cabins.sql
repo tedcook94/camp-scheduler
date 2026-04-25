@@ -59,8 +59,10 @@ SELECT
     c.id,
     c.cabin_name,
     c.gender,
+    c.archived AS cabin_archived,
     sag.age_group_id,
     ag.age_group_name,
+    ag.archived AS age_group_archived,
     sagc.id AS session_age_group_cabin_id,
     sagc.group_size,
     sagc.required_counselors

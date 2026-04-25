@@ -78,12 +78,76 @@ func (q *Queries) GetActivity(ctx context.Context, arg GetActivityParams) (Activ
 const listActivities = `-- name: ListActivities :many
 SELECT id, camp_id, activity_name, archived
 FROM activities
-WHERE camp_id = $1
+WHERE camp_id = $1 AND archived = false
 ORDER BY activity_name
 `
 
 func (q *Queries) ListActivities(ctx context.Context, campID pgtype.UUID) ([]Activity, error) {
 	rows, err := q.db.Query(ctx, listActivities, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Activity
+	for rows.Next() {
+		var i Activity
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.ActivityName,
+			&i.Archived,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAllActivities = `-- name: ListAllActivities :many
+SELECT id, camp_id, activity_name, archived
+FROM activities
+WHERE camp_id = $1
+ORDER BY activity_name
+`
+
+func (q *Queries) ListAllActivities(ctx context.Context, campID pgtype.UUID) ([]Activity, error) {
+	rows, err := q.db.Query(ctx, listAllActivities, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Activity
+	for rows.Next() {
+		var i Activity
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.ActivityName,
+			&i.Archived,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listArchivedActivities = `-- name: ListArchivedActivities :many
+SELECT id, camp_id, activity_name, archived
+FROM activities
+WHERE camp_id = $1 AND archived = true
+ORDER BY activity_name
+`
+
+func (q *Queries) ListArchivedActivities(ctx context.Context, campID pgtype.UUID) ([]Activity, error) {
+	rows, err := q.db.Query(ctx, listArchivedActivities, campID)
 	if err != nil {
 		return nil, err
 	}

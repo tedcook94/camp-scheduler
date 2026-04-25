@@ -8,6 +8,7 @@ SELECT
     c.last_name AS camper_last_name,
     btrim(c.first_name || ' ' || c.last_name)::text AS camper_name,
     c.gender,
+    c.archived AS camper_archived,
     sag.session_id,
     sag.age_group_id
 FROM camper_session_enrollments e

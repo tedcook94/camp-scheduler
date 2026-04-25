@@ -1,7 +1,19 @@
 -- name: ListActivities :many
 SELECT id, camp_id, activity_name, archived
 FROM activities
+WHERE camp_id = $1 AND archived = false
+ORDER BY activity_name;
+
+-- name: ListAllActivities :many
+SELECT id, camp_id, activity_name, archived
+FROM activities
 WHERE camp_id = $1
+ORDER BY activity_name;
+
+-- name: ListArchivedActivities :many
+SELECT id, camp_id, activity_name, archived
+FROM activities
+WHERE camp_id = $1 AND archived = true
 ORDER BY activity_name;
 
 -- name: GetActivity :one

@@ -237,8 +237,10 @@ SELECT
     c.id,
     c.cabin_name,
     c.gender,
+    c.archived AS cabin_archived,
     sag.age_group_id,
     ag.age_group_name,
+    ag.archived AS age_group_archived,
     sagc.id AS session_age_group_cabin_id,
     sagc.group_size,
     sagc.required_counselors
@@ -259,8 +261,10 @@ type ListSessionCabinsWithCapacityRow struct {
 	ID                     pgtype.UUID
 	CabinName              string
 	Gender                 string
+	CabinArchived          bool
 	AgeGroupID             pgtype.UUID
 	AgeGroupName           string
+	AgeGroupArchived       bool
 	SessionAgeGroupCabinID pgtype.UUID
 	GroupSize              int32
 	RequiredCounselors     int32
@@ -279,8 +283,10 @@ func (q *Queries) ListSessionCabinsWithCapacity(ctx context.Context, arg ListSes
 			&i.ID,
 			&i.CabinName,
 			&i.Gender,
+			&i.CabinArchived,
 			&i.AgeGroupID,
 			&i.AgeGroupName,
+			&i.AgeGroupArchived,
 			&i.SessionAgeGroupCabinID,
 			&i.GroupSize,
 			&i.RequiredCounselors,

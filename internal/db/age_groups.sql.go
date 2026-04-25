@@ -78,12 +78,76 @@ func (q *Queries) GetAgeGroup(ctx context.Context, arg GetAgeGroupParams) (AgeGr
 const listAgeGroups = `-- name: ListAgeGroups :many
 SELECT id, camp_id, age_group_name, archived
 FROM age_groups
-WHERE camp_id = $1
+WHERE camp_id = $1 AND archived = false
 ORDER BY age_group_name
 `
 
 func (q *Queries) ListAgeGroups(ctx context.Context, campID pgtype.UUID) ([]AgeGroup, error) {
 	rows, err := q.db.Query(ctx, listAgeGroups, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgeGroup
+	for rows.Next() {
+		var i AgeGroup
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.AgeGroupName,
+			&i.Archived,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAllAgeGroups = `-- name: ListAllAgeGroups :many
+SELECT id, camp_id, age_group_name, archived
+FROM age_groups
+WHERE camp_id = $1
+ORDER BY age_group_name
+`
+
+func (q *Queries) ListAllAgeGroups(ctx context.Context, campID pgtype.UUID) ([]AgeGroup, error) {
+	rows, err := q.db.Query(ctx, listAllAgeGroups, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgeGroup
+	for rows.Next() {
+		var i AgeGroup
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.AgeGroupName,
+			&i.Archived,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listArchivedAgeGroups = `-- name: ListArchivedAgeGroups :many
+SELECT id, camp_id, age_group_name, archived
+FROM age_groups
+WHERE camp_id = $1 AND archived = true
+ORDER BY age_group_name
+`
+
+func (q *Queries) ListArchivedAgeGroups(ctx context.Context, campID pgtype.UUID) ([]AgeGroup, error) {
+	rows, err := q.db.Query(ctx, listArchivedAgeGroups, campID)
 	if err != nil {
 		return nil, err
 	}

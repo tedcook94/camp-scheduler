@@ -75,10 +75,74 @@ func (q *Queries) GetTimeSlot(ctx context.Context, arg GetTimeSlotParams) (TimeS
 	return i, err
 }
 
-const listTimeSlots = `-- name: ListTimeSlots :many
+const listAllTimeSlots = `-- name: ListAllTimeSlots :many
 SELECT id, camp_id, time_slot_name, archived
 FROM time_slots
 WHERE camp_id = $1
+ORDER BY time_slot_name
+`
+
+func (q *Queries) ListAllTimeSlots(ctx context.Context, campID pgtype.UUID) ([]TimeSlot, error) {
+	rows, err := q.db.Query(ctx, listAllTimeSlots, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TimeSlot
+	for rows.Next() {
+		var i TimeSlot
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.TimeSlotName,
+			&i.Archived,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listArchivedTimeSlots = `-- name: ListArchivedTimeSlots :many
+SELECT id, camp_id, time_slot_name, archived
+FROM time_slots
+WHERE camp_id = $1 AND archived = true
+ORDER BY time_slot_name
+`
+
+func (q *Queries) ListArchivedTimeSlots(ctx context.Context, campID pgtype.UUID) ([]TimeSlot, error) {
+	rows, err := q.db.Query(ctx, listArchivedTimeSlots, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TimeSlot
+	for rows.Next() {
+		var i TimeSlot
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.TimeSlotName,
+			&i.Archived,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTimeSlots = `-- name: ListTimeSlots :many
+SELECT id, camp_id, time_slot_name, archived
+FROM time_slots
+WHERE camp_id = $1 AND archived = false
 ORDER BY time_slot_name
 `
 

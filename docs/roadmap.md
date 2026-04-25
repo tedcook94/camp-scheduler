@@ -27,7 +27,7 @@ integration) is in progress.
 ### Schema
 
 Tables are organized by domain. See `database/migrations/` for the complete
-schema (31 migrations). Key groups:
+schema (37 migrations). Key groups:
 
 - **Core:** camps, age_groups, cabins, seasons, sessions, counselors
 - **Preferences:** counselor_age_group_preferences, counselor_cocounselor_preferences, counselor_activity_preferences, camper_friend_preferences
@@ -156,11 +156,12 @@ viable configurations and understand trade-offs.
 - [x] Assign all counselors for cabins/activities
 - [x] Reports
 - [x] First and last name for campers and counselors
-- [ ] "Dirty" flag for when changes have been made since assignment run
+- [x] "Dirty" flag for when changes have been made since assignment run
 - [ ] Archive (soft delete) objects
 - [ ] Overrides (locking assignments before solver runs)
 - [ ] Data import (CSV/spreadsheet)
 - [ ] Migrate auth to BetterAuth (camps as orgs, enable MFA)
+- [ ] Rebrand to Leiri
 - [ ] Reimplement solver in Prolog?
 - [ ] Reimplement frontend in HTMX?
 - [ ] Auditing

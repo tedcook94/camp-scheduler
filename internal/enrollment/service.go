@@ -7,18 +7,22 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+	"camp-scheduler/internal/staleness"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var ErrNotFound = errors.New("enrollment not found")
 
 type Service struct {
 	queries *db.Queries
+	pool    *pgxpool.Pool
+	marker  *staleness.Marker
 }
 
-func NewService(queries *db.Queries) *Service {
-	return &Service{queries: queries}
+func NewService(queries *db.Queries, pool *pgxpool.Pool, marker *staleness.Marker) *Service {
+	return &Service{queries: queries, pool: pool, marker: marker}
 }
 
 func (svc *Service) ListBySession(ctx context.Context, campID, sessionID string) ([]EnrollmentResponse, error) {
@@ -122,8 +126,15 @@ func (svc *Service) Create(ctx context.Context, campID, sessionID string, req Cr
 		return EnrollmentResponse{}, err
 	}
 
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return EnrollmentResponse{}, fmt.Errorf("error beginning create enrollment transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
 	// Verify the session age group belongs to this session.
-	_, err = svc.queries.GetSessionAgeGroup(ctx, db.GetSessionAgeGroupParams{
+	_, err = qtx.GetSessionAgeGroup(ctx, db.GetSessionAgeGroupParams{
 		ID:        sessionAgeGroupUUID,
 		CampID:    campUUID,
 		SessionID: sessionUUID,
@@ -132,7 +143,7 @@ func (svc *Service) Create(ctx context.Context, campID, sessionID string, req Cr
 		return EnrollmentResponse{}, fmt.Errorf("error validating session age group %s: %w", req.SessionAgeGroupID, err)
 	}
 
-	row, err := svc.queries.CreateSessionEnrollment(ctx, db.CreateSessionEnrollmentParams{
+	row, err := qtx.CreateSessionEnrollment(ctx, db.CreateSessionEnrollmentParams{
 		CampID:            campUUID,
 		CamperID:          camperUUID,
 		SessionID:         sessionUUID,
@@ -140,6 +151,14 @@ func (svc *Service) Create(ctx context.Context, campID, sessionID string, req Cr
 	})
 	if err != nil {
 		return EnrollmentResponse{}, fmt.Errorf("error creating enrollment: %w", err)
+	}
+
+	if err := svc.marker.MarkSessions(ctx, qtx, campUUID, []pgtype.UUID{sessionUUID}, []staleness.RunType{staleness.RunTypeCabin}); err != nil {
+		return EnrollmentResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return EnrollmentResponse{}, fmt.Errorf("error committing create enrollment transaction: %w", err)
 	}
 
 	return svc.GetByID(ctx, campID, sessionID, api.UUIDToString(row.ID))
@@ -161,7 +180,14 @@ func (svc *Service) Delete(ctx context.Context, campID, sessionID, id string) er
 		return err
 	}
 
-	rows, err := svc.queries.DeleteSessionEnrollment(ctx, db.DeleteSessionEnrollmentParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning delete enrollment transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	rows, err := qtx.DeleteSessionEnrollment(ctx, db.DeleteSessionEnrollmentParams{
 		ID:        uid,
 		CampID:    campUUID,
 		SessionID: sessionUUID,
@@ -171,6 +197,14 @@ func (svc *Service) Delete(ctx context.Context, campID, sessionID, id string) er
 	}
 	if rows == 0 {
 		return ErrNotFound
+	}
+
+	if err := svc.marker.MarkSessions(ctx, qtx, campUUID, []pgtype.UUID{sessionUUID}, []staleness.RunType{staleness.RunTypeCabin}); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing delete enrollment transaction: %w", err)
 	}
 
 	return nil

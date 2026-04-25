@@ -6,17 +6,20 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+	"camp-scheduler/internal/staleness"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type ActivityPreferenceService struct {
 	queries *db.Queries
 	pool    *pgxpool.Pool
+	marker  *staleness.Marker
 }
 
-func NewActivityPreferenceService(queries *db.Queries, pool *pgxpool.Pool) *ActivityPreferenceService {
-	return &ActivityPreferenceService{queries: queries, pool: pool}
+func NewActivityPreferenceService(queries *db.Queries, pool *pgxpool.Pool, marker *staleness.Marker) *ActivityPreferenceService {
+	return &ActivityPreferenceService{queries: queries, pool: pool, marker: marker}
 }
 
 func (svc *ActivityPreferenceService) List(ctx context.Context, campID, sessionID, counselorID string) ([]ActivityPreferenceResponse, error) {
@@ -141,6 +144,10 @@ func (svc *ActivityPreferenceService) ReplaceAll(ctx context.Context, campID, se
 		}
 
 		result[i] = toActivityPreferenceResponse(pref)
+	}
+
+	if err := svc.marker.MarkSessions(ctx, qtx, campUUID, []pgtype.UUID{sessionUUID}, []staleness.RunType{staleness.RunTypeActivity}); err != nil {
+		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {

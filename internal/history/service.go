@@ -7,19 +7,23 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+	"camp-scheduler/internal/staleness"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var ErrSessionHistoryNotFound = errors.New("session history entry not found")
 
 type Service struct {
 	queries *db.Queries
+	pool    *pgxpool.Pool
+	marker  *staleness.Marker
 }
 
-func NewService(queries *db.Queries) *Service {
-	return &Service{queries: queries}
+func NewService(queries *db.Queries, pool *pgxpool.Pool, marker *staleness.Marker) *Service {
+	return &Service{queries: queries, pool: pool, marker: marker}
 }
 
 func (svc *Service) List(ctx context.Context, campID, counselorID string) ([]SessionHistoryResponse, error) {
@@ -102,7 +106,14 @@ func (svc *Service) Create(ctx context.Context, campID, counselorID string, req 
 		return SessionHistoryResponse{}, err
 	}
 
-	entry, err := svc.queries.CreateCounselorSessionHistoryEntry(ctx, db.CreateCounselorSessionHistoryEntryParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return SessionHistoryResponse{}, fmt.Errorf("error beginning create session history transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	entry, err := qtx.CreateCounselorSessionHistoryEntry(ctx, db.CreateCounselorSessionHistoryEntryParams{
 		CampID:      campUUID,
 		CounselorID: counselorUUID,
 		SessionID:   sessionUUID,
@@ -111,6 +122,16 @@ func (svc *Service) Create(ctx context.Context, campID, counselorID string, req 
 	})
 	if err != nil {
 		return SessionHistoryResponse{}, fmt.Errorf("error creating session history entry: %w", err)
+	}
+
+	// History on session A feeds the cabin solver of any session B with
+	// previous_session=A. Mark via cascade.
+	if err := svc.marker.MarkSessions(ctx, qtx, campUUID, []pgtype.UUID{sessionUUID}, []staleness.RunType{staleness.RunTypeCabin}); err != nil {
+		return SessionHistoryResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return SessionHistoryResponse{}, fmt.Errorf("error committing create session history transaction: %w", err)
 	}
 
 	return toSessionHistoryResponse(entry), nil
@@ -147,7 +168,28 @@ func (svc *Service) Update(ctx context.Context, campID, counselorID, id string, 
 		return SessionHistoryResponse{}, err
 	}
 
-	entry, err := svc.queries.UpdateCounselorSessionHistoryEntry(ctx, db.UpdateCounselorSessionHistoryEntryParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return SessionHistoryResponse{}, fmt.Errorf("error beginning update session history transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	// Fetch the current entry first so we can detect a session move and
+	// dirty both the old and new session's dependent runs.
+	existing, err := qtx.GetCounselorSessionHistoryEntry(ctx, db.GetCounselorSessionHistoryEntryParams{
+		ID:          uid,
+		CampID:      campUUID,
+		CounselorID: counselorUUID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return SessionHistoryResponse{}, ErrSessionHistoryNotFound
+		}
+		return SessionHistoryResponse{}, fmt.Errorf("error getting session history entry %s: %w", id, err)
+	}
+
+	entry, err := qtx.UpdateCounselorSessionHistoryEntry(ctx, db.UpdateCounselorSessionHistoryEntryParams{
 		ID:          uid,
 		CampID:      campUUID,
 		CounselorID: counselorUUID,
@@ -157,6 +199,21 @@ func (svc *Service) Update(ctx context.Context, campID, counselorID, id string, 
 	})
 	if err != nil {
 		return SessionHistoryResponse{}, fmt.Errorf("error updating session history entry %s: %w", id, err)
+	}
+
+	// When a history entry moves between sessions, both the old and new
+	// session's dependents need to be invalidated — the old loses an input,
+	// the new gains one.
+	sessionIDs := []pgtype.UUID{sessionUUID}
+	if existing.SessionID != sessionUUID {
+		sessionIDs = append(sessionIDs, existing.SessionID)
+	}
+	if err := svc.marker.MarkSessions(ctx, qtx, campUUID, sessionIDs, []staleness.RunType{staleness.RunTypeCabin}); err != nil {
+		return SessionHistoryResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return SessionHistoryResponse{}, fmt.Errorf("error committing update session history transaction: %w", err)
 	}
 
 	return toSessionHistoryResponse(entry), nil
@@ -178,7 +235,28 @@ func (svc *Service) Delete(ctx context.Context, campID, counselorID, id string) 
 		return err
 	}
 
-	rows, err := svc.queries.DeleteCounselorSessionHistoryEntry(ctx, db.DeleteCounselorSessionHistoryEntryParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning delete session history transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	// Fetch the entry first so we know which session is affected by its
+	// removal — the row is gone after the delete.
+	entry, err := qtx.GetCounselorSessionHistoryEntry(ctx, db.GetCounselorSessionHistoryEntryParams{
+		ID:          uid,
+		CampID:      campUUID,
+		CounselorID: counselorUUID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrSessionHistoryNotFound
+		}
+		return fmt.Errorf("error getting session history entry %s: %w", id, err)
+	}
+
+	rows, err := qtx.DeleteCounselorSessionHistoryEntry(ctx, db.DeleteCounselorSessionHistoryEntryParams{
 		ID:          uid,
 		CampID:      campUUID,
 		CounselorID: counselorUUID,
@@ -188,6 +266,14 @@ func (svc *Service) Delete(ctx context.Context, campID, counselorID, id string) 
 	}
 	if rows == 0 {
 		return ErrSessionHistoryNotFound
+	}
+
+	if err := svc.marker.MarkSessions(ctx, qtx, campUUID, []pgtype.UUID{entry.SessionID}, []staleness.RunType{staleness.RunTypeCabin}); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing delete session history transaction: %w", err)
 	}
 
 	return nil

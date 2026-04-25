@@ -6,17 +6,20 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+	"camp-scheduler/internal/staleness"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type AgeGroupService struct {
 	queries *db.Queries
 	pool    *pgxpool.Pool
+	marker  *staleness.Marker
 }
 
-func NewAgeGroupService(queries *db.Queries, pool *pgxpool.Pool) *AgeGroupService {
-	return &AgeGroupService{queries: queries, pool: pool}
+func NewAgeGroupService(queries *db.Queries, pool *pgxpool.Pool, marker *staleness.Marker) *AgeGroupService {
+	return &AgeGroupService{queries: queries, pool: pool, marker: marker}
 }
 
 func (svc *AgeGroupService) List(ctx context.Context, campID, sessionID, counselorID string) ([]AgeGroupPreferenceResponse, error) {
@@ -141,6 +144,10 @@ func (svc *AgeGroupService) ReplaceAll(ctx context.Context, campID, sessionID, c
 		}
 
 		result[i] = toAgeGroupPreferenceResponse(pref)
+	}
+
+	if err := svc.marker.MarkSessions(ctx, qtx, campUUID, []pgtype.UUID{sessionUUID}, []staleness.RunType{staleness.RunTypeCabin}); err != nil {
+		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {

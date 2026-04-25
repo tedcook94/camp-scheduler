@@ -131,7 +131,7 @@ func (s *Server) routes() {
 	seasonController := season.NewController(seasonService)
 	seasonController.RegisterRoutes(protected)
 
-	sessionService := session.NewService(queries, s.pool)
+	sessionService := session.NewService(queries, s.pool, marker)
 	sessionController := session.NewController(sessionService)
 	sessionController.RegisterRoutes(protected)
 
@@ -139,39 +139,39 @@ func (s *Server) routes() {
 	counselorController := counselor.NewController(counselorService)
 	counselorController.RegisterRoutes(protected)
 
-	ageGroupPrefService := preferences.NewAgeGroupService(queries, s.pool)
+	ageGroupPrefService := preferences.NewAgeGroupService(queries, s.pool, marker)
 	ageGroupPrefController := preferences.NewAgeGroupController(ageGroupPrefService)
 	ageGroupPrefController.RegisterRoutes(protected)
 
-	cocounselorPrefService := preferences.NewCocounselorService(queries, s.pool)
+	cocounselorPrefService := preferences.NewCocounselorService(queries, s.pool, marker)
 	cocounselorPrefController := preferences.NewCocounselorController(cocounselorPrefService)
 	cocounselorPrefController.RegisterRoutes(protected)
 
-	counselorCertService := preferences.NewCounselorCertificationService(queries)
+	counselorCertService := preferences.NewCounselorCertificationService(queries, s.pool, marker)
 	counselorCertController := preferences.NewCounselorCertificationController(counselorCertService)
 	counselorCertController.RegisterRoutes(protected)
 
-	activityPrefService := preferences.NewActivityPreferenceService(queries, s.pool)
+	activityPrefService := preferences.NewActivityPreferenceService(queries, s.pool, marker)
 	activityPrefController := preferences.NewActivityPreferenceController(activityPrefService)
 	activityPrefController.RegisterRoutes(protected)
 
-	camperFriendPrefService := preferences.NewCamperFriendService(queries, s.pool)
+	camperFriendPrefService := preferences.NewCamperFriendService(queries, s.pool, marker)
 	camperFriendPrefController := preferences.NewCamperFriendController(camperFriendPrefService)
 	camperFriendPrefController.RegisterRoutes(protected)
 
-	historyService := history.NewService(queries)
+	historyService := history.NewService(queries, s.pool, marker)
 	historyController := history.NewController(historyService)
 	historyController.RegisterRoutes(protected)
 
-	sessionConfigService := sessionconfig.NewService(queries)
+	sessionConfigService := sessionconfig.NewService(queries, s.pool, marker)
 	sessionConfigController := sessionconfig.NewController(sessionConfigService)
 	sessionConfigController.RegisterRoutes(protected)
 
-	activityConfigService := sessionconfig.NewActivityService(queries, s.pool)
+	activityConfigService := sessionconfig.NewActivityService(queries, s.pool, marker)
 	activityConfigController := sessionconfig.NewActivityController(activityConfigService)
 	activityConfigController.RegisterRoutes(protected)
 
-	sessionCounselorService := sessionconfig.NewCounselorService(queries)
+	sessionCounselorService := sessionconfig.NewCounselorService(queries, s.pool, marker)
 	sessionCounselorController := sessionconfig.NewCounselorController(sessionCounselorService)
 	sessionCounselorController.RegisterRoutes(protected)
 
@@ -179,7 +179,7 @@ func (s *Server) routes() {
 	camperController := camper.NewController(camperService)
 	camperController.RegisterRoutes(protected)
 
-	enrollmentService := enrollment.NewService(queries)
+	enrollmentService := enrollment.NewService(queries, s.pool, marker)
 	enrollmentController := enrollment.NewController(enrollmentService)
 	enrollmentController.RegisterRoutes(protected)
 

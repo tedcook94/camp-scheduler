@@ -6,17 +6,20 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+	"camp-scheduler/internal/staleness"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type CamperFriendService struct {
 	queries *db.Queries
 	pool    *pgxpool.Pool
+	marker  *staleness.Marker
 }
 
-func NewCamperFriendService(queries *db.Queries, pool *pgxpool.Pool) *CamperFriendService {
-	return &CamperFriendService{queries: queries, pool: pool}
+func NewCamperFriendService(queries *db.Queries, pool *pgxpool.Pool, marker *staleness.Marker) *CamperFriendService {
+	return &CamperFriendService{queries: queries, pool: pool, marker: marker}
 }
 
 func (svc *CamperFriendService) List(ctx context.Context, campID, sessionID, camperID string) ([]CamperFriendPreferenceResponse, error) {
@@ -145,6 +148,10 @@ func (svc *CamperFriendService) ReplaceAll(ctx context.Context, campID, sessionI
 		}
 
 		result[i] = toCamperFriendPreferenceResponse(pref)
+	}
+
+	if err := svc.marker.MarkSessions(ctx, qtx, campUUID, []pgtype.UUID{sessionUUID}, []staleness.RunType{staleness.RunTypeCabin}); err != nil {
+		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {

@@ -7,16 +7,21 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+	"camp-scheduler/internal/staleness"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var ErrNotFound = errors.New("cabin not found")
 
 type Service struct {
 	queries *db.Queries
+	pool    *pgxpool.Pool
+	marker  *staleness.Marker
 }
 
-func NewService(queries *db.Queries) *Service {
-	return &Service{queries: queries}
+func NewService(queries *db.Queries, pool *pgxpool.Pool, marker *staleness.Marker) *Service {
+	return &Service{queries: queries, pool: pool, marker: marker}
 }
 
 func (svc *Service) List(ctx context.Context, campID string) ([]CabinResponse, error) {
@@ -128,7 +133,14 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCab
 		return CabinResponse{}, err
 	}
 
-	cabin, err := svc.queries.UpdateCabin(ctx, db.UpdateCabinParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return CabinResponse{}, fmt.Errorf("error beginning update cabin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	cabin, err := qtx.UpdateCabin(ctx, db.UpdateCabinParams{
 		ID:                        uid,
 		CampID:                    campUUID,
 		DefaultAgeGroupID:         ageGroupUUID,
@@ -139,6 +151,14 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCab
 	})
 	if err != nil {
 		return CabinResponse{}, fmt.Errorf("error updating cabin %s: %w", id, err)
+	}
+
+	if err := svc.marker.MarkCamp(ctx, qtx, campUUID, []staleness.RunType{staleness.RunTypeCabin}); err != nil {
+		return CabinResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return CabinResponse{}, fmt.Errorf("error committing update cabin transaction: %w", err)
 	}
 
 	return CabinResponse{
@@ -164,7 +184,14 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 		return err
 	}
 
-	rows, err := svc.queries.DeleteCabin(ctx, db.DeleteCabinParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning delete cabin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	rows, err := qtx.DeleteCabin(ctx, db.DeleteCabinParams{
 		ID:     uid,
 		CampID: campUUID,
 	})
@@ -173,6 +200,14 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 	}
 	if rows == 0 {
 		return ErrNotFound
+	}
+
+	if err := svc.marker.MarkCamp(ctx, qtx, campUUID, []staleness.RunType{staleness.RunTypeCabin}); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing delete cabin transaction: %w", err)
 	}
 
 	return nil

@@ -7,16 +7,21 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+	"camp-scheduler/internal/staleness"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var ErrNotFound = errors.New("activity not found")
 
 type Service struct {
 	queries *db.Queries
+	pool    *pgxpool.Pool
+	marker  *staleness.Marker
 }
 
-func NewService(queries *db.Queries) *Service {
-	return &Service{queries: queries}
+func NewService(queries *db.Queries, pool *pgxpool.Pool, marker *staleness.Marker) *Service {
+	return &Service{queries: queries, pool: pool, marker: marker}
 }
 
 func (svc *Service) List(ctx context.Context, campID string) ([]ActivityResponse, error) {
@@ -110,7 +115,14 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 		return err
 	}
 
-	rows, err := svc.queries.DeleteActivity(ctx, db.DeleteActivityParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning delete activity transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	rows, err := qtx.DeleteActivity(ctx, db.DeleteActivityParams{
 		ID:     uid,
 		CampID: campUUID,
 	})
@@ -119,6 +131,14 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 	}
 	if rows == 0 {
 		return ErrNotFound
+	}
+
+	if err := svc.marker.MarkCamp(ctx, qtx, campUUID, []staleness.RunType{staleness.RunTypeActivity}); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing delete activity transaction: %w", err)
 	}
 
 	return nil
@@ -197,13 +217,28 @@ func (svc *Service) AddCertification(ctx context.Context, campID, activityID str
 		return ActivityCertificationResponse{}, err
 	}
 
-	ac, err := svc.queries.CreateActivityCertification(ctx, db.CreateActivityCertificationParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return ActivityCertificationResponse{}, fmt.Errorf("error beginning add certification transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	ac, err := qtx.CreateActivityCertification(ctx, db.CreateActivityCertificationParams{
 		CampID:          campUUID,
 		ActivityID:      activityUUID,
 		CertificationID: certUUID,
 	})
 	if err != nil {
 		return ActivityCertificationResponse{}, fmt.Errorf("error adding certification to activity: %w", err)
+	}
+
+	if err := svc.marker.MarkCamp(ctx, qtx, campUUID, []staleness.RunType{staleness.RunTypeActivity}); err != nil {
+		return ActivityCertificationResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return ActivityCertificationResponse{}, fmt.Errorf("error committing add certification transaction: %w", err)
 	}
 
 	return ActivityCertificationResponse{
@@ -230,7 +265,14 @@ func (svc *Service) RemoveCertification(ctx context.Context, campID, activityID,
 		return err
 	}
 
-	rows, err := svc.queries.DeleteActivityCertification(ctx, db.DeleteActivityCertificationParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning remove certification transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	rows, err := qtx.DeleteActivityCertification(ctx, db.DeleteActivityCertificationParams{
 		ID:         uid,
 		CampID:     campUUID,
 		ActivityID: activityUUID,
@@ -240,6 +282,14 @@ func (svc *Service) RemoveCertification(ctx context.Context, campID, activityID,
 	}
 	if rows == 0 {
 		return ErrNotFound
+	}
+
+	if err := svc.marker.MarkCamp(ctx, qtx, campUUID, []staleness.RunType{staleness.RunTypeActivity}); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing remove certification transaction: %w", err)
 	}
 
 	return nil

@@ -28,6 +28,7 @@ import (
 	"camp-scheduler/internal/season"
 	"camp-scheduler/internal/session"
 	"camp-scheduler/internal/sessionconfig"
+	"camp-scheduler/internal/staleness"
 	"camp-scheduler/internal/timeslot"
 
 	"github.com/gin-gonic/gin"
@@ -88,6 +89,7 @@ func (s *Server) Addr() string {
 
 func (s *Server) routes() {
 	queries := db.New(s.pool)
+	marker := staleness.New()
 
 	s.router.GET("/health", func(c *gin.Context) {
 		c.Status(http.StatusOK)
@@ -117,11 +119,11 @@ func (s *Server) routes() {
 	campController := camp.NewController(campService)
 	campController.RegisterRoutes(protected)
 
-	ageGroupService := agegroup.NewService(queries)
+	ageGroupService := agegroup.NewService(queries, s.pool, marker)
 	ageGroupController := agegroup.NewController(ageGroupService)
 	ageGroupController.RegisterRoutes(protected)
 
-	cabinService := cabin.NewService(queries)
+	cabinService := cabin.NewService(queries, s.pool, marker)
 	cabinController := cabin.NewController(cabinService)
 	cabinController.RegisterRoutes(protected)
 
@@ -133,7 +135,7 @@ func (s *Server) routes() {
 	sessionController := session.NewController(sessionService)
 	sessionController.RegisterRoutes(protected)
 
-	counselorService := counselor.NewService(queries, s.pool)
+	counselorService := counselor.NewService(queries, s.pool, marker)
 	counselorController := counselor.NewController(counselorService)
 	counselorController.RegisterRoutes(protected)
 
@@ -173,7 +175,7 @@ func (s *Server) routes() {
 	sessionCounselorController := sessionconfig.NewCounselorController(sessionCounselorService)
 	sessionCounselorController.RegisterRoutes(protected)
 
-	camperService := camper.NewService(queries)
+	camperService := camper.NewService(queries, s.pool, marker)
 	camperController := camper.NewController(camperService)
 	camperController.RegisterRoutes(protected)
 
@@ -181,15 +183,15 @@ func (s *Server) routes() {
 	enrollmentController := enrollment.NewController(enrollmentService)
 	enrollmentController.RegisterRoutes(protected)
 
-	certificationService := certification.NewService(queries)
+	certificationService := certification.NewService(queries, s.pool, marker)
 	certificationController := certification.NewController(certificationService)
 	certificationController.RegisterRoutes(protected)
 
-	activityService := activity.NewService(queries)
+	activityService := activity.NewService(queries, s.pool, marker)
 	activityController := activity.NewController(activityService)
 	activityController.RegisterRoutes(protected)
 
-	timeSlotService := timeslot.NewService(queries)
+	timeSlotService := timeslot.NewService(queries, s.pool, marker)
 	timeSlotController := timeslot.NewController(timeSlotService)
 	timeSlotController.RegisterRoutes(protected)
 

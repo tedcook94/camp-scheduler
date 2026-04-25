@@ -268,7 +268,15 @@ func (svc *Service) loadPeopleByID(ctx context.Context, campUUID pgtype.UUID) (m
 	}
 	cMap := make(map[string]db.Counselor, len(counselors))
 	for _, c := range counselors {
-		cMap[api.UUIDToString(c.ID)] = c
+		cMap[api.UUIDToString(c.ID)] = db.Counselor{
+			ID:               c.ID,
+			CampID:           c.CampID,
+			JuniorCounselor:  c.JuniorCounselor,
+			CounselorEnabled: c.CounselorEnabled,
+			Gender:           c.Gender,
+			FirstName:        c.FirstName,
+			LastName:         c.LastName,
+		}
 	}
 	mMap := make(map[string]db.Camper, len(campers))
 	for _, c := range campers {

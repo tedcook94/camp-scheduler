@@ -29,13 +29,15 @@ func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 }
 
 type CreateCounselorRequest struct {
-	Name            string `json:"name" binding:"required"`
+	FirstName       string `json:"first_name" binding:"required"`
+	LastName        string `json:"last_name" binding:"required"`
 	JuniorCounselor bool   `json:"junior_counselor"`
 	Gender          string `json:"gender" binding:"required,oneof=male female"`
 }
 
 type UpdateCounselorRequest struct {
-	Name            string `json:"name" binding:"required"`
+	FirstName       string `json:"first_name" binding:"required"`
+	LastName        string `json:"last_name" binding:"required"`
 	JuniorCounselor bool   `json:"junior_counselor"`
 	Enabled         bool   `json:"enabled"`
 	Gender          string `json:"gender" binding:"required,oneof=male female"`
@@ -44,6 +46,8 @@ type UpdateCounselorRequest struct {
 type CounselorResponse struct {
 	ID              string `json:"id"`
 	CampID          string `json:"camp_id"`
+	FirstName       string `json:"first_name"`
+	LastName        string `json:"last_name"`
 	Name            string `json:"name"`
 	JuniorCounselor bool   `json:"junior_counselor"`
 	Enabled         bool   `json:"enabled"`

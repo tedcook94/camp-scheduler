@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"camp-scheduler/internal/api"
+	"camp-scheduler/internal/counselor"
 	"camp-scheduler/internal/db"
 )
 
@@ -95,11 +96,11 @@ func (svc *CounselorService) Add(ctx context.Context, campID, sessionID string, 
 	// Load the counselor first so we can validate eligibility (must belong to
 	// the camp and be enabled) and so we have the details needed to build the
 	// response without a second round-trip after the insert.
-	counselor, err := svc.queries.GetCounselor(ctx, db.GetCounselorParams{ID: counselorUUID, CampID: campUUID})
+	c, err := svc.queries.GetCounselor(ctx, db.GetCounselorParams{ID: counselorUUID, CampID: campUUID})
 	if err != nil {
 		return SessionCounselorResponse{}, fmt.Errorf("error loading counselor %s: %w", req.CounselorID, err)
 	}
-	if !counselor.CounselorEnabled {
+	if !c.CounselorEnabled {
 		return SessionCounselorResponse{}, api.BadInput("counselor is disabled and cannot be added to a session")
 	}
 
@@ -117,10 +118,10 @@ func (svc *CounselorService) Add(ctx context.Context, campID, sessionID string, 
 		CampID:           api.UUIDToString(row.CampID),
 		SessionID:        api.UUIDToString(row.SessionID),
 		CounselorID:      api.UUIDToString(row.CounselorID),
-		CounselorName:    counselor.CounselorName,
-		JuniorCounselor:  counselor.JuniorCounselor,
-		CounselorEnabled: counselor.CounselorEnabled,
-		Gender:           counselor.Gender,
+		CounselorName:    counselor.FullName(c.FirstName, c.LastName),
+		JuniorCounselor:  c.JuniorCounselor,
+		CounselorEnabled: c.CounselorEnabled,
+		Gender:           c.Gender,
 	}, nil
 }
 

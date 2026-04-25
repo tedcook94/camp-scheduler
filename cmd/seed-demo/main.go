@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"camp-scheduler/internal/config"
@@ -576,16 +577,26 @@ func createCounselors(ctx context.Context, q *db.Queries, campID pgtype.UUID) (m
 	}
 	m := make(map[string]db.Counselor)
 	for _, d := range defs {
+		first, last, _ := strings.Cut(d.name, " ")
 		c, err := q.CreateCounselor(ctx, db.CreateCounselorParams{
 			CampID:          campID,
-			CounselorName:   d.name,
-			JuniorCounselor:  d.junior,
+			FirstName:       first,
+			LastName:        last,
+			JuniorCounselor: d.junior,
 			Gender:          d.gender,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("error creating counselor %s: %w", d.name, err)
 		}
-		m[d.name] = c
+		m[d.name] = db.Counselor{
+			ID:               c.ID,
+			CampID:           c.CampID,
+			JuniorCounselor:  c.JuniorCounselor,
+			CounselorEnabled: c.CounselorEnabled,
+			Gender:           c.Gender,
+			FirstName:        c.FirstName,
+			LastName:         c.LastName,
+		}
 	}
 	return m, nil
 }

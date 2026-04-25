@@ -155,13 +155,14 @@ viable configurations and understand trade-offs.
 - [x] Assign counselors and campers to cabin at once (respect max cabin size of campers + counselors)
 - [x] Assign all counselors for cabins/activities
 - [x] Reports
-- [ ] First and last name for campers
+- [x] First and last name for campers and counselors
 - [ ] "Dirty" flag for when changes have been made since assignment run
 - [ ] Archive (soft delete) objects
 - [ ] Overrides (locking assignments before solver runs)
 - [ ] Data import (CSV/spreadsheet)
 - [ ] Migrate auth to BetterAuth (camps as orgs, enable MFA)
-- [ ] Reimplement solver in Prolog
+- [ ] Reimplement solver in Prolog?
+- [ ] Reimplement frontend in HTMX?
 - [ ] Auditing
 - [ ] External system integration (Campminder, etc.)
 - [ ] LLM conversational layer (MCP) for "why was X assigned to Y?" queries

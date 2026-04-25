@@ -14,10 +14,12 @@ type Cabin struct {
 }
 
 type Counselor struct {
-	ID       string
-	Name     string
-	IsJunior bool
-	Gender   string
+	ID        string
+	FirstName string
+	LastName  string
+	Name      string
+	IsJunior  bool
+	Gender    string
 }
 
 type CounselorPreviousPlacement struct {

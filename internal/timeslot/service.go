@@ -7,16 +7,21 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+	"camp-scheduler/internal/staleness"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var ErrNotFound = errors.New("time slot not found")
 
 type Service struct {
 	queries *db.Queries
+	pool    *pgxpool.Pool
+	marker  *staleness.Marker
 }
 
-func NewService(queries *db.Queries) *Service {
-	return &Service{queries: queries}
+func NewService(queries *db.Queries, pool *pgxpool.Pool, marker *staleness.Marker) *Service {
+	return &Service{queries: queries, pool: pool, marker: marker}
 }
 
 func (svc *Service) List(ctx context.Context, campID string) ([]TimeSlotResponse, error) {
@@ -110,7 +115,14 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 		return err
 	}
 
-	rows, err := svc.queries.DeleteTimeSlot(ctx, db.DeleteTimeSlotParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning delete time slot transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	rows, err := qtx.DeleteTimeSlot(ctx, db.DeleteTimeSlotParams{
 		ID:     uid,
 		CampID: campUUID,
 	})
@@ -119,6 +131,14 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 	}
 	if rows == 0 {
 		return ErrNotFound
+	}
+
+	if err := svc.marker.MarkCamp(ctx, qtx, campUUID, []staleness.RunType{staleness.RunTypeActivity}); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing delete time slot transaction: %w", err)
 	}
 
 	return nil

@@ -8,6 +8,7 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+	"camp-scheduler/internal/staleness"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -18,10 +19,11 @@ var ErrNotFound = errors.New("counselor not found")
 type Service struct {
 	queries *db.Queries
 	pool    *pgxpool.Pool
+	marker  *staleness.Marker
 }
 
-func NewService(queries *db.Queries, pool *pgxpool.Pool) *Service {
-	return &Service{queries: queries, pool: pool}
+func NewService(queries *db.Queries, pool *pgxpool.Pool, marker *staleness.Marker) *Service {
+	return &Service{queries: queries, pool: pool, marker: marker}
 }
 
 // FullName joins first and last name into a display string. Empty parts are
@@ -114,6 +116,7 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCounsel
 	if err != nil {
 		return CounselorResponse{}, fmt.Errorf("error listing sessions for counselor roster: %w", err)
 	}
+	sessionIDs := make([]pgtype.UUID, 0, len(sessions))
 	for _, s := range sessions {
 		if _, err := qtx.AddSessionCounselor(ctx, db.AddSessionCounselorParams{
 			CampID:      uid,
@@ -122,6 +125,11 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCounsel
 		}); err != nil {
 			return CounselorResponse{}, fmt.Errorf("error rostering new counselor onto session: %w", err)
 		}
+		sessionIDs = append(sessionIDs, s.ID)
+	}
+
+	if err := svc.marker.MarkSessions(ctx, qtx, uid, sessionIDs, staleness.AllRunTypes); err != nil {
+		return CounselorResponse{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -170,6 +178,12 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCou
 	// When a counselor transitions from enabled to disabled, remove them from
 	// every session roster. This keeps the roster aligned with assignability;
 	// re-enabling does not auto-restore prior memberships.
+	// Capture the roster *before* we potentially clear it so the staleness
+	// marker still sees the affected sessions when disabling.
+	if err := svc.marker.MarkSessionsForCounselor(ctx, qtx, campUUID, uid, staleness.AllRunTypes); err != nil {
+		return CounselorResponse{}, err
+	}
+
 	if existing.CounselorEnabled && !req.Enabled {
 		if err := qtx.RemoveCounselorFromAllSessions(ctx, db.RemoveCounselorFromAllSessionsParams{
 			CampID:      campUUID,
@@ -197,7 +211,20 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 		return err
 	}
 
-	rows, err := svc.queries.DeleteCounselor(ctx, db.DeleteCounselorParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning delete counselor transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	// Mark stale before the FK cascade removes session_counselors rows so
+	// we still see which sessions were affected.
+	if err := svc.marker.MarkSessionsForCounselor(ctx, qtx, campUUID, uid, staleness.AllRunTypes); err != nil {
+		return err
+	}
+
+	rows, err := qtx.DeleteCounselor(ctx, db.DeleteCounselorParams{
 		ID:     uid,
 		CampID: campUUID,
 	})
@@ -208,5 +235,8 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 		return ErrNotFound
 	}
 
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing delete counselor transaction: %w", err)
+	}
 	return nil
 }

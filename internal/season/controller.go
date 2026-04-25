@@ -46,6 +46,7 @@ type SeasonResponse struct {
 	Name      string `json:"name"`
 	StartDate string `json:"start_date"`
 	EndDate   string `json:"end_date"`
+	Archived  bool   `json:"archived"`
 }
 
 func (ctrl *Controller) List(c *gin.Context) {

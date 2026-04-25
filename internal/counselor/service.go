@@ -63,6 +63,24 @@ func (svc *Service) List(ctx context.Context, campID string) ([]CounselorRespons
 	return result, nil
 }
 
+func (svc *Service) ListArchived(ctx context.Context, campID string) ([]CounselorResponse, error) {
+	uid, err := api.ParseUUID(campID)
+	if err != nil {
+		return nil, err
+	}
+
+	counselors, err := svc.queries.ListArchivedCounselors(ctx, uid)
+	if err != nil {
+		return nil, fmt.Errorf("error listing archived counselors: %w", err)
+	}
+
+	result := make([]CounselorResponse, len(counselors))
+	for i, c := range counselors {
+		result[i] = toResponse(c.ID, c.CampID, c.FirstName, c.LastName, c.JuniorCounselor, c.Archived, c.Gender)
+	}
+	return result, nil
+}
+
 func (svc *Service) GetByID(ctx context.Context, campID, id string) (CounselorResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {
@@ -218,5 +236,57 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("error committing delete counselor transaction: %w", err)
 	}
+	return nil
+}
+
+func (svc *Service) Archive(ctx context.Context, campID, id string) error {
+	return svc.setArchived(ctx, campID, id, true)
+}
+
+func (svc *Service) Unarchive(ctx context.Context, campID, id string) error {
+	return svc.setArchived(ctx, campID, id, false)
+}
+
+func (svc *Service) setArchived(ctx context.Context, campID, id string, archived bool) error {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return err
+	}
+
+	uid, err := api.ParseUUID(id)
+	if err != nil {
+		return err
+	}
+
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning archive counselor transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	// Mark stale before flipping the flag so the roster lookup still sees
+	// this counselor's session memberships.
+	if err := svc.marker.MarkSessionsForCounselor(ctx, qtx, campUUID, uid, staleness.AllRunTypes); err != nil {
+		return err
+	}
+
+	var rows int64
+	if archived {
+		rows, err = qtx.ArchiveCounselor(ctx, db.ArchiveCounselorParams{ID: uid, CampID: campUUID})
+	} else {
+		rows, err = qtx.UnarchiveCounselor(ctx, db.UnarchiveCounselorParams{ID: uid, CampID: campUUID})
+	}
+	if err != nil {
+		return fmt.Errorf("error setting counselor %s archived=%t: %w", id, archived, err)
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing archive counselor transaction: %w", err)
+	}
+
 	return nil
 }

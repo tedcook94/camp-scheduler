@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
@@ -24,6 +25,26 @@ type Service struct {
 
 func NewService(queries *db.Queries, pool *pgxpool.Pool, marker *staleness.Marker) *Service {
 	return &Service{queries: queries, pool: pool, marker: marker}
+}
+
+// ensureSeasonActive rejects sessions being created or updated under an
+// archived season. Archived seasons are filtered out of the default sessions
+// listing, so allowing new sessions under them would orphan the data.
+func (svc *Service) ensureSeasonActive(ctx context.Context, q *db.Queries, campID, seasonID pgtype.UUID) error {
+	season, err := q.GetSeason(ctx, db.GetSeasonParams{
+		ID:     seasonID,
+		CampID: campID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return api.BadInput("season not found")
+		}
+		return fmt.Errorf("error looking up season: %w", err)
+	}
+	if season.Archived {
+		return api.BadInput("cannot use an archived season")
+	}
+	return nil
 }
 
 func (svc *Service) List(ctx context.Context, campID string) ([]SessionResponse, error) {
@@ -92,6 +113,10 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateSession
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := svc.queries.WithTx(tx)
+
+	if err := svc.ensureSeasonActive(ctx, qtx, campUUID, seasonUUID); err != nil {
+		return SessionResponse{}, err
+	}
 
 	session, err := qtx.CreateSession(ctx, db.CreateSessionParams{
 		CampID:          campUUID,
@@ -183,6 +208,12 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateSes
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := svc.queries.WithTx(tx)
 
+	if current.SeasonID != seasonUUID {
+		if err := svc.ensureSeasonActive(ctx, qtx, campUUID, seasonUUID); err != nil {
+			return SessionResponse{}, err
+		}
+	}
+
 	session, err := qtx.UpdateSession(ctx, db.UpdateSessionParams{
 		ID:              uid,
 		CampID:          campUUID,
@@ -257,7 +288,76 @@ func toSessionResponse(s db.Session) SessionResponse {
 		SeasonID:          api.UUIDToString(s.SeasonID),
 		Name:              s.SessionName,
 		PreviousSessionID: api.UUIDToStringPtr(s.PreviousSession),
+		Archived:          s.Archived,
 	}
+}
+
+func (svc *Service) ListArchived(ctx context.Context, campID string) ([]SessionResponse, error) {
+	uid, err := api.ParseUUID(campID)
+	if err != nil {
+		return nil, err
+	}
+
+	sessions, err := svc.queries.ListArchivedSessions(ctx, uid)
+	if err != nil {
+		return nil, fmt.Errorf("error listing archived sessions: %w", err)
+	}
+
+	result := make([]SessionResponse, len(sessions))
+	for i, sn := range sessions {
+		result[i] = toSessionResponse(sn)
+	}
+	return result, nil
+}
+
+func (svc *Service) Archive(ctx context.Context, campID, id string) error {
+	return svc.setArchived(ctx, campID, id, true)
+}
+
+func (svc *Service) Unarchive(ctx context.Context, campID, id string) error {
+	return svc.setArchived(ctx, campID, id, false)
+}
+
+func (svc *Service) setArchived(ctx context.Context, campID, id string, archived bool) error {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return err
+	}
+
+	uid, err := api.ParseUUID(id)
+	if err != nil {
+		return err
+	}
+
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning archive session transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	if err := svc.marker.MarkSessions(ctx, qtx, campUUID, []pgtype.UUID{uid}, staleness.AllRunTypes); err != nil {
+		return err
+	}
+
+	var rows int64
+	if archived {
+		rows, err = qtx.ArchiveSession(ctx, db.ArchiveSessionParams{ID: uid, CampID: campUUID})
+	} else {
+		rows, err = qtx.UnarchiveSession(ctx, db.UnarchiveSessionParams{ID: uid, CampID: campUUID})
+	}
+	if err != nil {
+		return fmt.Errorf("error setting session %s archived=%t: %w", id, archived, err)
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing archive session transaction: %w", err)
+	}
+
+	return nil
 }
 
 // validatePreviousSession checks that the referenced previous session belongs
@@ -341,6 +441,10 @@ func (svc *Service) Copy(ctx context.Context, campID, sourceID string, req CopyS
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := svc.queries.WithTx(tx)
 
+	if err := svc.ensureSeasonActive(ctx, qtx, campUUID, seasonUUID); err != nil {
+		return SessionResponse{}, err
+	}
+
 	newSession, err := qtx.CreateSession(ctx, db.CreateSessionParams{
 		CampID:          campUUID,
 		SeasonID:        seasonUUID,
@@ -350,6 +454,12 @@ func (svc *Service) Copy(ctx context.Context, campID, sourceID string, req CopyS
 	if err != nil {
 		return SessionResponse{}, fmt.Errorf("error creating copied session: %w", err)
 	}
+
+	// Track skipped references so we can surface a single summary log at the
+	// end. Archived parents are intentionally omitted from the clone so the
+	// new active session does not inherit references the admin already
+	// retired.
+	var skippedAgeGroups, skippedCabins, skippedTimeSlots, skippedActivities, skippedCounselors int
 
 	// Copy session_age_groups, building a map from old SAG id to new SAG id
 	// so we can remap session_age_group_cabins below.
@@ -362,6 +472,17 @@ func (svc *Service) Copy(ctx context.Context, campID, sourceID string, req CopyS
 	}
 	sagIDMap := make(map[pgtype.UUID]pgtype.UUID, len(sourceSAGs))
 	for _, sag := range sourceSAGs {
+		ag, err := qtx.GetAgeGroup(ctx, db.GetAgeGroupParams{
+			ID:     sag.AgeGroupID,
+			CampID: campUUID,
+		})
+		if err != nil {
+			return SessionResponse{}, fmt.Errorf("error loading source age group %v: %w", sag.AgeGroupID, err)
+		}
+		if ag.Archived {
+			skippedAgeGroups++
+			continue
+		}
 		newSAG, err := qtx.CreateSessionAgeGroup(ctx, db.CreateSessionAgeGroupParams{
 			CampID:     campUUID,
 			SessionID:  newSession.ID,
@@ -383,7 +504,20 @@ func (svc *Service) Copy(ctx context.Context, campID, sourceID string, req CopyS
 	for _, sc := range sourceCabins {
 		newSAGID, ok := sagIDMap[sc.SessionAgeGroupID]
 		if !ok {
-			return SessionResponse{}, fmt.Errorf("error remapping session age group id during copy: source session_age_group_id=%v source session_id=%s", sc.SessionAgeGroupID, sourceID)
+			// Parent SAG was skipped (archived age group); skip dependent cabin.
+			skippedCabins++
+			continue
+		}
+		cabin, err := qtx.GetCabin(ctx, db.GetCabinParams{
+			ID:     sc.CabinID,
+			CampID: campUUID,
+		})
+		if err != nil {
+			return SessionResponse{}, fmt.Errorf("error loading source cabin %v: %w", sc.CabinID, err)
+		}
+		if cabin.Archived {
+			skippedCabins++
+			continue
 		}
 		if _, err := qtx.CreateSessionAgeGroupCabin(ctx, db.CreateSessionAgeGroupCabinParams{
 			CampID:             campUUID,
@@ -407,6 +541,17 @@ func (svc *Service) Copy(ctx context.Context, campID, sourceID string, req CopyS
 	}
 	stsIDMap := make(map[pgtype.UUID]pgtype.UUID, len(sourceSTSs))
 	for _, sts := range sourceSTSs {
+		ts, err := qtx.GetTimeSlot(ctx, db.GetTimeSlotParams{
+			ID:     sts.TimeSlotID,
+			CampID: campUUID,
+		})
+		if err != nil {
+			return SessionResponse{}, fmt.Errorf("error loading source time slot %v: %w", sts.TimeSlotID, err)
+		}
+		if ts.Archived {
+			skippedTimeSlots++
+			continue
+		}
 		newSTS, err := qtx.CreateSessionTimeSlot(ctx, db.CreateSessionTimeSlotParams{
 			CampID:     campUUID,
 			SessionID:  newSession.ID,
@@ -429,7 +574,20 @@ func (svc *Service) Copy(ctx context.Context, campID, sourceID string, req CopyS
 	for _, sa := range sourceActivities {
 		newSTSID, ok := stsIDMap[sa.SessionTimeSlotID]
 		if !ok {
-			return SessionResponse{}, fmt.Errorf("error remapping session time slot id during copy: source session_time_slot_id=%v source session_id=%s", sa.SessionTimeSlotID, sourceID)
+			// Parent STS was skipped (archived time slot); skip dependent activity.
+			skippedActivities++
+			continue
+		}
+		act, err := qtx.GetActivity(ctx, db.GetActivityParams{
+			ID:     sa.ActivityID,
+			CampID: campUUID,
+		})
+		if err != nil {
+			return SessionResponse{}, fmt.Errorf("error loading source activity %v: %w", sa.ActivityID, err)
+		}
+		if act.Archived {
+			skippedActivities++
+			continue
 		}
 		if _, err := qtx.CreateSessionActivity(ctx, db.CreateSessionActivityParams{
 			CampID:             campUUID,
@@ -452,6 +610,17 @@ func (svc *Service) Copy(ctx context.Context, campID, sourceID string, req CopyS
 		return SessionResponse{}, fmt.Errorf("error listing source session counselors: %w", err)
 	}
 	for _, counselorID := range sourceCounselors {
+		c, err := qtx.GetCounselor(ctx, db.GetCounselorParams{
+			ID:     counselorID,
+			CampID: campUUID,
+		})
+		if err != nil {
+			return SessionResponse{}, fmt.Errorf("error loading source counselor %v: %w", counselorID, err)
+		}
+		if c.Archived {
+			skippedCounselors++
+			continue
+		}
 		if _, err := qtx.AddSessionCounselor(ctx, db.AddSessionCounselorParams{
 			CampID:      campUUID,
 			SessionID:   newSession.ID,
@@ -463,6 +632,18 @@ func (svc *Service) Copy(ctx context.Context, campID, sourceID string, req CopyS
 
 	if err := tx.Commit(ctx); err != nil {
 		return SessionResponse{}, fmt.Errorf("error committing copy session transaction: %w", err)
+	}
+
+	if skippedAgeGroups+skippedCabins+skippedTimeSlots+skippedActivities+skippedCounselors > 0 {
+		slog.
+			With("source_session_id", sourceID).
+			With("new_session_id", newSession.ID.String()).
+			With("skipped_age_groups", skippedAgeGroups).
+			With("skipped_cabins", skippedCabins).
+			With("skipped_time_slots", skippedTimeSlots).
+			With("skipped_activities", skippedActivities).
+			With("skipped_counselors", skippedCounselors).
+			Info("skipped archived references during session copy")
 	}
 
 	return toSessionResponse(newSession), nil

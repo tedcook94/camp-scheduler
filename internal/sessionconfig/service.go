@@ -9,6 +9,7 @@ import (
 	"camp-scheduler/internal/db"
 	"camp-scheduler/internal/staleness"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -30,6 +31,44 @@ func NewService(queries *db.Queries, pool *pgxpool.Pool, marker *staleness.Marke
 
 func (svc *Service) markCabinStale(ctx context.Context, q *db.Queries, campID, sessionID pgtype.UUID) error {
 	return svc.marker.MarkSessions(ctx, q, campID, []pgtype.UUID{sessionID}, []staleness.RunType{staleness.RunTypeCabin})
+}
+
+// ensureAgeGroupActive rejects attaching an archived age group to a session.
+// Archived resources are filtered from default lists and ignored by the
+// solver, so accepting them here would create config that exists in DB but
+// silently goes unused.
+func (svc *Service) ensureAgeGroupActive(ctx context.Context, q *db.Queries, campID, ageGroupID pgtype.UUID) error {
+	ag, err := q.GetAgeGroup(ctx, db.GetAgeGroupParams{
+		ID:     ageGroupID,
+		CampID: campID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return api.BadInput("age group not found")
+		}
+		return fmt.Errorf("error looking up age group: %w", err)
+	}
+	if ag.Archived {
+		return api.BadInput("cannot use an archived age group")
+	}
+	return nil
+}
+
+func (svc *Service) ensureCabinActive(ctx context.Context, q *db.Queries, campID, cabinID pgtype.UUID) error {
+	cabin, err := q.GetCabin(ctx, db.GetCabinParams{
+		ID:     cabinID,
+		CampID: campID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return api.BadInput("cabin not found")
+		}
+		return fmt.Errorf("error looking up cabin: %w", err)
+	}
+	if cabin.Archived {
+		return api.BadInput("cannot use an archived cabin")
+	}
+	return nil
 }
 
 // Session age group operations
@@ -111,6 +150,10 @@ func (svc *Service) CreateAgeGroup(ctx context.Context, campID, sessionID string
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := svc.queries.WithTx(tx)
 
+	if err := svc.ensureAgeGroupActive(ctx, qtx, campUUID, ageGroupUUID); err != nil {
+		return SessionAgeGroupResponse{}, err
+	}
+
 	row, err := qtx.CreateSessionAgeGroup(ctx, db.CreateSessionAgeGroupParams{
 		CampID:     campUUID,
 		SessionID:  sessionUUID,
@@ -158,6 +201,10 @@ func (svc *Service) UpdateAgeGroup(ctx context.Context, campID, sessionID, id st
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := svc.queries.WithTx(tx)
+
+	if err := svc.ensureAgeGroupActive(ctx, qtx, campUUID, ageGroupUUID); err != nil {
+		return SessionAgeGroupResponse{}, err
+	}
 
 	row, err := qtx.UpdateSessionAgeGroup(ctx, db.UpdateSessionAgeGroupParams{
 		ID:         uid,
@@ -321,6 +368,10 @@ func (svc *Service) CreateCabin(ctx context.Context, campID, sessionID string, r
 		return SessionCabinResponse{}, err
 	}
 
+	if err := svc.ensureCabinActive(ctx, qtx, campUUID, cabinUUID); err != nil {
+		return SessionCabinResponse{}, err
+	}
+
 	row, err := qtx.CreateSessionAgeGroupCabin(ctx, db.CreateSessionAgeGroupCabinParams{
 		CampID:             campUUID,
 		SessionAgeGroupID:  sessionAgeGroupUUID,
@@ -370,6 +421,10 @@ func (svc *Service) UpdateCabin(ctx context.Context, campID, sessionID, id strin
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := svc.queries.WithTx(tx)
+
+	if err := svc.ensureCabinActive(ctx, qtx, campUUID, cabinUUID); err != nil {
+		return SessionCabinResponse{}, err
+	}
 
 	row, err := qtx.UpdateSessionAgeGroupCabin(ctx, db.UpdateSessionAgeGroupCabinParams{
 		ID:                 uid,

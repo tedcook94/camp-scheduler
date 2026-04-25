@@ -51,6 +51,33 @@ func (svc *Service) List(ctx context.Context, campID string) ([]CamperResponse, 
 			LastName:  c.LastName,
 			Name:      FullName(c.FirstName, c.LastName),
 			Gender:    c.Gender,
+			Archived:  c.Archived,
+		}
+	}
+	return result, nil
+}
+
+func (svc *Service) ListArchived(ctx context.Context, campID string) ([]CamperResponse, error) {
+	uid, err := api.ParseUUID(campID)
+	if err != nil {
+		return nil, err
+	}
+
+	campers, err := svc.queries.ListArchivedCampers(ctx, uid)
+	if err != nil {
+		return nil, fmt.Errorf("error listing archived campers: %w", err)
+	}
+
+	result := make([]CamperResponse, len(campers))
+	for i, c := range campers {
+		result[i] = CamperResponse{
+			ID:        api.UUIDToString(c.ID),
+			CampID:    api.UUIDToString(c.CampID),
+			FirstName: c.FirstName,
+			LastName:  c.LastName,
+			Name:      FullName(c.FirstName, c.LastName),
+			Gender:    c.Gender,
+			Archived:  c.Archived,
 		}
 	}
 	return result, nil
@@ -82,6 +109,7 @@ func (svc *Service) GetByID(ctx context.Context, campID, id string) (CamperRespo
 		LastName:  c.LastName,
 		Name:      FullName(c.FirstName, c.LastName),
 		Gender:    c.Gender,
+		Archived:  c.Archived,
 	}, nil
 }
 
@@ -108,6 +136,7 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCamperR
 		LastName:  c.LastName,
 		Name:      FullName(c.FirstName, c.LastName),
 		Gender:    c.Gender,
+		Archived:  c.Archived,
 	}, nil
 }
 
@@ -155,6 +184,7 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCam
 		LastName:  c.LastName,
 		Name:      FullName(c.FirstName, c.LastName),
 		Gender:    c.Gender,
+		Archived:  c.Archived,
 	}, nil
 }
 
@@ -196,6 +226,58 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("error committing delete camper transaction: %w", err)
+	}
+
+	return nil
+}
+
+func (svc *Service) Archive(ctx context.Context, campID, id string) error {
+	return svc.setArchived(ctx, campID, id, true)
+}
+
+func (svc *Service) Unarchive(ctx context.Context, campID, id string) error {
+	return svc.setArchived(ctx, campID, id, false)
+}
+
+func (svc *Service) setArchived(ctx context.Context, campID, id string, archived bool) error {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return err
+	}
+
+	uid, err := api.ParseUUID(id)
+	if err != nil {
+		return err
+	}
+
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning archive camper transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	// Mark stale before flipping the flag so the enrollment lookup still
+	// sees this camper's session memberships in case archive ever cascades.
+	if err := svc.marker.MarkSessionsForCamper(ctx, qtx, campUUID, uid, []staleness.RunType{staleness.RunTypeCabin}); err != nil {
+		return err
+	}
+
+	var rows int64
+	if archived {
+		rows, err = qtx.ArchiveCamper(ctx, db.ArchiveCamperParams{ID: uid, CampID: campUUID})
+	} else {
+		rows, err = qtx.UnarchiveCamper(ctx, db.UnarchiveCamperParams{ID: uid, CampID: campUUID})
+	}
+	if err != nil {
+		return fmt.Errorf("error setting camper %s archived=%t: %w", id, archived, err)
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing archive camper transaction: %w", err)
 	}
 
 	return nil

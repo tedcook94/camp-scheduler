@@ -11,4 +11,7 @@
 	createFn={certificationApi.create}
 	updateFn={certificationApi.update}
 	deleteFn={certificationApi.delete}
+	archiveFn={certificationApi.archive}
+	unarchiveFn={certificationApi.unarchive}
+	listArchivedFn={certificationApi.listArchived}
 />

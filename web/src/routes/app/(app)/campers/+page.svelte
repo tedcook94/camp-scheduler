@@ -16,9 +16,12 @@
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import TrashIcon from "@lucide/svelte/icons/trash";
+	import ArchiveIcon from "@lucide/svelte/icons/archive";
+	import ArchiveRestoreIcon from "@lucide/svelte/icons/archive-restore";
 	import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
 	import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 	import SortableTableHead from "$lib/components/sortable-table-head.svelte";
+	import ArchivedSection from "$lib/components/archived-section.svelte";
 	import { sortItems, type SortDirection } from "$lib/utils";
 
 	const getCampDisabled = getContext<() => boolean>("campDisabled");
@@ -163,6 +166,34 @@
 		deleteOpen = true;
 	}
 
+	let archivingId = $state<string | null>(null);
+	let archivedSection = $state<ArchivedSection<Camper> | null>(null);
+
+	async function handleArchive(camper: Camper) {
+		archivingId = camper.id;
+		try {
+			await camperApi.archive(camper.id);
+			campers = campers.filter((c) => c.id !== camper.id);
+			archivedSection?.addArchived({ ...camper, archived: true });
+			toast.success("Camper archived");
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to archive camper";
+			toast.error(message);
+		} finally {
+			archivingId = null;
+		}
+	}
+
+	async function handleUnarchive(id: string) {
+		await camperApi.unarchive(id);
+		try {
+			campers = await camperApi.list();
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to refresh camper list";
+			toast.error(message);
+		}
+	}
+
 	async function handleDelete() {
 		if (!deleteTarget) return;
 		deleting = true;
@@ -174,8 +205,23 @@
 			deleteOpen = false;
 			deleteTarget = null;
 		} catch (err) {
-			const message = err instanceof ApiClientError ? err.message : "Failed to delete camper";
-			toast.error(message);
+			if (err instanceof ApiClientError && err.status === 409) {
+				const target = deleteTarget;
+				deleteOpen = false;
+				deleteTarget = null;
+				toast.message("Camper has dependent records and cannot be deleted.", {
+					description: "Archive it instead?",
+					action: {
+						label: "Archive",
+						onClick: () => {
+							if (target) handleArchive(target);
+						},
+					},
+				});
+			} else {
+				const message = err instanceof ApiClientError ? err.message : "Failed to delete camper";
+				toast.error(message);
+			}
 		} finally {
 			deleting = false;
 		}
@@ -254,6 +300,20 @@
 								<Button
 									variant="ghost"
 									size="icon-sm"
+									title="Archive"
+									disabled={disabled || archivingId === camper.id}
+									onclick={(e: MouseEvent) => { e.stopPropagation(); handleArchive(camper); }}
+								>
+									{#if archivingId === camper.id}
+										<LoaderCircleIcon class="size-4 animate-spin" />
+									{:else}
+										<ArchiveIcon class="size-4" />
+									{/if}
+									<span class="sr-only">Archive</span>
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon-sm"
 									disabled={disabled}
 									title="Delete"
 									onclick={(e: MouseEvent) => { e.stopPropagation(); confirmDelete(camper); }}
@@ -268,6 +328,35 @@
 				{/each}
 			</Table.TableBody>
 		</Table.Table>
+	{/if}
+
+	{#if camp}
+		<ArchivedSection
+			bind:this={archivedSection}
+			resourceName="Camper"
+			listArchivedFn={camperApi.listArchived}
+			unarchiveFn={handleUnarchive}
+		>
+			{#snippet row({ item, unarchive, busy })}
+				<div class="flex items-center justify-between border-b py-2 last:border-b-0">
+					<span class="text-sm">{item.name}</span>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						title="Restore"
+						disabled={disabled || busy}
+						onclick={unarchive}
+					>
+						{#if busy}
+							<LoaderCircleIcon class="size-4 animate-spin" />
+						{:else}
+							<ArchiveRestoreIcon class="size-4" />
+						{/if}
+						<span class="sr-only">Restore</span>
+					</Button>
+				</div>
+			{/snippet}
+		</ArchivedSection>
 	{/if}
 </div>
 

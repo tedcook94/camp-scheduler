@@ -93,6 +93,39 @@
 	let ageGroupMap = $derived(new Map(allAgeGroups.map((a) => [a.id, a.name])));
 	let cabinMap = $derived(new Map(allCabins.map((c) => [c.id, c])));
 
+	// Label-only maps for archived resources still referenced by this session.
+	// These are intentionally NOT merged into allXxx so option lists stay
+	// archive-free; they are consulted only when rendering existing labels.
+	let archivedTimeSlotNames = $state<Map<string, string>>(new Map());
+	let archivedActivityNames = $state<Map<string, string>>(new Map());
+	let archivedAgeGroupNames = $state<Map<string, string>>(new Map());
+	let archivedCabinNames = $state<Map<string, string>>(new Map());
+
+	function timeSlotLabel(id: string): string {
+		const active = timeSlotMap.get(id);
+		if (active) return active;
+		const archived = archivedTimeSlotNames.get(id);
+		return archived ? `${archived} (archived)` : "Unknown Time Slot";
+	}
+	function activityLabel(id: string): string {
+		const active = activityMap.get(id);
+		if (active) return active;
+		const archived = archivedActivityNames.get(id);
+		return archived ? `${archived} (archived)` : "Unknown";
+	}
+	function ageGroupLabel(id: string): string {
+		const active = ageGroupMap.get(id);
+		if (active) return active;
+		const archived = archivedAgeGroupNames.get(id);
+		return archived ? `${archived} (archived)` : "Unknown Age Group";
+	}
+	function cabinLabel(id: string): string {
+		const active = cabinMap.get(id);
+		if (active) return active.name;
+		const archived = archivedCabinNames.get(id);
+		return archived ? `${archived} (archived)` : "Unknown";
+	}
+
 	// Sorted session time slots by DB sort_order
 	let sortedSessionTimeSlots = $derived(
 		[...sessionTimeSlots].sort((a, b) => a.sort_order - b.sort_order)
@@ -158,8 +191,8 @@
 	// session_age_groups sorted by underlying age-group name
 	let sortedSessionAgeGroups = $derived(
 		[...sessionAgeGroups].sort((a, b) =>
-			(ageGroupMap.get(a.age_group_id) ?? "").localeCompare(
-				ageGroupMap.get(b.age_group_id) ?? ""
+			ageGroupLabel(a.age_group_id).localeCompare(
+				ageGroupLabel(b.age_group_id)
 			)
 		)
 	);
@@ -176,8 +209,8 @@
 		}
 		for (const list of m.values()) {
 			list.sort((a, b) =>
-				(cabinMap.get(a.cabin_id)?.name ?? "").localeCompare(
-					cabinMap.get(b.cabin_id)?.name ?? ""
+				cabinLabel(a.cabin_id).localeCompare(
+					cabinLabel(b.cabin_id)
 				)
 			);
 		}
@@ -338,6 +371,68 @@
 		return allActivities.filter((a) => !assignedIds.has(a.id));
 	}
 
+	// hydrateArchivedReferences populates separate label-only maps for any
+	// archived resources still referenced by this session. Active arrays
+	// (allTimeSlots, allActivities, ...) stay archive-free so option lists
+	// only ever surface selectable resources; the archived maps are consulted
+	// when rendering existing labels and when injecting a single disabled
+	// option to preserve a previously-archived selection in edit forms.
+	async function hydrateArchivedReferences(
+		stSlots: SessionTimeSlot[],
+		sActs: SessionActivity[],
+		sAgs: SessionAgeGroup[],
+		sCbs: SessionCabin[],
+		sCns: SessionCounselor[],
+	) {
+		const missing = <T extends { id: string }>(have: T[], refs: string[]) => {
+			const known = new Set(have.map((x) => x.id));
+			return refs.filter((id) => !known.has(id));
+		};
+
+		const fetches: Promise<void>[] = [];
+
+		// Each fetch is best-effort: a failed enrichment falls back to the
+		// "Unknown ..." label rather than failing the whole page load.
+		const swallow = (label: string) => (err: unknown) => {
+			console.warn(`error hydrating archived ${label} labels:`, err);
+		};
+
+		if (missing(allTimeSlots, stSlots.map((s) => s.time_slot_id)).length > 0) {
+			fetches.push(
+				timeSlotApi.listArchived().then((arch) => {
+					archivedTimeSlotNames = new Map(arch.map((x) => [x.id, x.name]));
+				}, swallow("time slot")),
+			);
+		}
+		if (missing(allActivities, sActs.map((s) => s.activity_id)).length > 0) {
+			fetches.push(
+				activityApi.listArchived().then((arch) => {
+					archivedActivityNames = new Map(arch.map((x) => [x.id, x.name]));
+				}, swallow("activity")),
+			);
+		}
+		if (missing(allAgeGroups, sAgs.map((s) => s.age_group_id)).length > 0) {
+			fetches.push(
+				ageGroupApi.listArchived().then((arch) => {
+					archivedAgeGroupNames = new Map(arch.map((x) => [x.id, x.name]));
+				}, swallow("age group")),
+			);
+		}
+		if (missing(allCabins, sCbs.map((s) => s.cabin_id)).length > 0) {
+			fetches.push(
+				cabinApi.listArchived().then((arch) => {
+					archivedCabinNames = new Map(arch.map((x) => [x.id, x.name]));
+				}, swallow("cabin")),
+			);
+		}
+
+		// Counselor names are embedded in the session roster response itself,
+		// so we don't need to hydrate an archived label map for counselors.
+		void sCns;
+
+		await Promise.all(fetches);
+	}
+
 	onMount(async () => {
 		try {
 			const [s, stSlots, ts, acts, allSessionActs, sAgeGroups, sCabins, ags, cbs, sCouns, cns] =
@@ -364,6 +459,11 @@
 			allCabins = cbs;
 			sessionCounselors = sCouns;
 			allCounselors = cns;
+
+			// Hydrate any archived parents this session still references so labels
+			// and edit forms remain accurate. Fetched lazily and only when there
+			// is at least one missing reference per resource type.
+			await hydrateArchivedReferences(stSlots, allSessionActs, sAgeGroups, sCabins, sCouns);
 
 			// Group activities by session time slot
 			const activitiesByTimeSlotMap = new Map<string, SessionActivity[]>();
@@ -1070,7 +1170,7 @@
 								>
 									<ChevronDownIcon class="size-4 transition-transform {isExpanded ? '' : '-rotate-90'}" />
 									<h3 class="font-medium">
-										{ageGroupMap.get(sag.age_group_id) ?? "Unknown Age Group"}
+										{ageGroupLabel(sag.age_group_id)}
 									</h3>
 									<span class="text-muted-foreground text-sm">
 										— {cabins.length} {cabins.length === 1 ? "cabin" : "cabins"}
@@ -1093,7 +1193,7 @@
 											{#each cabins as sc (sc.id)}
 												<Table.TableRow>
 													<Table.TableCell>
-														{cabinMap.get(sc.cabin_id)?.name ?? "Unknown"}
+														{cabinLabel(sc.cabin_id)}
 													</Table.TableCell>
 													<Table.TableCell>
 														{sc.group_size}
@@ -1178,14 +1278,14 @@
 			{:else}
 				{#each sortedSessionTimeSlots as st (st.id)}
 					{@const activities = [...(activitiesByTimeSlot.get(st.id) ?? [])].sort((a, b) =>
-						(activityMap.get(a.activity_id) ?? "").localeCompare(activityMap.get(b.activity_id) ?? "")
+						activityLabel(a.activity_id).localeCompare(activityLabel(b.activity_id))
 					)}
 					{@const availableActs = getAvailableActivities(st.id)}
 					{@const isExpanded = expandedTimeSlots.has(st.id)}
 				<div
 					class="border-border relative rounded-lg border transition-opacity {draggedId === st.id ? 'opacity-50' : ''}"
 					role="region"
-					aria-label={`${timeSlotMap.get(st.time_slot_id) ?? "Unknown time slot"} drop zone`}
+					aria-label={`${timeSlotLabel(st.time_slot_id)} drop zone`}
 					ondragover={(e) => handleDragOver(e, st.id)}
 					ondragleave={(e) => handleDragLeave(e)}
 					ondrop={(e) => handleDrop(e, st.id)}
@@ -1222,7 +1322,7 @@
 								>
 									<ChevronDownIcon class="size-4 transition-transform {isExpanded ? '' : '-rotate-90'}" />
 									<h3 class="font-medium">
-										{timeSlotMap.get(st.time_slot_id) ?? "Unknown Time Slot"}
+										{timeSlotLabel(st.time_slot_id)}
 									</h3>
 									{#if !isExpanded && activities.length > 0}
 										<span class="text-muted-foreground text-sm">
@@ -1286,7 +1386,7 @@
 									{#each activities as activity (activity.id)}
 										<Table.TableRow>
 											<Table.TableCell>
-												{activityMap.get(activity.activity_id) ?? "Unknown"}
+												{activityLabel(activity.activity_id)}
 											</Table.TableCell>
 											<Table.TableCell>{activity.capacity}</Table.TableCell>
 											<Table.TableCell>{activity.required_counselors}</Table.TableCell>
@@ -1461,7 +1561,7 @@
 			<AlertDialog.AlertDialogTitle>Remove Time Slot</AlertDialog.AlertDialogTitle>
 			<AlertDialog.AlertDialogDescription>
 				Are you sure you want to remove
-				"{removeTimeSlotTarget ? timeSlotMap.get(removeTimeSlotTarget.time_slot_id) ?? 'this time slot' : ''}"
+				"{removeTimeSlotTarget ? timeSlotLabel(removeTimeSlotTarget.time_slot_id) : ''}"
 				from this session? All activity assignments within it will also be removed.
 			</AlertDialog.AlertDialogDescription>
 		</AlertDialog.AlertDialogHeader>
@@ -1577,7 +1677,7 @@
 			<Dialog.DialogTitle>Edit Activity</Dialog.DialogTitle>
 			<Dialog.DialogDescription>
 				Update capacity and staffing requirements for
-				{editActivityTarget ? activityMap.get(editActivityTarget.activity.activity_id) ?? "this activity" : "this activity"}.
+				{editActivityTarget ? activityLabel(editActivityTarget.activity.activity_id) : "this activity"}.
 			</Dialog.DialogDescription>
 		</Dialog.DialogHeader>
 		<form onsubmit={handleEditActivity} class="grid gap-4">
@@ -1715,7 +1815,7 @@
 			<AlertDialog.AlertDialogTitle>Remove Activity</AlertDialog.AlertDialogTitle>
 			<AlertDialog.AlertDialogDescription>
 				Are you sure you want to remove
-				"{removeActivityTarget ? activityMap.get(removeActivityTarget.activity.activity_id) ?? 'this activity' : ''}"
+				"{removeActivityTarget ? activityLabel(removeActivityTarget.activity.activity_id) : ''}"
 				from this time slot?
 			</AlertDialog.AlertDialogDescription>
 		</AlertDialog.AlertDialogHeader>
@@ -1857,7 +1957,7 @@
 			<Dialog.DialogTitle>Edit Cabin</Dialog.DialogTitle>
 			<Dialog.DialogDescription>
 				Update group size and required counselors for
-				{editCabinTarget ? cabinMap.get(editCabinTarget.cabin_id)?.name ?? "this cabin" : "this cabin"}.
+				{editCabinTarget ? cabinLabel(editCabinTarget.cabin_id) : "this cabin"}.
 			</Dialog.DialogDescription>
 		</Dialog.DialogHeader>
 		<form onsubmit={handleEditCabin} class="grid gap-4">
@@ -1918,7 +2018,7 @@
 			<AlertDialog.AlertDialogTitle>Remove Cabin</AlertDialog.AlertDialogTitle>
 			<AlertDialog.AlertDialogDescription>
 				Are you sure you want to remove
-				"{removeCabinTarget ? cabinMap.get(removeCabinTarget.cabin_id)?.name ?? 'this cabin' : ''}"
+				"{removeCabinTarget ? cabinLabel(removeCabinTarget.cabin_id) : ''}"
 				from this age group?
 			</AlertDialog.AlertDialogDescription>
 		</AlertDialog.AlertDialogHeader>

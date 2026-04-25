@@ -329,6 +329,7 @@ export interface Camper {
 	last_name: string;
 	name: string;
 	gender: Gender;
+	archived: boolean;
 }
 
 export interface CreateCamperRequest {

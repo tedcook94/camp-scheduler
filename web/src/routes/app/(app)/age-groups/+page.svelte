@@ -11,4 +11,7 @@
 	createFn={ageGroupApi.create}
 	updateFn={ageGroupApi.update}
 	deleteFn={ageGroupApi.delete}
+	archiveFn={ageGroupApi.archive}
+	unarchiveFn={ageGroupApi.unarchive}
+	listArchivedFn={ageGroupApi.listArchived}
 />

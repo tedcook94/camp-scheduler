@@ -17,9 +17,12 @@
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import TrashIcon from "@lucide/svelte/icons/trash";
+	import ArchiveIcon from "@lucide/svelte/icons/archive";
+	import ArchiveRestoreIcon from "@lucide/svelte/icons/archive-restore";
 	import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
 	import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 	import SortableTableHead from "$lib/components/sortable-table-head.svelte";
+	import ArchivedSection from "$lib/components/archived-section.svelte";
 	import { sortItems, type SortDirection } from "$lib/utils";
 
 	const getCampDisabled = getContext<() => boolean>("campDisabled");
@@ -86,6 +89,34 @@
 	let deleteOpen = $state(false);
 	let deleteTarget = $state<Counselor | null>(null);
 	let deleting = $state(false);
+
+	let archivingId = $state<string | null>(null);
+	let archivedSection = $state<ArchivedSection<Counselor> | null>(null);
+
+	async function handleArchive(counselor: Counselor) {
+		archivingId = counselor.id;
+		try {
+			await counselorApi.archive(counselor.id);
+			counselors = counselors.filter((c) => c.id !== counselor.id);
+			archivedSection?.addArchived({ ...counselor, archived: true });
+			toast.success("Counselor archived");
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to archive counselor";
+			toast.error(message);
+		} finally {
+			archivingId = null;
+		}
+	}
+
+	async function handleUnarchive(id: string) {
+		await counselorApi.unarchive(id);
+		try {
+			counselors = await counselorApi.list();
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to refresh counselor list";
+			toast.error(message);
+		}
+	}
 
 	onMount(async () => {
 		try {
@@ -194,8 +225,23 @@
 			deleteOpen = false;
 			deleteTarget = null;
 		} catch (err) {
-			const message = err instanceof ApiClientError ? err.message : "Failed to delete counselor";
-			toast.error(message);
+			if (err instanceof ApiClientError && err.status === 409) {
+				const target = deleteTarget;
+				deleteOpen = false;
+				deleteTarget = null;
+				toast.message("Counselor has dependent records and cannot be deleted.", {
+					description: "Archive it instead?",
+					action: {
+						label: "Archive",
+						onClick: () => {
+							if (target) handleArchive(target);
+						},
+					},
+				});
+			} else {
+				const message = err instanceof ApiClientError ? err.message : "Failed to delete counselor";
+				toast.error(message);
+			}
 		} finally {
 			deleting = false;
 		}
@@ -269,6 +315,20 @@
 								<Button
 									variant="ghost"
 									size="icon-sm"
+									title="Archive"
+									disabled={disabled || archivingId === counselor.id}
+									onclick={(e: MouseEvent) => { e.stopPropagation(); handleArchive(counselor); }}
+								>
+									{#if archivingId === counselor.id}
+										<LoaderCircleIcon class="size-4 animate-spin" />
+									{:else}
+										<ArchiveIcon class="size-4" />
+									{/if}
+									<span class="sr-only">Archive</span>
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon-sm"
 									disabled={disabled}
 									title="Delete"
 									onclick={(e: MouseEvent) => { e.stopPropagation(); confirmDelete(counselor); }}
@@ -290,6 +350,35 @@
 				{/each}
 			</Table.TableBody>
 		</Table.Table>
+	{/if}
+
+	{#if camp}
+		<ArchivedSection
+			bind:this={archivedSection}
+			resourceName="Counselor"
+			listArchivedFn={counselorApi.listArchived}
+			unarchiveFn={handleUnarchive}
+		>
+			{#snippet row({ item, unarchive, busy })}
+				<div class="flex items-center justify-between border-b py-2 last:border-b-0">
+					<span class="text-sm">{item.name}</span>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						title="Restore"
+						disabled={disabled || busy}
+						onclick={unarchive}
+					>
+						{#if busy}
+							<LoaderCircleIcon class="size-4 animate-spin" />
+						{:else}
+							<ArchiveRestoreIcon class="size-4" />
+						{/if}
+						<span class="sr-only">Restore</span>
+					</Button>
+				</div>
+			{/snippet}
+		</ArchivedSection>
 	{/if}
 </div>
 
@@ -360,9 +449,6 @@
 					<p class="text-destructive text-sm">{genderError}</p>
 				{/if}
 			</div>
-			{#if editingCounselor}
-				<!-- Archive controls will be added back as a dedicated section in a later commit. -->
-			{/if}
 			<Dialog.DialogFooter>
 				<Button type="button" variant="outline" disabled={submitting} onclick={() => (dialogOpen = false)}>
 					Cancel

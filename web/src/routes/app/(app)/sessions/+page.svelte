@@ -17,10 +17,13 @@
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import CopyIcon from "@lucide/svelte/icons/copy";
 	import TrashIcon from "@lucide/svelte/icons/trash";
+	import ArchiveIcon from "@lucide/svelte/icons/archive";
+	import ArchiveRestoreIcon from "@lucide/svelte/icons/archive-restore";
 	import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
 	import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 	import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
+	import ArchivedSection from "$lib/components/archived-section.svelte";
 
 	const getCampDisabled = getContext<() => boolean>("campDisabled");
 	const getCamp = getContext<() => Camp | null>("camp");
@@ -73,6 +76,12 @@
 	let seasonMap = $derived(new Map(seasons.map((s) => [s.id, s.name])));
 	let sessionMap = $derived(new Map(sessions.map((s) => [s.id, s.name])));
 
+	// Archived sessions are loaded lazily so previous_session selectors can
+	// preserve and label references to sessions that have since been archived.
+	let archivedSessions = $state<Session[]>([]);
+	let archivedSessionsLoaded = $state(false);
+	let archivedSessionMap = $derived(new Map(archivedSessions.map((s) => [s.id, s.name])));
+
 	// Group sessions by season; newest seasons first; sessions sorted by name asc.
 	let sortedSeasons = $derived(
 		[...seasons].sort((a, b) => b.start_date.localeCompare(a.start_date))
@@ -122,6 +131,21 @@
 			sessions = sessionList;
 			seasons = seasonList;
 			expandedSeasons = new Set(seasonList.map((s) => s.id));
+
+			// If any session references a previous session that is not in the
+			// active list, hydrate archived sessions so labels resolve.
+			const activeIds = new Set(sessionList.map((s) => s.id));
+			const referencesArchived = sessionList.some(
+				(s) => s.previous_session_id && !activeIds.has(s.previous_session_id),
+			);
+			if (referencesArchived) {
+				try {
+					archivedSessions = await sessionApi.listArchived();
+					archivedSessionsLoaded = true;
+				} catch {
+					// non-fatal; previous-session column will read "Unknown"
+				}
+			}
 		} catch (err) {
 			const message = err instanceof ApiClientError ? err.message : "Failed to load sessions";
 			toast.error(message);
@@ -152,6 +176,23 @@
 		formPreviousSessionId = session.previous_session_id;
 		clearErrors();
 		dialogOpen = true;
+		if (session.previous_session_id) {
+			void ensureArchivedPreviousLoaded(session.previous_session_id);
+		}
+	}
+
+	async function ensureArchivedPreviousLoaded(id: string) {
+		if (sessions.some((s) => s.id === id)) return;
+		if (archivedSessions.some((s) => s.id === id)) return;
+		if (archivedSessionsLoaded) return;
+		try {
+			archivedSessions = await sessionApi.listArchived();
+			archivedSessionsLoaded = true;
+		} catch (err) {
+			const message =
+				err instanceof ApiClientError ? err.message : "Failed to load archived sessions";
+			toast.error(message);
+		}
 	}
 
 	async function handleSubmit(e: SubmitEvent) {
@@ -203,6 +244,40 @@
 		deleteOpen = true;
 	}
 
+	let archivingId = $state<string | null>(null);
+	let archivedSection = $state<ArchivedSection<Session> | null>(null);
+
+	async function handleArchive(session: Session) {
+		archivingId = session.id;
+		try {
+			await sessionApi.archive(session.id);
+			sessions = sessions.filter((s) => s.id !== session.id);
+			archivedSection?.addArchived({ ...session, archived: true });
+			// Keep `archivedSessions` (and the derived `archivedSessionMap`) in
+			// sync so any remaining session whose `previous_session_id` points
+			// at the just-archived session still renders its label correctly.
+			if (!archivedSessions.some((s) => s.id === session.id)) {
+				archivedSessions = [...archivedSessions, { ...session, archived: true }];
+			}
+			toast.success("Session archived");
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to archive session";
+			toast.error(message);
+		} finally {
+			archivingId = null;
+		}
+	}
+
+	async function handleUnarchive(id: string) {
+		await sessionApi.unarchive(id);
+		try {
+			sessions = await sessionApi.list();
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : "Failed to refresh session list";
+			toast.error(message);
+		}
+	}
+
 	async function handleDelete() {
 		if (!deleteTarget) return;
 		deleting = true;
@@ -214,8 +289,23 @@
 			deleteOpen = false;
 			deleteTarget = null;
 		} catch (err) {
-			const message = err instanceof ApiClientError ? err.message : "Failed to delete session";
-			toast.error(message);
+			if (err instanceof ApiClientError && err.status === 409) {
+				const target = deleteTarget;
+				deleteOpen = false;
+				deleteTarget = null;
+				toast.message("Session has dependent records and cannot be deleted.", {
+					description: "Archive it instead?",
+					action: {
+						label: "Archive",
+						onClick: () => {
+							if (target) handleArchive(target);
+						},
+					},
+				});
+			} else {
+				const message = err instanceof ApiClientError ? err.message : "Failed to delete session";
+				toast.error(message);
+			}
 		} finally {
 			deleting = false;
 		}
@@ -355,7 +445,12 @@
 											<Table.TableCell>{session.name}</Table.TableCell>
 											<Table.TableCell>
 												{#if session.previous_session_id}
-													{sessionMap.get(session.previous_session_id) ?? "Unknown"}
+													{@const prevName = sessionMap.get(session.previous_session_id) ?? archivedSessionMap.get(session.previous_session_id)}
+													{#if prevName}
+														{prevName}{#if archivedSessionMap.has(session.previous_session_id)}<span class="text-muted-foreground"> (archived)</span>{/if}
+													{:else}
+														Unknown
+													{/if}
 												{:else}
 													<span class="text-muted-foreground">—</span>
 												{/if}
@@ -381,6 +476,20 @@
 													>
 														<CopyIcon class="size-4" />
 														<span class="sr-only">Copy</span>
+													</Button>
+													<Button
+														variant="ghost"
+														size="icon-sm"
+														title="Archive"
+														disabled={disabled || archivingId === session.id}
+														onclick={(e: MouseEvent) => { e.stopPropagation(); handleArchive(session); }}
+													>
+														{#if archivingId === session.id}
+															<LoaderCircleIcon class="size-4 animate-spin" />
+														{:else}
+															<ArchiveIcon class="size-4" />
+														{/if}
+														<span class="sr-only">Archive</span>
 													</Button>
 													<Button
 														variant="ghost"
@@ -411,6 +520,35 @@
 				{/if}
 			{/each}
 		</div>
+	{/if}
+
+	{#if camp}
+		<ArchivedSection
+			bind:this={archivedSection}
+			resourceName="Session"
+			listArchivedFn={sessionApi.listArchived}
+			unarchiveFn={handleUnarchive}
+		>
+			{#snippet row({ item, unarchive, busy })}
+				<div class="flex items-center justify-between border-b py-2 last:border-b-0">
+					<span class="text-sm">{item.name}</span>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						title="Restore"
+						disabled={disabled || busy}
+						onclick={unarchive}
+					>
+						{#if busy}
+							<LoaderCircleIcon class="size-4 animate-spin" />
+						{:else}
+							<ArchiveRestoreIcon class="size-4" />
+						{/if}
+						<span class="sr-only">Restore</span>
+					</Button>
+				</div>
+			{/snippet}
+		</ArchivedSection>
 	{/if}
 </div>
 
@@ -477,7 +615,12 @@
 				>
 					<Select.SelectTrigger id="session-previous" class="w-full">
 						{#if formPreviousSessionId}
-							{sessionMap.get(formPreviousSessionId!) ?? "Select session"}
+							{@const name = sessionMap.get(formPreviousSessionId!) ?? archivedSessionMap.get(formPreviousSessionId!)}
+							{#if name}
+								{name}{#if archivedSessionMap.has(formPreviousSessionId!)}<span class="text-muted-foreground"> (archived)</span>{/if}
+							{:else}
+								Select session
+							{/if}
 						{:else}
 							<span class="text-muted-foreground">None</span>
 						{/if}
@@ -486,6 +629,9 @@
 						<Select.SelectItem value="">None</Select.SelectItem>
 						{#each previousSessionOptions as s (s.id)}
 							<Select.SelectItem value={s.id}>{s.name}</Select.SelectItem>
+						{/each}
+						{#each archivedSessions.filter((s) => s.id === formPreviousSessionId) as s (s.id)}
+							<Select.SelectItem value={s.id} disabled>{s.name} (archived)</Select.SelectItem>
 						{/each}
 					</Select.SelectContent>
 				</Select.Select>

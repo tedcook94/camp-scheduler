@@ -11,4 +11,7 @@
 	createFn={timeSlotApi.create}
 	updateFn={timeSlotApi.update}
 	deleteFn={timeSlotApi.delete}
+	archiveFn={timeSlotApi.archive}
+	unarchiveFn={timeSlotApi.unarchive}
+	listArchivedFn={timeSlotApi.listArchived}
 />

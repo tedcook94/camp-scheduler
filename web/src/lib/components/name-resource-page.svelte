@@ -9,10 +9,13 @@
 	import * as AlertDialog from "$lib/components/ui/alert-dialog";
 	import { sortItems, type SortDirection } from "$lib/utils";
 	import SortableTableHead from "$lib/components/sortable-table-head.svelte";
+	import ArchivedSection from "$lib/components/archived-section.svelte";
 	import type { Camp } from "$lib/api/types";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import TrashIcon from "@lucide/svelte/icons/trash";
+	import ArchiveIcon from "@lucide/svelte/icons/archive";
+	import ArchiveRestoreIcon from "@lucide/svelte/icons/archive-restore";
 	import CheckIcon from "@lucide/svelte/icons/check";
 	import XIcon from "@lucide/svelte/icons/x";
 	import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
@@ -20,19 +23,36 @@
 	interface NameResource {
 		id: string;
 		name: string;
+		archived?: boolean;
 	}
 
 	interface Props {
 		title: string;
 		description: string;
 		resourceName: string;
+		resourceNamePlural?: string;
 		listFn: () => Promise<NameResource[]>;
 		createFn: (name: string) => Promise<NameResource>;
 		updateFn: (id: string, name: string) => Promise<NameResource>;
 		deleteFn: (id: string) => Promise<void>;
+		archiveFn?: (id: string) => Promise<void>;
+		unarchiveFn?: (id: string) => Promise<void>;
+		listArchivedFn?: () => Promise<NameResource[]>;
 	}
 
-	let { title, description, resourceName, listFn, createFn, updateFn, deleteFn }: Props = $props();
+	let {
+		title,
+		description,
+		resourceName,
+		resourceNamePlural,
+		listFn,
+		createFn,
+		updateFn,
+		deleteFn,
+		archiveFn,
+		unarchiveFn,
+		listArchivedFn,
+	}: Props = $props();
 
 	const getCampDisabled = getContext<() => boolean>("campDisabled");
 	const getCamp = getContext<() => Camp | null>("camp");
@@ -71,6 +91,37 @@
 	let deleteOpen = $state(false);
 	let deleteTarget = $state<NameResource | null>(null);
 	let deleting = $state(false);
+
+	let archivingId = $state<string | null>(null);
+	let archivedSection = $state<ArchivedSection<NameResource> | null>(null);
+
+	async function handleArchive(item: NameResource) {
+		if (!archiveFn) return;
+		archivingId = item.id;
+		try {
+			await archiveFn(item.id);
+			items = items.filter((i) => i.id !== item.id);
+			archivedSection?.addArchived({ ...item, archived: true });
+			toast.success(`${resourceName} archived`);
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : `Failed to archive ${resourceName}`;
+			toast.error(message);
+		} finally {
+			archivingId = null;
+		}
+	}
+
+	async function handleUnarchive(id: string) {
+		if (!unarchiveFn) return;
+		await unarchiveFn(id);
+		// Refetch the active list so the restored item reappears.
+		try {
+			items = await listFn();
+		} catch (err) {
+			const message = err instanceof ApiClientError ? err.message : `Failed to refresh ${resourceName.toLowerCase()} list`;
+			toast.error(message);
+		}
+	}
 
 	onMount(async () => {
 		try {
@@ -149,8 +200,23 @@
 			deleteOpen = false;
 			deleteTarget = null;
 		} catch (err) {
-			const message = err instanceof ApiClientError ? err.message : `Failed to delete ${resourceName}`;
-			toast.error(message);
+			if (err instanceof ApiClientError && err.status === 409 && archiveFn) {
+				const target = deleteTarget;
+				deleteOpen = false;
+				deleteTarget = null;
+				toast.message(`${resourceName} has dependent records and cannot be deleted.`, {
+					description: "Archive it instead?",
+					action: {
+						label: "Archive",
+						onClick: () => {
+							if (target) handleArchive(target);
+						},
+					},
+				});
+			} else {
+				const message = err instanceof ApiClientError ? err.message : `Failed to delete ${resourceName}`;
+				toast.error(message);
+			}
 		} finally {
 			deleting = false;
 		}
@@ -253,6 +319,22 @@
 										<PencilIcon class="size-4" />
 										<span class="sr-only">Edit</span>
 									</Button>
+									{#if archiveFn}
+										<Button
+											variant="ghost"
+											size="icon-sm"
+											title="Archive"
+											disabled={disabled || editingId !== null || archivingId === item.id}
+											onclick={() => handleArchive(item)}
+										>
+											{#if archivingId === item.id}
+												<LoaderCircleIcon class="size-4 animate-spin" />
+											{:else}
+												<ArchiveIcon class="size-4" />
+											{/if}
+											<span class="sr-only">Archive</span>
+										</Button>
+									{/if}
 									<Button
 										variant="ghost"
 										size="icon-sm"
@@ -270,6 +352,36 @@
 				{/each}
 			</Table.TableBody>
 		</Table.Table>
+	{/if}
+
+	{#if camp && listArchivedFn && unarchiveFn}
+		<ArchivedSection
+			bind:this={archivedSection}
+			{resourceName}
+			{resourceNamePlural}
+			listArchivedFn={listArchivedFn}
+			unarchiveFn={handleUnarchive}
+		>
+			{#snippet row({ item, unarchive, busy })}
+				<div class="flex items-center justify-between border-b py-2 last:border-b-0">
+					<span class="text-sm">{item.name}</span>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						title="Restore"
+						disabled={disabled || busy}
+						onclick={unarchive}
+					>
+						{#if busy}
+							<LoaderCircleIcon class="size-4 animate-spin" />
+						{:else}
+							<ArchiveRestoreIcon class="size-4" />
+						{/if}
+						<span class="sr-only">Restore</span>
+					</Button>
+				</div>
+			{/snippet}
+		</ArchivedSection>
 	{/if}
 </div>
 

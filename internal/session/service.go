@@ -7,6 +7,7 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+	"camp-scheduler/internal/staleness"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -18,10 +19,11 @@ var ErrNotFound = errors.New("session not found")
 type Service struct {
 	queries *db.Queries
 	pool    *pgxpool.Pool
+	marker  *staleness.Marker
 }
 
-func NewService(queries *db.Queries, pool *pgxpool.Pool) *Service {
-	return &Service{queries: queries, pool: pool}
+func NewService(queries *db.Queries, pool *pgxpool.Pool, marker *staleness.Marker) *Service {
+	return &Service{queries: queries, pool: pool, marker: marker}
 }
 
 func (svc *Service) List(ctx context.Context, campID string) ([]SessionResponse, error) {
@@ -173,7 +175,14 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateSes
 		}
 	}
 
-	session, err := svc.queries.UpdateSession(ctx, db.UpdateSessionParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return SessionResponse{}, fmt.Errorf("error beginning update session transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	session, err := qtx.UpdateSession(ctx, db.UpdateSessionParams{
 		ID:              uid,
 		CampID:          campUUID,
 		SeasonID:        seasonUUID,
@@ -185,6 +194,14 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateSes
 			return SessionResponse{}, ErrNotFound
 		}
 		return SessionResponse{}, fmt.Errorf("error updating session %s: %w", id, err)
+	}
+
+	if err := svc.marker.MarkSessions(ctx, qtx, campUUID, []pgtype.UUID{uid}, staleness.AllRunTypes); err != nil {
+		return SessionResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return SessionResponse{}, fmt.Errorf("error committing update session transaction: %w", err)
 	}
 
 	return toSessionResponse(session), nil
@@ -201,7 +218,20 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 		return err
 	}
 
-	rows, err := svc.queries.DeleteSession(ctx, db.DeleteSessionParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning delete session transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	// Mark stale inside the tx before delete so the cascade lookup still
+	// sees this session as a previous_session for any dependents.
+	if err := svc.marker.MarkSessions(ctx, qtx, campUUID, []pgtype.UUID{uid}, staleness.AllRunTypes); err != nil {
+		return err
+	}
+
+	rows, err := qtx.DeleteSession(ctx, db.DeleteSessionParams{
 		ID:     uid,
 		CampID: campUUID,
 	})
@@ -210,6 +240,10 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 	}
 	if rows == 0 {
 		return ErrNotFound
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing delete session transaction: %w", err)
 	}
 
 	return nil

@@ -8,16 +8,22 @@ import (
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/counselor"
 	"camp-scheduler/internal/db"
+	"camp-scheduler/internal/staleness"
+
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var ErrSessionCounselorNotFound = errors.New("session counselor not found")
 
 type CounselorService struct {
 	queries *db.Queries
+	pool    *pgxpool.Pool
+	marker  *staleness.Marker
 }
 
-func NewCounselorService(queries *db.Queries) *CounselorService {
-	return &CounselorService{queries: queries}
+func NewCounselorService(queries *db.Queries, pool *pgxpool.Pool, marker *staleness.Marker) *CounselorService {
+	return &CounselorService{queries: queries, pool: pool, marker: marker}
 }
 
 type SessionCounselorResponse struct {
@@ -90,17 +96,24 @@ func (svc *CounselorService) Add(ctx context.Context, campID, sessionID string, 
 		return SessionCounselorResponse{}, err
 	}
 
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return SessionCounselorResponse{}, fmt.Errorf("error beginning add session counselor transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
 	// Verify the session belongs to this camp before attempting to insert,
 	// so we surface a clean error instead of an FK violation when the session
 	// id is bogus.
-	if _, err := svc.queries.GetSession(ctx, db.GetSessionParams{ID: sessionUUID, CampID: campUUID}); err != nil {
+	if _, err := qtx.GetSession(ctx, db.GetSessionParams{ID: sessionUUID, CampID: campUUID}); err != nil {
 		return SessionCounselorResponse{}, fmt.Errorf("error validating session %s: %w", sessionID, err)
 	}
 
 	// Load the counselor first so we can validate eligibility (must belong to
 	// the camp and be enabled) and so we have the details needed to build the
 	// response without a second round-trip after the insert.
-	c, err := svc.queries.GetCounselor(ctx, db.GetCounselorParams{ID: counselorUUID, CampID: campUUID})
+	c, err := qtx.GetCounselor(ctx, db.GetCounselorParams{ID: counselorUUID, CampID: campUUID})
 	if err != nil {
 		return SessionCounselorResponse{}, fmt.Errorf("error loading counselor %s: %w", req.CounselorID, err)
 	}
@@ -108,13 +121,21 @@ func (svc *CounselorService) Add(ctx context.Context, campID, sessionID string, 
 		return SessionCounselorResponse{}, api.BadInput("counselor is disabled and cannot be added to a session")
 	}
 
-	row, err := svc.queries.AddSessionCounselor(ctx, db.AddSessionCounselorParams{
+	row, err := qtx.AddSessionCounselor(ctx, db.AddSessionCounselorParams{
 		CampID:      campUUID,
 		SessionID:   sessionUUID,
 		CounselorID: counselorUUID,
 	})
 	if err != nil {
 		return SessionCounselorResponse{}, fmt.Errorf("error adding session counselor: %w", err)
+	}
+
+	if err := svc.marker.MarkSessions(ctx, qtx, campUUID, []pgtype.UUID{sessionUUID}, staleness.AllRunTypes); err != nil {
+		return SessionCounselorResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return SessionCounselorResponse{}, fmt.Errorf("error committing add session counselor transaction: %w", err)
 	}
 
 	return SessionCounselorResponse{
@@ -147,7 +168,14 @@ func (svc *CounselorService) Remove(ctx context.Context, campID, sessionID, coun
 		return err
 	}
 
-	rows, err := svc.queries.RemoveSessionCounselor(ctx, db.RemoveSessionCounselorParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning remove session counselor transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	rows, err := qtx.RemoveSessionCounselor(ctx, db.RemoveSessionCounselorParams{
 		SessionID:   sessionUUID,
 		CampID:      campUUID,
 		CounselorID: counselorUUID,
@@ -157,6 +185,14 @@ func (svc *CounselorService) Remove(ctx context.Context, campID, sessionID, coun
 	}
 	if rows == 0 {
 		return ErrSessionCounselorNotFound
+	}
+
+	if err := svc.marker.MarkSessions(ctx, qtx, campUUID, []pgtype.UUID{sessionUUID}, staleness.AllRunTypes); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing remove session counselor transaction: %w", err)
 	}
 	return nil
 }

@@ -7,16 +7,21 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+	"camp-scheduler/internal/staleness"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var ErrCounselorCertificationNotFound = errors.New("counselor certification not found")
 
 type CounselorCertificationService struct {
 	queries *db.Queries
+	pool    *pgxpool.Pool
+	marker  *staleness.Marker
 }
 
-func NewCounselorCertificationService(queries *db.Queries) *CounselorCertificationService {
-	return &CounselorCertificationService{queries: queries}
+func NewCounselorCertificationService(queries *db.Queries, pool *pgxpool.Pool, marker *staleness.Marker) *CounselorCertificationService {
+	return &CounselorCertificationService{queries: queries, pool: pool, marker: marker}
 }
 
 func (svc *CounselorCertificationService) List(ctx context.Context, campID, counselorID string) ([]CounselorCertificationResponse, error) {
@@ -67,13 +72,28 @@ func (svc *CounselorCertificationService) Add(ctx context.Context, campID, couns
 		return CounselorCertificationResponse{}, err
 	}
 
-	cc, err := svc.queries.CreateCounselorCertification(ctx, db.CreateCounselorCertificationParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return CounselorCertificationResponse{}, fmt.Errorf("error beginning add counselor certification transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	cc, err := qtx.CreateCounselorCertification(ctx, db.CreateCounselorCertificationParams{
 		CampID:          campUUID,
 		CounselorID:     counselorUUID,
 		CertificationID: certUUID,
 	})
 	if err != nil {
 		return CounselorCertificationResponse{}, fmt.Errorf("error adding counselor certification: %w", err)
+	}
+
+	if err := svc.marker.MarkSessionsForCounselor(ctx, qtx, campUUID, counselorUUID, []staleness.RunType{staleness.RunTypeActivity}); err != nil {
+		return CounselorCertificationResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return CounselorCertificationResponse{}, fmt.Errorf("error committing add counselor certification transaction: %w", err)
 	}
 
 	return CounselorCertificationResponse{
@@ -100,7 +120,14 @@ func (svc *CounselorCertificationService) Remove(ctx context.Context, campID, co
 		return err
 	}
 
-	rows, err := svc.queries.DeleteCounselorCertification(ctx, db.DeleteCounselorCertificationParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning remove counselor certification transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	rows, err := qtx.DeleteCounselorCertification(ctx, db.DeleteCounselorCertificationParams{
 		ID:          uid,
 		CampID:      campUUID,
 		CounselorID: counselorUUID,
@@ -110,6 +137,14 @@ func (svc *CounselorCertificationService) Remove(ctx context.Context, campID, co
 	}
 	if rows == 0 {
 		return ErrCounselorCertificationNotFound
+	}
+
+	if err := svc.marker.MarkSessionsForCounselor(ctx, qtx, campUUID, counselorUUID, []staleness.RunType{staleness.RunTypeActivity}); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing remove counselor certification transaction: %w", err)
 	}
 
 	return nil

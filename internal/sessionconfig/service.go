@@ -7,6 +7,10 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+	"camp-scheduler/internal/staleness"
+
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var (
@@ -16,10 +20,16 @@ var (
 
 type Service struct {
 	queries *db.Queries
+	pool    *pgxpool.Pool
+	marker  *staleness.Marker
 }
 
-func NewService(queries *db.Queries) *Service {
-	return &Service{queries: queries}
+func NewService(queries *db.Queries, pool *pgxpool.Pool, marker *staleness.Marker) *Service {
+	return &Service{queries: queries, pool: pool, marker: marker}
+}
+
+func (svc *Service) markCabinStale(ctx context.Context, q *db.Queries, campID, sessionID pgtype.UUID) error {
+	return svc.marker.MarkSessions(ctx, q, campID, []pgtype.UUID{sessionID}, []staleness.RunType{staleness.RunTypeCabin})
 }
 
 // Session age group operations
@@ -94,13 +104,28 @@ func (svc *Service) CreateAgeGroup(ctx context.Context, campID, sessionID string
 		return SessionAgeGroupResponse{}, err
 	}
 
-	row, err := svc.queries.CreateSessionAgeGroup(ctx, db.CreateSessionAgeGroupParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return SessionAgeGroupResponse{}, fmt.Errorf("error beginning create session age group transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	row, err := qtx.CreateSessionAgeGroup(ctx, db.CreateSessionAgeGroupParams{
 		CampID:     campUUID,
 		SessionID:  sessionUUID,
 		AgeGroupID: ageGroupUUID,
 	})
 	if err != nil {
 		return SessionAgeGroupResponse{}, fmt.Errorf("error creating session age group: %w", err)
+	}
+
+	if err := svc.markCabinStale(ctx, qtx, campUUID, sessionUUID); err != nil {
+		return SessionAgeGroupResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return SessionAgeGroupResponse{}, fmt.Errorf("error committing create session age group transaction: %w", err)
 	}
 
 	return toSessionAgeGroupResponse(row), nil
@@ -127,7 +152,14 @@ func (svc *Service) UpdateAgeGroup(ctx context.Context, campID, sessionID, id st
 		return SessionAgeGroupResponse{}, err
 	}
 
-	row, err := svc.queries.UpdateSessionAgeGroup(ctx, db.UpdateSessionAgeGroupParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return SessionAgeGroupResponse{}, fmt.Errorf("error beginning update session age group transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	row, err := qtx.UpdateSessionAgeGroup(ctx, db.UpdateSessionAgeGroupParams{
 		ID:         uid,
 		CampID:     campUUID,
 		SessionID:  sessionUUID,
@@ -135,6 +167,14 @@ func (svc *Service) UpdateAgeGroup(ctx context.Context, campID, sessionID, id st
 	})
 	if err != nil {
 		return SessionAgeGroupResponse{}, fmt.Errorf("error updating session age group %s: %w", id, err)
+	}
+
+	if err := svc.markCabinStale(ctx, qtx, campUUID, sessionUUID); err != nil {
+		return SessionAgeGroupResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return SessionAgeGroupResponse{}, fmt.Errorf("error committing update session age group transaction: %w", err)
 	}
 
 	return toSessionAgeGroupResponse(row), nil
@@ -156,7 +196,14 @@ func (svc *Service) DeleteAgeGroup(ctx context.Context, campID, sessionID, id st
 		return err
 	}
 
-	rows, err := svc.queries.DeleteSessionAgeGroup(ctx, db.DeleteSessionAgeGroupParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning delete session age group transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	rows, err := qtx.DeleteSessionAgeGroup(ctx, db.DeleteSessionAgeGroupParams{
 		ID:        uid,
 		CampID:    campUUID,
 		SessionID: sessionUUID,
@@ -166,6 +213,14 @@ func (svc *Service) DeleteAgeGroup(ctx context.Context, campID, sessionID, id st
 	}
 	if rows == 0 {
 		return ErrAgeGroupNotFound
+	}
+
+	if err := svc.markCabinStale(ctx, qtx, campUUID, sessionUUID); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing delete session age group transaction: %w", err)
 	}
 
 	return nil
@@ -243,9 +298,16 @@ func (svc *Service) CreateCabin(ctx context.Context, campID, sessionID string, r
 		return SessionCabinResponse{}, err
 	}
 
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return SessionCabinResponse{}, fmt.Errorf("error beginning create session cabin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
 	// Verify the session age group belongs to this session.
 	// The composite FK enforces camp-scoping, but not session-scoping.
-	_, err = svc.queries.GetSessionAgeGroup(ctx, db.GetSessionAgeGroupParams{
+	_, err = qtx.GetSessionAgeGroup(ctx, db.GetSessionAgeGroupParams{
 		ID:        sessionAgeGroupUUID,
 		CampID:    campUUID,
 		SessionID: sessionUUID,
@@ -259,7 +321,7 @@ func (svc *Service) CreateCabin(ctx context.Context, campID, sessionID string, r
 		return SessionCabinResponse{}, err
 	}
 
-	row, err := svc.queries.CreateSessionAgeGroupCabin(ctx, db.CreateSessionAgeGroupCabinParams{
+	row, err := qtx.CreateSessionAgeGroupCabin(ctx, db.CreateSessionAgeGroupCabinParams{
 		CampID:             campUUID,
 		SessionAgeGroupID:  sessionAgeGroupUUID,
 		CabinID:            cabinUUID,
@@ -268,6 +330,14 @@ func (svc *Service) CreateCabin(ctx context.Context, campID, sessionID string, r
 	})
 	if err != nil {
 		return SessionCabinResponse{}, fmt.Errorf("error creating session cabin: %w", err)
+	}
+
+	if err := svc.markCabinStale(ctx, qtx, campUUID, sessionUUID); err != nil {
+		return SessionCabinResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return SessionCabinResponse{}, fmt.Errorf("error committing create session cabin transaction: %w", err)
 	}
 
 	return toSessionCabinResponse(row, sessionID), nil
@@ -294,7 +364,14 @@ func (svc *Service) UpdateCabin(ctx context.Context, campID, sessionID, id strin
 		return SessionCabinResponse{}, err
 	}
 
-	row, err := svc.queries.UpdateSessionAgeGroupCabin(ctx, db.UpdateSessionAgeGroupCabinParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return SessionCabinResponse{}, fmt.Errorf("error beginning update session cabin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	row, err := qtx.UpdateSessionAgeGroupCabin(ctx, db.UpdateSessionAgeGroupCabinParams{
 		ID:                 uid,
 		CampID:             campUUID,
 		SessionID:          sessionUUID,
@@ -304,6 +381,14 @@ func (svc *Service) UpdateCabin(ctx context.Context, campID, sessionID, id strin
 	})
 	if err != nil {
 		return SessionCabinResponse{}, fmt.Errorf("error updating session cabin %s: %w", id, err)
+	}
+
+	if err := svc.markCabinStale(ctx, qtx, campUUID, sessionUUID); err != nil {
+		return SessionCabinResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return SessionCabinResponse{}, fmt.Errorf("error committing update session cabin transaction: %w", err)
 	}
 
 	return toSessionCabinResponse(row, sessionID), nil
@@ -325,7 +410,14 @@ func (svc *Service) DeleteCabin(ctx context.Context, campID, sessionID, id strin
 		return err
 	}
 
-	rows, err := svc.queries.DeleteSessionAgeGroupCabin(ctx, db.DeleteSessionAgeGroupCabinParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning delete session cabin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	rows, err := qtx.DeleteSessionAgeGroupCabin(ctx, db.DeleteSessionAgeGroupCabinParams{
 		ID:        uid,
 		CampID:    campUUID,
 		SessionID: sessionUUID,
@@ -335,6 +427,14 @@ func (svc *Service) DeleteCabin(ctx context.Context, campID, sessionID, id strin
 	}
 	if rows == 0 {
 		return ErrCabinNotFound
+	}
+
+	if err := svc.markCabinStale(ctx, qtx, campUUID, sessionUUID); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing delete session cabin transaction: %w", err)
 	}
 
 	return nil

@@ -7,7 +7,9 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+	"camp-scheduler/internal/staleness"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -20,10 +22,15 @@ var (
 type ActivityService struct {
 	queries *db.Queries
 	pool    *pgxpool.Pool
+	marker  *staleness.Marker
 }
 
-func NewActivityService(queries *db.Queries, pool *pgxpool.Pool) *ActivityService {
-	return &ActivityService{queries: queries, pool: pool}
+func NewActivityService(queries *db.Queries, pool *pgxpool.Pool, marker *staleness.Marker) *ActivityService {
+	return &ActivityService{queries: queries, pool: pool, marker: marker}
+}
+
+func (svc *ActivityService) markActivityStale(ctx context.Context, q *db.Queries, campID, sessionID pgtype.UUID) error {
+	return svc.marker.MarkSessions(ctx, q, campID, []pgtype.UUID{sessionID}, []staleness.RunType{staleness.RunTypeActivity})
 }
 
 func (svc *ActivityService) ListTimeSlots(ctx context.Context, campID, sessionID string) ([]SessionTimeSlotResponse, error) {
@@ -96,7 +103,14 @@ func (svc *ActivityService) CreateTimeSlot(ctx context.Context, campID, sessionI
 		return SessionTimeSlotResponse{}, err
 	}
 
-	row, err := svc.queries.CreateSessionTimeSlot(ctx, db.CreateSessionTimeSlotParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return SessionTimeSlotResponse{}, fmt.Errorf("error beginning create session time slot transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	row, err := qtx.CreateSessionTimeSlot(ctx, db.CreateSessionTimeSlotParams{
 		CampID:     campUUID,
 		SessionID:  sessionUUID,
 		TimeSlotID: timeSlotUUID,
@@ -104,6 +118,14 @@ func (svc *ActivityService) CreateTimeSlot(ctx context.Context, campID, sessionI
 	})
 	if err != nil {
 		return SessionTimeSlotResponse{}, fmt.Errorf("error creating session time slot: %w", err)
+	}
+
+	if err := svc.markActivityStale(ctx, qtx, campUUID, sessionUUID); err != nil {
+		return SessionTimeSlotResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return SessionTimeSlotResponse{}, fmt.Errorf("error committing create session time slot transaction: %w", err)
 	}
 
 	return toSessionTimeSlotResponse(row), nil
@@ -130,7 +152,14 @@ func (svc *ActivityService) UpdateTimeSlot(ctx context.Context, campID, sessionI
 		return SessionTimeSlotResponse{}, err
 	}
 
-	row, err := svc.queries.UpdateSessionTimeSlot(ctx, db.UpdateSessionTimeSlotParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return SessionTimeSlotResponse{}, fmt.Errorf("error beginning update session time slot transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	row, err := qtx.UpdateSessionTimeSlot(ctx, db.UpdateSessionTimeSlotParams{
 		ID:         uid,
 		CampID:     campUUID,
 		SessionID:  sessionUUID,
@@ -139,6 +168,14 @@ func (svc *ActivityService) UpdateTimeSlot(ctx context.Context, campID, sessionI
 	})
 	if err != nil {
 		return SessionTimeSlotResponse{}, fmt.Errorf("error updating session time slot %s: %w", id, err)
+	}
+
+	if err := svc.markActivityStale(ctx, qtx, campUUID, sessionUUID); err != nil {
+		return SessionTimeSlotResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return SessionTimeSlotResponse{}, fmt.Errorf("error committing update session time slot transaction: %w", err)
 	}
 
 	return toSessionTimeSlotResponse(row), nil
@@ -160,7 +197,14 @@ func (svc *ActivityService) DeleteTimeSlot(ctx context.Context, campID, sessionI
 		return err
 	}
 
-	rows, err := svc.queries.DeleteSessionTimeSlot(ctx, db.DeleteSessionTimeSlotParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning delete session time slot transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	rows, err := qtx.DeleteSessionTimeSlot(ctx, db.DeleteSessionTimeSlotParams{
 		ID:        uid,
 		CampID:    campUUID,
 		SessionID: sessionUUID,
@@ -170,6 +214,14 @@ func (svc *ActivityService) DeleteTimeSlot(ctx context.Context, campID, sessionI
 	}
 	if rows == 0 {
 		return ErrTimeSlotNotFound
+	}
+
+	if err := svc.markActivityStale(ctx, qtx, campUUID, sessionUUID); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing delete session time slot transaction: %w", err)
 	}
 
 	return nil
@@ -240,6 +292,10 @@ func (svc *ActivityService) ReorderTimeSlots(ctx context.Context, campID, sessio
 		if err != nil {
 			return fmt.Errorf("error updating sort order for %s: %w", id, err)
 		}
+	}
+
+	if err := svc.markActivityStale(ctx, qtx, campUUID, sessionUUID); err != nil {
+		return err
 	}
 
 	return tx.Commit(ctx)
@@ -357,8 +413,15 @@ func (svc *ActivityService) CreateActivity(ctx context.Context, campID, sessionI
 		return SessionActivityResponse{}, err
 	}
 
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return SessionActivityResponse{}, fmt.Errorf("error beginning create session activity transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
 	// Verify the session time slot belongs to this session.
-	_, err = svc.queries.GetSessionTimeSlot(ctx, db.GetSessionTimeSlotParams{
+	_, err = qtx.GetSessionTimeSlot(ctx, db.GetSessionTimeSlotParams{
 		ID:        timeSlotUUID,
 		CampID:    campUUID,
 		SessionID: sessionUUID,
@@ -376,7 +439,7 @@ func (svc *ActivityService) CreateActivity(ctx context.Context, campID, sessionI
 		return SessionActivityResponse{}, ErrInvalidCounselorCount
 	}
 
-	row, err := svc.queries.CreateSessionActivity(ctx, db.CreateSessionActivityParams{
+	row, err := qtx.CreateSessionActivity(ctx, db.CreateSessionActivityParams{
 		CampID:             campUUID,
 		SessionTimeSlotID:  timeSlotUUID,
 		ActivityID:         activityUUID,
@@ -385,6 +448,14 @@ func (svc *ActivityService) CreateActivity(ctx context.Context, campID, sessionI
 	})
 	if err != nil {
 		return SessionActivityResponse{}, fmt.Errorf("error creating session activity: %w", err)
+	}
+
+	if err := svc.markActivityStale(ctx, qtx, campUUID, sessionUUID); err != nil {
+		return SessionActivityResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return SessionActivityResponse{}, fmt.Errorf("error committing create session activity transaction: %w", err)
 	}
 
 	return toSessionActivityResponse(row), nil
@@ -415,7 +486,14 @@ func (svc *ActivityService) UpdateActivity(ctx context.Context, campID, sessionI
 		return SessionActivityResponse{}, ErrInvalidCounselorCount
 	}
 
-	row, err := svc.queries.UpdateSessionActivity(ctx, db.UpdateSessionActivityParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return SessionActivityResponse{}, fmt.Errorf("error beginning update session activity transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	row, err := qtx.UpdateSessionActivity(ctx, db.UpdateSessionActivityParams{
 		ID:                 uid,
 		CampID:             campUUID,
 		SessionID:          sessionUUID,
@@ -425,6 +503,14 @@ func (svc *ActivityService) UpdateActivity(ctx context.Context, campID, sessionI
 	})
 	if err != nil {
 		return SessionActivityResponse{}, fmt.Errorf("error updating session activity %s: %w", id, err)
+	}
+
+	if err := svc.markActivityStale(ctx, qtx, campUUID, sessionUUID); err != nil {
+		return SessionActivityResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return SessionActivityResponse{}, fmt.Errorf("error committing update session activity transaction: %w", err)
 	}
 
 	return toSessionActivityResponse(row), nil
@@ -446,7 +532,14 @@ func (svc *ActivityService) DeleteActivity(ctx context.Context, campID, sessionI
 		return err
 	}
 
-	rows, err := svc.queries.DeleteSessionActivity(ctx, db.DeleteSessionActivityParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning delete session activity transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	rows, err := qtx.DeleteSessionActivity(ctx, db.DeleteSessionActivityParams{
 		ID:        uid,
 		CampID:    campUUID,
 		SessionID: sessionUUID,
@@ -456,6 +549,14 @@ func (svc *ActivityService) DeleteActivity(ctx context.Context, campID, sessionI
 	}
 	if rows == 0 {
 		return ErrSessionActivityNotFound
+	}
+
+	if err := svc.markActivityStale(ctx, qtx, campUUID, sessionUUID); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing delete session activity transaction: %w", err)
 	}
 
 	return nil
@@ -542,6 +643,10 @@ func (svc *ActivityService) CopyActivities(ctx context.Context, campID, sessionI
 			return nil, fmt.Errorf("error copying activity: %w", err)
 		}
 		result = append(result, toSessionActivityResponse(created))
+	}
+
+	if err := svc.markActivityStale(ctx, qtx, campUUID, sessionUUID); err != nil {
+		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {

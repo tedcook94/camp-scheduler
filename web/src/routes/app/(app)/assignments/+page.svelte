@@ -459,7 +459,7 @@
 			await assignmentApi.selectSolution(selectedSessionId, runId, solutionId);
 			const fresh = await assignmentApi.getRun(selectedSessionId, runId);
 			runDetails = new Map(runDetails).set(runId, fresh);
-			runs = runs.map((r) => (r.id === runId ? { ...r, status: fresh.status, selected_solution_id: fresh.selected_solution_id } : r));
+			runs = runs.map((r) => (r.id === runId ? { ...r, status: fresh.status, selected_solution_id: fresh.selected_solution_id, is_stale: fresh.is_stale } : r));
 			toast.success("Solution selected");
 		} catch (err) {
 			const message =
@@ -858,7 +858,21 @@
 								{/if}
 							</span>
 						</button>
-						{#if run?.status === "selected"}
+						{#if run?.is_stale}
+							<Badge
+								variant="outline"
+								class="mr-3 border-amber-600 text-amber-600 dark:border-amber-400 dark:text-amber-400"
+							>
+								Inputs changed
+							</Badge>
+						{:else if run && run.status !== "selected"}
+							<Badge
+								variant="outline"
+								class="mr-3 border-amber-600 text-amber-600 dark:border-amber-400 dark:text-amber-400"
+							>
+								No selection
+							</Badge>
+						{:else if run?.status === "selected"}
 							<Button
 								size="sm"
 								variant="outline"
@@ -869,14 +883,6 @@
 								<DownloadIcon class="mr-2 size-4" />
 								Export
 							</Button>
-						{:else}
-							<span
-								title="No assignments selected"
-								class="mr-3 inline-flex items-center text-amber-600 dark:text-amber-400"
-							>
-								<TriangleAlertIcon class="size-5" />
-								<span class="sr-only">No assignments selected</span>
-							</span>
 						{/if}
 						<Button
 							size="sm"

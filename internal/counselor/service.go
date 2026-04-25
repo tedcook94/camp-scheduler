@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 var ErrNotFound = errors.New("counselor not found")
@@ -20,6 +22,25 @@ type Service struct {
 
 func NewService(queries *db.Queries, pool *pgxpool.Pool) *Service {
 	return &Service{queries: queries, pool: pool}
+}
+
+// FullName joins first and last name into a display string. Empty parts are
+// trimmed so single-token names render cleanly.
+func FullName(first, last string) string {
+	return strings.TrimSpace(first + " " + last)
+}
+
+func toResponse(id, campID pgtype.UUID, first, last string, junior, enabled bool, gender string) CounselorResponse {
+	return CounselorResponse{
+		ID:              api.UUIDToString(id),
+		CampID:          api.UUIDToString(campID),
+		FirstName:       first,
+		LastName:        last,
+		Name:            FullName(first, last),
+		JuniorCounselor: junior,
+		Enabled:         enabled,
+		Gender:          gender,
+	}
 }
 
 func (svc *Service) List(ctx context.Context, campID string) ([]CounselorResponse, error) {
@@ -35,7 +56,7 @@ func (svc *Service) List(ctx context.Context, campID string) ([]CounselorRespons
 
 	result := make([]CounselorResponse, len(counselors))
 	for i, c := range counselors {
-		result[i] = toCounselorResponse(c)
+		result[i] = toResponse(c.ID, c.CampID, c.FirstName, c.LastName, c.JuniorCounselor, c.CounselorEnabled, c.Gender)
 	}
 	return result, nil
 }
@@ -51,7 +72,7 @@ func (svc *Service) GetByID(ctx context.Context, campID, id string) (CounselorRe
 		return CounselorResponse{}, err
 	}
 
-	counselor, err := svc.queries.GetCounselor(ctx, db.GetCounselorParams{
+	c, err := svc.queries.GetCounselor(ctx, db.GetCounselorParams{
 		ID:     uid,
 		CampID: campUUID,
 	})
@@ -59,7 +80,7 @@ func (svc *Service) GetByID(ctx context.Context, campID, id string) (CounselorRe
 		return CounselorResponse{}, fmt.Errorf("error getting counselor %s: %w", id, err)
 	}
 
-	return toCounselorResponse(counselor), nil
+	return toResponse(c.ID, c.CampID, c.FirstName, c.LastName, c.JuniorCounselor, c.CounselorEnabled, c.Gender), nil
 }
 
 func (svc *Service) Create(ctx context.Context, campID string, req CreateCounselorRequest) (CounselorResponse, error) {
@@ -75,9 +96,10 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCounsel
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := svc.queries.WithTx(tx)
 
-	counselor, err := qtx.CreateCounselor(ctx, db.CreateCounselorParams{
+	c, err := qtx.CreateCounselor(ctx, db.CreateCounselorParams{
 		CampID:          uid,
-		CounselorName:   req.Name,
+		FirstName:       req.FirstName,
+		LastName:        req.LastName,
 		JuniorCounselor: req.JuniorCounselor,
 		Gender:          req.Gender,
 	})
@@ -96,7 +118,7 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCounsel
 		if _, err := qtx.AddSessionCounselor(ctx, db.AddSessionCounselorParams{
 			CampID:      uid,
 			SessionID:   s.ID,
-			CounselorID: counselor.ID,
+			CounselorID: c.ID,
 		}); err != nil {
 			return CounselorResponse{}, fmt.Errorf("error rostering new counselor onto session: %w", err)
 		}
@@ -106,7 +128,7 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCounsel
 		return CounselorResponse{}, fmt.Errorf("error committing create counselor transaction: %w", err)
 	}
 
-	return toCounselorResponse(counselor), nil
+	return toResponse(c.ID, c.CampID, c.FirstName, c.LastName, c.JuniorCounselor, c.CounselorEnabled, c.Gender), nil
 }
 
 func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCounselorRequest) (CounselorResponse, error) {
@@ -132,10 +154,11 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCou
 		return CounselorResponse{}, fmt.Errorf("error loading counselor %s: %w", id, err)
 	}
 
-	counselor, err := qtx.UpdateCounselor(ctx, db.UpdateCounselorParams{
+	c, err := qtx.UpdateCounselor(ctx, db.UpdateCounselorParams{
 		ID:               uid,
 		CampID:           campUUID,
-		CounselorName:    req.Name,
+		FirstName:        req.FirstName,
+		LastName:         req.LastName,
 		JuniorCounselor:  req.JuniorCounselor,
 		CounselorEnabled: req.Enabled,
 		Gender:           req.Gender,
@@ -160,7 +183,7 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCou
 		return CounselorResponse{}, fmt.Errorf("error committing update counselor transaction: %w", err)
 	}
 
-	return toCounselorResponse(counselor), nil
+	return toResponse(c.ID, c.CampID, c.FirstName, c.LastName, c.JuniorCounselor, c.CounselorEnabled, c.Gender), nil
 }
 
 func (svc *Service) Delete(ctx context.Context, campID, id string) error {
@@ -186,15 +209,4 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 	}
 
 	return nil
-}
-
-func toCounselorResponse(c db.Counselor) CounselorResponse {
-	return CounselorResponse{
-		ID:              api.UUIDToString(c.ID),
-		CampID:          api.UUIDToString(c.CampID),
-		Name:            c.CounselorName,
-		JuniorCounselor: c.JuniorCounselor,
-		Enabled:         c.CounselorEnabled,
-		Gender:          c.Gender,
-	}
 }

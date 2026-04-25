@@ -6,6 +6,7 @@ import (
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/assignment"
 	"camp-scheduler/internal/camper"
+	"camp-scheduler/internal/counselor"
 	"camp-scheduler/internal/db"
 )
 
@@ -213,7 +214,7 @@ func buildActivityReport(
 func counselorRow(id, fallbackName string, counselors map[string]db.Counselor) CounselorRow {
 	row := CounselorRow{ID: id, Name: fallbackName}
 	if c, ok := counselors[id]; ok {
-		row.Name = c.CounselorName
+		row.Name = counselor.FullName(c.FirstName, c.LastName)
 		row.Junior = c.JuniorCounselor
 		row.Gender = c.Gender
 	}

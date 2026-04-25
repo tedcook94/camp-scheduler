@@ -12,30 +12,43 @@ import (
 )
 
 const createCounselor = `-- name: CreateCounselor :one
-INSERT INTO counselors (camp_id, counselor_name, junior_counselor, gender)
-VALUES ($1, $2, $3, $4)
-RETURNING id, camp_id, counselor_name, junior_counselor, counselor_enabled, gender
+INSERT INTO counselors (camp_id, first_name, last_name, junior_counselor, gender)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, camp_id, first_name, last_name, junior_counselor, counselor_enabled, gender
 `
 
 type CreateCounselorParams struct {
 	CampID          pgtype.UUID
-	CounselorName   string
+	FirstName       string
+	LastName        string
 	JuniorCounselor bool
 	Gender          string
 }
 
-func (q *Queries) CreateCounselor(ctx context.Context, arg CreateCounselorParams) (Counselor, error) {
+type CreateCounselorRow struct {
+	ID               pgtype.UUID
+	CampID           pgtype.UUID
+	FirstName        string
+	LastName         string
+	JuniorCounselor  bool
+	CounselorEnabled bool
+	Gender           string
+}
+
+func (q *Queries) CreateCounselor(ctx context.Context, arg CreateCounselorParams) (CreateCounselorRow, error) {
 	row := q.db.QueryRow(ctx, createCounselor,
 		arg.CampID,
-		arg.CounselorName,
+		arg.FirstName,
+		arg.LastName,
 		arg.JuniorCounselor,
 		arg.Gender,
 	)
-	var i Counselor
+	var i CreateCounselorRow
 	err := row.Scan(
 		&i.ID,
 		&i.CampID,
-		&i.CounselorName,
+		&i.FirstName,
+		&i.LastName,
 		&i.JuniorCounselor,
 		&i.CounselorEnabled,
 		&i.Gender,
@@ -62,7 +75,7 @@ func (q *Queries) DeleteCounselor(ctx context.Context, arg DeleteCounselorParams
 }
 
 const getCounselor = `-- name: GetCounselor :one
-SELECT id, camp_id, counselor_name, junior_counselor, counselor_enabled, gender
+SELECT id, camp_id, first_name, last_name, junior_counselor, counselor_enabled, gender
 FROM counselors
 WHERE id = $1 AND camp_id = $2
 `
@@ -72,13 +85,24 @@ type GetCounselorParams struct {
 	CampID pgtype.UUID
 }
 
-func (q *Queries) GetCounselor(ctx context.Context, arg GetCounselorParams) (Counselor, error) {
+type GetCounselorRow struct {
+	ID               pgtype.UUID
+	CampID           pgtype.UUID
+	FirstName        string
+	LastName         string
+	JuniorCounselor  bool
+	CounselorEnabled bool
+	Gender           string
+}
+
+func (q *Queries) GetCounselor(ctx context.Context, arg GetCounselorParams) (GetCounselorRow, error) {
 	row := q.db.QueryRow(ctx, getCounselor, arg.ID, arg.CampID)
-	var i Counselor
+	var i GetCounselorRow
 	err := row.Scan(
 		&i.ID,
 		&i.CampID,
-		&i.CounselorName,
+		&i.FirstName,
+		&i.LastName,
 		&i.JuniorCounselor,
 		&i.CounselorEnabled,
 		&i.Gender,
@@ -87,25 +111,36 @@ func (q *Queries) GetCounselor(ctx context.Context, arg GetCounselorParams) (Cou
 }
 
 const listCounselors = `-- name: ListCounselors :many
-SELECT id, camp_id, counselor_name, junior_counselor, counselor_enabled, gender
+SELECT id, camp_id, first_name, last_name, junior_counselor, counselor_enabled, gender
 FROM counselors
 WHERE camp_id = $1
-ORDER BY counselor_name
+ORDER BY last_name, first_name
 `
 
-func (q *Queries) ListCounselors(ctx context.Context, campID pgtype.UUID) ([]Counselor, error) {
+type ListCounselorsRow struct {
+	ID               pgtype.UUID
+	CampID           pgtype.UUID
+	FirstName        string
+	LastName         string
+	JuniorCounselor  bool
+	CounselorEnabled bool
+	Gender           string
+}
+
+func (q *Queries) ListCounselors(ctx context.Context, campID pgtype.UUID) ([]ListCounselorsRow, error) {
 	rows, err := q.db.Query(ctx, listCounselors, campID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Counselor
+	var items []ListCounselorsRow
 	for rows.Next() {
-		var i Counselor
+		var i ListCounselorsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.CampID,
-			&i.CounselorName,
+			&i.FirstName,
+			&i.LastName,
 			&i.JuniorCounselor,
 			&i.CounselorEnabled,
 			&i.Gender,
@@ -121,25 +156,36 @@ func (q *Queries) ListCounselors(ctx context.Context, campID pgtype.UUID) ([]Cou
 }
 
 const listEnabledCounselors = `-- name: ListEnabledCounselors :many
-SELECT id, camp_id, counselor_name, junior_counselor, counselor_enabled, gender
+SELECT id, camp_id, first_name, last_name, junior_counselor, counselor_enabled, gender
 FROM counselors
 WHERE camp_id = $1 AND counselor_enabled = true
-ORDER BY counselor_name
+ORDER BY last_name, first_name
 `
 
-func (q *Queries) ListEnabledCounselors(ctx context.Context, campID pgtype.UUID) ([]Counselor, error) {
+type ListEnabledCounselorsRow struct {
+	ID               pgtype.UUID
+	CampID           pgtype.UUID
+	FirstName        string
+	LastName         string
+	JuniorCounselor  bool
+	CounselorEnabled bool
+	Gender           string
+}
+
+func (q *Queries) ListEnabledCounselors(ctx context.Context, campID pgtype.UUID) ([]ListEnabledCounselorsRow, error) {
 	rows, err := q.db.Query(ctx, listEnabledCounselors, campID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Counselor
+	var items []ListEnabledCounselorsRow
 	for rows.Next() {
-		var i Counselor
+		var i ListEnabledCounselorsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.CampID,
-			&i.CounselorName,
+			&i.FirstName,
+			&i.LastName,
 			&i.JuniorCounselor,
 			&i.CounselorEnabled,
 			&i.Gender,
@@ -156,37 +202,51 @@ func (q *Queries) ListEnabledCounselors(ctx context.Context, campID pgtype.UUID)
 
 const updateCounselor = `-- name: UpdateCounselor :one
 UPDATE counselors
-SET counselor_name = $3,
-    junior_counselor = $4,
-    counselor_enabled = $5,
-    gender = $6
+SET first_name = $3,
+    last_name = $4,
+    junior_counselor = $5,
+    counselor_enabled = $6,
+    gender = $7
 WHERE id = $1 AND camp_id = $2
-RETURNING id, camp_id, counselor_name, junior_counselor, counselor_enabled, gender
+RETURNING id, camp_id, first_name, last_name, junior_counselor, counselor_enabled, gender
 `
 
 type UpdateCounselorParams struct {
 	ID               pgtype.UUID
 	CampID           pgtype.UUID
-	CounselorName    string
+	FirstName        string
+	LastName         string
 	JuniorCounselor  bool
 	CounselorEnabled bool
 	Gender           string
 }
 
-func (q *Queries) UpdateCounselor(ctx context.Context, arg UpdateCounselorParams) (Counselor, error) {
+type UpdateCounselorRow struct {
+	ID               pgtype.UUID
+	CampID           pgtype.UUID
+	FirstName        string
+	LastName         string
+	JuniorCounselor  bool
+	CounselorEnabled bool
+	Gender           string
+}
+
+func (q *Queries) UpdateCounselor(ctx context.Context, arg UpdateCounselorParams) (UpdateCounselorRow, error) {
 	row := q.db.QueryRow(ctx, updateCounselor,
 		arg.ID,
 		arg.CampID,
-		arg.CounselorName,
+		arg.FirstName,
+		arg.LastName,
 		arg.JuniorCounselor,
 		arg.CounselorEnabled,
 		arg.Gender,
 	)
-	var i Counselor
+	var i UpdateCounselorRow
 	err := row.Scan(
 		&i.ID,
 		&i.CampID,
-		&i.CounselorName,
+		&i.FirstName,
+		&i.LastName,
 		&i.JuniorCounselor,
 		&i.CounselorEnabled,
 		&i.Gender,

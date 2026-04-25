@@ -152,10 +152,11 @@ type Certification struct {
 type Counselor struct {
 	ID               pgtype.UUID
 	CampID           pgtype.UUID
-	CounselorName    string
 	JuniorCounselor  bool
 	CounselorEnabled bool
 	Gender           string
+	FirstName        string
+	LastName         string
 }
 
 type CounselorActivityPreference struct {

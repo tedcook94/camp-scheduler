@@ -5,6 +5,7 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/assignment"
+	"camp-scheduler/internal/camper"
 	"camp-scheduler/internal/db"
 )
 
@@ -222,7 +223,7 @@ func counselorRow(id, fallbackName string, counselors map[string]db.Counselor) C
 func camperRow(id, fallbackName string, campers map[string]db.Camper) CamperRow {
 	row := CamperRow{ID: id, Name: fallbackName}
 	if c, ok := campers[id]; ok {
-		row.Name = c.CamperName
+		row.Name = camper.FullName(c.FirstName, c.LastName)
 		row.Gender = c.Gender
 	}
 	return row

@@ -29,20 +29,24 @@ func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 }
 
 type CreateCamperRequest struct {
-	Name   string `json:"name" binding:"required"`
-	Gender string `json:"gender" binding:"required,oneof=male female"`
+	FirstName string `json:"first_name" binding:"required"`
+	LastName  string `json:"last_name" binding:"required"`
+	Gender    string `json:"gender" binding:"required,oneof=male female"`
 }
 
 type UpdateCamperRequest struct {
-	Name   string `json:"name" binding:"required"`
-	Gender string `json:"gender" binding:"required,oneof=male female"`
+	FirstName string `json:"first_name" binding:"required"`
+	LastName  string `json:"last_name" binding:"required"`
+	Gender    string `json:"gender" binding:"required,oneof=male female"`
 }
 
 type CamperResponse struct {
-	ID     string `json:"id"`
-	CampID string `json:"camp_id"`
-	Name   string `json:"name"`
-	Gender string `json:"gender"`
+	ID        string `json:"id"`
+	CampID    string `json:"camp_id"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Name      string `json:"name"`
+	Gender    string `json:"gender"`
 }
 
 func (ctrl *Controller) List(c *gin.Context) {

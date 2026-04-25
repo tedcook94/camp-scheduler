@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
@@ -19,6 +20,12 @@ func NewService(queries *db.Queries) *Service {
 	return &Service{queries: queries}
 }
 
+// FullName joins first and last name into a display string. Empty parts are
+// trimmed so single-token names render cleanly.
+func FullName(first, last string) string {
+	return strings.TrimSpace(first + " " + last)
+}
+
 func (svc *Service) List(ctx context.Context, campID string) ([]CamperResponse, error) {
 	uid, err := api.ParseUUID(campID)
 	if err != nil {
@@ -32,7 +39,14 @@ func (svc *Service) List(ctx context.Context, campID string) ([]CamperResponse, 
 
 	result := make([]CamperResponse, len(campers))
 	for i, c := range campers {
-		result[i] = toCamperResponse(c)
+		result[i] = CamperResponse{
+			ID:        api.UUIDToString(c.ID),
+			CampID:    api.UUIDToString(c.CampID),
+			FirstName: c.FirstName,
+			LastName:  c.LastName,
+			Name:      FullName(c.FirstName, c.LastName),
+			Gender:    c.Gender,
+		}
 	}
 	return result, nil
 }
@@ -48,7 +62,7 @@ func (svc *Service) GetByID(ctx context.Context, campID, id string) (CamperRespo
 		return CamperResponse{}, err
 	}
 
-	camper, err := svc.queries.GetCamper(ctx, db.GetCamperParams{
+	c, err := svc.queries.GetCamper(ctx, db.GetCamperParams{
 		ID:     uid,
 		CampID: campUUID,
 	})
@@ -56,7 +70,14 @@ func (svc *Service) GetByID(ctx context.Context, campID, id string) (CamperRespo
 		return CamperResponse{}, fmt.Errorf("error getting camper %s: %w", id, err)
 	}
 
-	return toCamperResponse(camper), nil
+	return CamperResponse{
+		ID:        api.UUIDToString(c.ID),
+		CampID:    api.UUIDToString(c.CampID),
+		FirstName: c.FirstName,
+		LastName:  c.LastName,
+		Name:      FullName(c.FirstName, c.LastName),
+		Gender:    c.Gender,
+	}, nil
 }
 
 func (svc *Service) Create(ctx context.Context, campID string, req CreateCamperRequest) (CamperResponse, error) {
@@ -65,16 +86,24 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCamperR
 		return CamperResponse{}, err
 	}
 
-	camper, err := svc.queries.CreateCamper(ctx, db.CreateCamperParams{
-		CampID:     uid,
-		CamperName: req.Name,
-		Gender:     req.Gender,
+	c, err := svc.queries.CreateCamper(ctx, db.CreateCamperParams{
+		CampID:    uid,
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
+		Gender:    req.Gender,
 	})
 	if err != nil {
 		return CamperResponse{}, fmt.Errorf("error creating camper: %w", err)
 	}
 
-	return toCamperResponse(camper), nil
+	return CamperResponse{
+		ID:        api.UUIDToString(c.ID),
+		CampID:    api.UUIDToString(c.CampID),
+		FirstName: c.FirstName,
+		LastName:  c.LastName,
+		Name:      FullName(c.FirstName, c.LastName),
+		Gender:    c.Gender,
+	}, nil
 }
 
 func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCamperRequest) (CamperResponse, error) {
@@ -88,17 +117,25 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCam
 		return CamperResponse{}, err
 	}
 
-	camper, err := svc.queries.UpdateCamper(ctx, db.UpdateCamperParams{
-		ID:         uid,
-		CampID:     campUUID,
-		CamperName: req.Name,
-		Gender:     req.Gender,
+	c, err := svc.queries.UpdateCamper(ctx, db.UpdateCamperParams{
+		ID:        uid,
+		CampID:    campUUID,
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
+		Gender:    req.Gender,
 	})
 	if err != nil {
 		return CamperResponse{}, fmt.Errorf("error updating camper %s: %w", id, err)
 	}
 
-	return toCamperResponse(camper), nil
+	return CamperResponse{
+		ID:        api.UUIDToString(c.ID),
+		CampID:    api.UUIDToString(c.CampID),
+		FirstName: c.FirstName,
+		LastName:  c.LastName,
+		Name:      FullName(c.FirstName, c.LastName),
+		Gender:    c.Gender,
+	}, nil
 }
 
 func (svc *Service) Delete(ctx context.Context, campID, id string) error {
@@ -124,13 +161,4 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 	}
 
 	return nil
-}
-
-func toCamperResponse(c db.Camper) CamperResponse {
-	return CamperResponse{
-		ID:     api.UUIDToString(c.ID),
-		CampID: api.UUIDToString(c.CampID),
-		Name:   c.CamperName,
-		Gender: c.Gender,
-	}
 }

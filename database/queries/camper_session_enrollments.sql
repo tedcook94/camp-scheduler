@@ -4,7 +4,7 @@ SELECT
     e.camp_id,
     e.camper_id,
     e.session_age_group_id,
-    c.camper_name,
+    (c.first_name || ' ' || c.last_name)::text AS camper_name,
     c.gender,
     sag.session_id,
     sag.age_group_id
@@ -12,7 +12,7 @@ FROM camper_session_enrollments e
 JOIN campers c ON c.id = e.camper_id AND c.camp_id = e.camp_id
 JOIN session_age_groups sag ON sag.id = e.session_age_group_id AND sag.camp_id = e.camp_id
 WHERE sag.session_id = $1 AND e.camp_id = $2
-ORDER BY c.camper_name;
+ORDER BY c.last_name, c.first_name;
 
 -- name: GetSessionEnrollment :one
 SELECT
@@ -20,7 +20,7 @@ SELECT
     e.camp_id,
     e.camper_id,
     e.session_age_group_id,
-    c.camper_name,
+    (c.first_name || ' ' || c.last_name)::text AS camper_name,
     sag.session_id,
     sag.age_group_id
 FROM camper_session_enrollments e
@@ -43,7 +43,7 @@ SELECT
     e.camp_id,
     e.camper_id,
     e.session_age_group_id,
-    c.camper_name,
+    (c.first_name || ' ' || c.last_name)::text AS camper_name,
     sag.session_id,
     sag.age_group_id
 FROM camper_session_enrollments e
@@ -60,11 +60,11 @@ SELECT
     e.camp_id,
     e.camper_id,
     e.session_age_group_id,
-    c.camper_name,
+    (c.first_name || ' ' || c.last_name)::text AS camper_name,
     sag.session_id,
     sag.age_group_id
 FROM camper_session_enrollments e
 JOIN campers c ON c.id = e.camper_id AND c.camp_id = e.camp_id
 JOIN session_age_groups sag ON sag.id = e.session_age_group_id AND sag.camp_id = e.camp_id
 WHERE e.session_age_group_id = $1 AND e.camp_id = $2
-ORDER BY c.camper_name;
+ORDER BY c.last_name, c.first_name;

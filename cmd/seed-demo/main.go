@@ -821,14 +821,21 @@ func createCampers(ctx context.Context, q *db.Queries, campID pgtype.UUID, ageGr
 	m := make(map[string]db.Camper)
 	for _, name := range allNames {
 		c, err := q.CreateCamper(ctx, db.CreateCamperParams{
-			CampID:     campID,
-			CamperName: name,
-			Gender:     camperGender[name],
+			CampID:    campID,
+			FirstName: name,
+			LastName:  "",
+			Gender:    camperGender[name],
 		})
 		if err != nil {
 			return nil, fmt.Errorf("error creating camper %s: %w", name, err)
 		}
-		m[name] = c
+		m[name] = db.Camper{
+			ID:        c.ID,
+			CampID:    c.CampID,
+			FirstName: c.FirstName,
+			LastName:  c.LastName,
+			Gender:    c.Gender,
+		}
 	}
 	return m, nil
 }

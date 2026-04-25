@@ -91,6 +91,8 @@ func loadCampers(ctx context.Context, queries *db.Queries, sessionID, campID pgt
 	for i, r := range rows {
 		campers[i] = Camper{
 			ID:         api.UUIDToString(r.CamperID),
+			FirstName:  r.CamperFirstName,
+			LastName:   r.CamperLastName,
 			Name:       r.CamperName,
 			AgeGroupID: api.UUIDToString(r.AgeGroupID),
 			Gender:     r.Gender,

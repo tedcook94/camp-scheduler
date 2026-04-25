@@ -13,6 +13,8 @@ type ActivitySlot struct {
 
 type ActivityCounselor struct {
 	ID             string
+	FirstName      string
+	LastName       string
 	Name           string
 	IsJunior       bool
 	Certifications map[string]bool

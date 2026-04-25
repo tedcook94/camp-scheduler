@@ -12,6 +12,8 @@ type CamperCabin struct {
 
 type Camper struct {
 	ID         string
+	FirstName  string
+	LastName   string
 	Name       string
 	AgeGroupID string
 	Gender     string

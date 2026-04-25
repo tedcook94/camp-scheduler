@@ -202,10 +202,12 @@ func loadCounselors(ctx context.Context, queries *db.Queries, sessionID, campID 
 	counselors := make([]Counselor, len(rows))
 	for i, r := range rows {
 		counselors[i] = Counselor{
-			ID:       api.UUIDToString(r.CounselorID),
-			Name:     r.CounselorName,
-			IsJunior: r.JuniorCounselor,
-			Gender:   r.Gender,
+			ID:        api.UUIDToString(r.CounselorID),
+			FirstName: r.CounselorFirstName,
+			LastName:  r.CounselorLastName,
+			Name:      r.CounselorName,
+			IsJunior:  r.JuniorCounselor,
+			Gender:    r.Gender,
 		}
 	}
 	return counselors, nil

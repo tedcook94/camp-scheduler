@@ -142,6 +142,8 @@ func loadActivityCounselors(ctx context.Context, queries *db.Queries, sessionID,
 		}
 		counselors[i] = ActivityCounselor{
 			ID:             cID,
+			FirstName:      r.CounselorFirstName,
+			LastName:       r.CounselorLastName,
 			Name:           r.CounselorName,
 			IsJunior:       r.JuniorCounselor,
 			Certifications: certs,

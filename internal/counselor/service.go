@@ -10,8 +10,8 @@ import (
 	"camp-scheduler/internal/db"
 	"camp-scheduler/internal/staleness"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var ErrNotFound = errors.New("counselor not found")
@@ -32,7 +32,7 @@ func FullName(first, last string) string {
 	return strings.TrimSpace(first + " " + last)
 }
 
-func toResponse(id, campID pgtype.UUID, first, last string, junior, enabled bool, gender string) CounselorResponse {
+func toResponse(id, campID pgtype.UUID, first, last string, junior, archived bool, gender string) CounselorResponse {
 	return CounselorResponse{
 		ID:              api.UUIDToString(id),
 		CampID:          api.UUIDToString(campID),
@@ -40,7 +40,7 @@ func toResponse(id, campID pgtype.UUID, first, last string, junior, enabled bool
 		LastName:        last,
 		Name:            FullName(first, last),
 		JuniorCounselor: junior,
-		Enabled:         enabled,
+		Archived:        archived,
 		Gender:          gender,
 	}
 }
@@ -58,7 +58,7 @@ func (svc *Service) List(ctx context.Context, campID string) ([]CounselorRespons
 
 	result := make([]CounselorResponse, len(counselors))
 	for i, c := range counselors {
-		result[i] = toResponse(c.ID, c.CampID, c.FirstName, c.LastName, c.JuniorCounselor, c.CounselorEnabled, c.Gender)
+		result[i] = toResponse(c.ID, c.CampID, c.FirstName, c.LastName, c.JuniorCounselor, c.Archived, c.Gender)
 	}
 	return result, nil
 }
@@ -82,7 +82,7 @@ func (svc *Service) GetByID(ctx context.Context, campID, id string) (CounselorRe
 		return CounselorResponse{}, fmt.Errorf("error getting counselor %s: %w", id, err)
 	}
 
-	return toResponse(c.ID, c.CampID, c.FirstName, c.LastName, c.JuniorCounselor, c.CounselorEnabled, c.Gender), nil
+	return toResponse(c.ID, c.CampID, c.FirstName, c.LastName, c.JuniorCounselor, c.Archived, c.Gender), nil
 }
 
 func (svc *Service) Create(ctx context.Context, campID string, req CreateCounselorRequest) (CounselorResponse, error) {
@@ -136,7 +136,7 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateCounsel
 		return CounselorResponse{}, fmt.Errorf("error committing create counselor transaction: %w", err)
 	}
 
-	return toResponse(c.ID, c.CampID, c.FirstName, c.LastName, c.JuniorCounselor, c.CounselorEnabled, c.Gender), nil
+	return toResponse(c.ID, c.CampID, c.FirstName, c.LastName, c.JuniorCounselor, c.Archived, c.Gender), nil
 }
 
 func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCounselorRequest) (CounselorResponse, error) {
@@ -157,47 +157,27 @@ func (svc *Service) Update(ctx context.Context, campID, id string, req UpdateCou
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := svc.queries.WithTx(tx)
 
-	existing, err := qtx.GetCounselor(ctx, db.GetCounselorParams{ID: uid, CampID: campUUID})
-	if err != nil {
-		return CounselorResponse{}, fmt.Errorf("error loading counselor %s: %w", id, err)
-	}
-
 	c, err := qtx.UpdateCounselor(ctx, db.UpdateCounselorParams{
-		ID:               uid,
-		CampID:           campUUID,
-		FirstName:        req.FirstName,
-		LastName:         req.LastName,
-		JuniorCounselor:  req.JuniorCounselor,
-		CounselorEnabled: req.Enabled,
-		Gender:           req.Gender,
+		ID:              uid,
+		CampID:          campUUID,
+		FirstName:       req.FirstName,
+		LastName:        req.LastName,
+		JuniorCounselor: req.JuniorCounselor,
+		Gender:          req.Gender,
 	})
 	if err != nil {
 		return CounselorResponse{}, fmt.Errorf("error updating counselor %s: %w", id, err)
 	}
 
-	// When a counselor transitions from enabled to disabled, remove them from
-	// every session roster. This keeps the roster aligned with assignability;
-	// re-enabling does not auto-restore prior memberships.
-	// Capture the roster *before* we potentially clear it so the staleness
-	// marker still sees the affected sessions when disabling.
 	if err := svc.marker.MarkSessionsForCounselor(ctx, qtx, campUUID, uid, staleness.AllRunTypes); err != nil {
 		return CounselorResponse{}, err
-	}
-
-	if existing.CounselorEnabled && !req.Enabled {
-		if err := qtx.RemoveCounselorFromAllSessions(ctx, db.RemoveCounselorFromAllSessionsParams{
-			CampID:      campUUID,
-			CounselorID: uid,
-		}); err != nil {
-			return CounselorResponse{}, fmt.Errorf("error removing disabled counselor from session rosters: %w", err)
-		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return CounselorResponse{}, fmt.Errorf("error committing update counselor transaction: %w", err)
 	}
 
-	return toResponse(c.ID, c.CampID, c.FirstName, c.LastName, c.JuniorCounselor, c.CounselorEnabled, c.Gender), nil
+	return toResponse(c.ID, c.CampID, c.FirstName, c.LastName, c.JuniorCounselor, c.Archived, c.Gender), nil
 }
 
 func (svc *Service) Delete(ctx context.Context, campID, id string) error {

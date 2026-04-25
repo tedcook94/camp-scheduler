@@ -103,13 +103,17 @@ func (svc *Service) Create(ctx context.Context, campID string, req CreateSession
 		return SessionResponse{}, fmt.Errorf("error creating session: %w", err)
 	}
 
-	// Bootstrap the session counselor roster with all currently enabled counselors.
-	// Admins curate it from there; the solver and preference filtering both read this roster.
-	enabled, err := qtx.ListEnabledCounselors(ctx, campUUID)
+	// Bootstrap the session counselor roster with all currently active (non-archived)
+	// counselors. Admins curate it from there; the solver and preference filtering
+	// both read this roster.
+	allCounselors, err := qtx.ListCounselors(ctx, campUUID)
 	if err != nil {
-		return SessionResponse{}, fmt.Errorf("error loading enabled counselors for new session roster: %w", err)
+		return SessionResponse{}, fmt.Errorf("error loading counselors for new session roster: %w", err)
 	}
-	for _, c := range enabled {
+	for _, c := range allCounselors {
+		if c.Archived {
+			continue
+		}
 		if _, err := qtx.AddSessionCounselor(ctx, db.AddSessionCounselorParams{
 			CampID:      campUUID,
 			SessionID:   session.ID,

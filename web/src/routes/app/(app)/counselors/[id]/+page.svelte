@@ -628,9 +628,6 @@
 					<Badge variant={counselor.gender === "female" ? "secondary" : "outline"}>
 						{counselor.gender === "female" ? "Female" : "Male"}
 					</Badge>
-					<Badge variant={counselor.enabled ? "default" : "outline"}>
-						{counselor.enabled ? "Active" : "Inactive"}
-					</Badge>
 				</div>
 			{:else}
 				<h1 class="text-2xl font-semibold tracking-tight">Counselor not found</h1>

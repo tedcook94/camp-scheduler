@@ -14,7 +14,7 @@ import (
 const createAgeGroup = `-- name: CreateAgeGroup :one
 INSERT INTO age_groups (camp_id, age_group_name)
 VALUES ($1, $2)
-RETURNING id, camp_id, age_group_name
+RETURNING id, camp_id, age_group_name, archived
 `
 
 type CreateAgeGroupParams struct {
@@ -25,7 +25,12 @@ type CreateAgeGroupParams struct {
 func (q *Queries) CreateAgeGroup(ctx context.Context, arg CreateAgeGroupParams) (AgeGroup, error) {
 	row := q.db.QueryRow(ctx, createAgeGroup, arg.CampID, arg.AgeGroupName)
 	var i AgeGroup
-	err := row.Scan(&i.ID, &i.CampID, &i.AgeGroupName)
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.AgeGroupName,
+		&i.Archived,
+	)
 	return i, err
 }
 
@@ -48,7 +53,7 @@ func (q *Queries) DeleteAgeGroup(ctx context.Context, arg DeleteAgeGroupParams) 
 }
 
 const getAgeGroup = `-- name: GetAgeGroup :one
-SELECT id, camp_id, age_group_name
+SELECT id, camp_id, age_group_name, archived
 FROM age_groups
 WHERE id = $1 AND camp_id = $2
 `
@@ -61,12 +66,17 @@ type GetAgeGroupParams struct {
 func (q *Queries) GetAgeGroup(ctx context.Context, arg GetAgeGroupParams) (AgeGroup, error) {
 	row := q.db.QueryRow(ctx, getAgeGroup, arg.ID, arg.CampID)
 	var i AgeGroup
-	err := row.Scan(&i.ID, &i.CampID, &i.AgeGroupName)
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.AgeGroupName,
+		&i.Archived,
+	)
 	return i, err
 }
 
 const listAgeGroups = `-- name: ListAgeGroups :many
-SELECT id, camp_id, age_group_name
+SELECT id, camp_id, age_group_name, archived
 FROM age_groups
 WHERE camp_id = $1
 ORDER BY age_group_name
@@ -81,7 +91,12 @@ func (q *Queries) ListAgeGroups(ctx context.Context, campID pgtype.UUID) ([]AgeG
 	var items []AgeGroup
 	for rows.Next() {
 		var i AgeGroup
-		if err := rows.Scan(&i.ID, &i.CampID, &i.AgeGroupName); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.AgeGroupName,
+			&i.Archived,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -96,7 +111,7 @@ const updateAgeGroup = `-- name: UpdateAgeGroup :one
 UPDATE age_groups
 SET age_group_name = $3
 WHERE id = $1 AND camp_id = $2
-RETURNING id, camp_id, age_group_name
+RETURNING id, camp_id, age_group_name, archived
 `
 
 type UpdateAgeGroupParams struct {
@@ -108,6 +123,11 @@ type UpdateAgeGroupParams struct {
 func (q *Queries) UpdateAgeGroup(ctx context.Context, arg UpdateAgeGroupParams) (AgeGroup, error) {
 	row := q.db.QueryRow(ctx, updateAgeGroup, arg.ID, arg.CampID, arg.AgeGroupName)
 	var i AgeGroup
-	err := row.Scan(&i.ID, &i.CampID, &i.AgeGroupName)
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.AgeGroupName,
+		&i.Archived,
+	)
 	return i, err
 }

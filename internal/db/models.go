@@ -12,6 +12,7 @@ type Activity struct {
 	ID           pgtype.UUID
 	CampID       pgtype.UUID
 	ActivityName string
+	Archived     bool
 }
 
 type ActivityAssignment struct {
@@ -54,6 +55,7 @@ type AgeGroup struct {
 	ID           pgtype.UUID
 	CampID       pgtype.UUID
 	AgeGroupName string
+	Archived     bool
 }
 
 type AssignmentRun struct {
@@ -82,6 +84,7 @@ type Cabin struct {
 	DefaultGroupSize          int32
 	DefaultRequiredCounselors int32
 	Gender                    string
+	Archived                  bool
 }
 
 type Camp struct {
@@ -97,6 +100,7 @@ type Camper struct {
 	Gender    string
 	FirstName string
 	LastName  string
+	Archived  bool
 }
 
 type CamperCabinAssignment struct {
@@ -148,16 +152,17 @@ type Certification struct {
 	ID                pgtype.UUID
 	CampID            pgtype.UUID
 	CertificationName string
+	Archived          bool
 }
 
 type Counselor struct {
-	ID               pgtype.UUID
-	CampID           pgtype.UUID
-	JuniorCounselor  bool
-	CounselorEnabled bool
-	Gender           string
-	FirstName        string
-	LastName         string
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	JuniorCounselor bool
+	Gender          string
+	FirstName       string
+	LastName        string
+	Archived        bool
 }
 
 type CounselorActivityPreference struct {
@@ -269,6 +274,7 @@ type Season struct {
 	SeasonName string
 	StartDate  pgtype.Date
 	EndDate    pgtype.Date
+	Archived   bool
 }
 
 type Session struct {
@@ -277,6 +283,7 @@ type Session struct {
 	SeasonID        pgtype.UUID
 	SessionName     string
 	PreviousSession pgtype.UUID
+	Archived        bool
 }
 
 type SessionActivity struct {
@@ -323,6 +330,7 @@ type TimeSlot struct {
 	ID           pgtype.UUID
 	CampID       pgtype.UUID
 	TimeSlotName string
+	Archived     bool
 }
 
 type User struct {

@@ -14,7 +14,7 @@ import (
 const createCertification = `-- name: CreateCertification :one
 INSERT INTO certifications (camp_id, certification_name)
 VALUES ($1, $2)
-RETURNING id, camp_id, certification_name
+RETURNING id, camp_id, certification_name, archived
 `
 
 type CreateCertificationParams struct {
@@ -25,7 +25,12 @@ type CreateCertificationParams struct {
 func (q *Queries) CreateCertification(ctx context.Context, arg CreateCertificationParams) (Certification, error) {
 	row := q.db.QueryRow(ctx, createCertification, arg.CampID, arg.CertificationName)
 	var i Certification
-	err := row.Scan(&i.ID, &i.CampID, &i.CertificationName)
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.CertificationName,
+		&i.Archived,
+	)
 	return i, err
 }
 
@@ -48,7 +53,7 @@ func (q *Queries) DeleteCertification(ctx context.Context, arg DeleteCertificati
 }
 
 const getCertification = `-- name: GetCertification :one
-SELECT id, camp_id, certification_name
+SELECT id, camp_id, certification_name, archived
 FROM certifications
 WHERE id = $1 AND camp_id = $2
 `
@@ -61,12 +66,17 @@ type GetCertificationParams struct {
 func (q *Queries) GetCertification(ctx context.Context, arg GetCertificationParams) (Certification, error) {
 	row := q.db.QueryRow(ctx, getCertification, arg.ID, arg.CampID)
 	var i Certification
-	err := row.Scan(&i.ID, &i.CampID, &i.CertificationName)
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.CertificationName,
+		&i.Archived,
+	)
 	return i, err
 }
 
 const listCertifications = `-- name: ListCertifications :many
-SELECT id, camp_id, certification_name
+SELECT id, camp_id, certification_name, archived
 FROM certifications
 WHERE camp_id = $1
 ORDER BY certification_name
@@ -81,7 +91,12 @@ func (q *Queries) ListCertifications(ctx context.Context, campID pgtype.UUID) ([
 	var items []Certification
 	for rows.Next() {
 		var i Certification
-		if err := rows.Scan(&i.ID, &i.CampID, &i.CertificationName); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.CertificationName,
+			&i.Archived,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -96,7 +111,7 @@ const updateCertification = `-- name: UpdateCertification :one
 UPDATE certifications
 SET certification_name = $3
 WHERE id = $1 AND camp_id = $2
-RETURNING id, camp_id, certification_name
+RETURNING id, camp_id, certification_name, archived
 `
 
 type UpdateCertificationParams struct {
@@ -108,6 +123,11 @@ type UpdateCertificationParams struct {
 func (q *Queries) UpdateCertification(ctx context.Context, arg UpdateCertificationParams) (Certification, error) {
 	row := q.db.QueryRow(ctx, updateCertification, arg.ID, arg.CampID, arg.CertificationName)
 	var i Certification
-	err := row.Scan(&i.ID, &i.CampID, &i.CertificationName)
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.CertificationName,
+		&i.Archived,
+	)
 	return i, err
 }

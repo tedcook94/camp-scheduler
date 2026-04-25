@@ -588,13 +588,13 @@ func createCounselors(ctx context.Context, q *db.Queries, campID pgtype.UUID) (m
 			return nil, fmt.Errorf("error creating counselor %s %s: %w", d.first, d.last, err)
 		}
 		m[d.first+" "+d.last] = db.Counselor{
-			ID:               c.ID,
-			CampID:           c.CampID,
-			JuniorCounselor:  c.JuniorCounselor,
-			CounselorEnabled: c.CounselorEnabled,
-			Gender:           c.Gender,
-			FirstName:        c.FirstName,
-			LastName:         c.LastName,
+			ID:              c.ID,
+			CampID:          c.CampID,
+			JuniorCounselor: c.JuniorCounselor,
+			Archived:        c.Archived,
+			Gender:          c.Gender,
+			FirstName:       c.FirstName,
+			LastName:        c.LastName,
 		}
 	}
 	return m, nil

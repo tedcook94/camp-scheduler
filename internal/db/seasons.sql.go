@@ -14,7 +14,7 @@ import (
 const createSeason = `-- name: CreateSeason :one
 INSERT INTO seasons (camp_id, season_name, start_date, end_date)
 VALUES ($1, $2, $3, $4)
-RETURNING id, camp_id, season_name, start_date, end_date
+RETURNING id, camp_id, season_name, start_date, end_date, archived
 `
 
 type CreateSeasonParams struct {
@@ -38,6 +38,7 @@ func (q *Queries) CreateSeason(ctx context.Context, arg CreateSeasonParams) (Sea
 		&i.SeasonName,
 		&i.StartDate,
 		&i.EndDate,
+		&i.Archived,
 	)
 	return i, err
 }
@@ -61,7 +62,7 @@ func (q *Queries) DeleteSeason(ctx context.Context, arg DeleteSeasonParams) (int
 }
 
 const getMostRecentSeason = `-- name: GetMostRecentSeason :one
-SELECT id, camp_id, season_name, start_date, end_date
+SELECT id, camp_id, season_name, start_date, end_date, archived
 FROM seasons
 WHERE camp_id = $1
 ORDER BY start_date DESC, id DESC
@@ -77,12 +78,13 @@ func (q *Queries) GetMostRecentSeason(ctx context.Context, campID pgtype.UUID) (
 		&i.SeasonName,
 		&i.StartDate,
 		&i.EndDate,
+		&i.Archived,
 	)
 	return i, err
 }
 
 const getSeason = `-- name: GetSeason :one
-SELECT id, camp_id, season_name, start_date, end_date
+SELECT id, camp_id, season_name, start_date, end_date, archived
 FROM seasons
 WHERE id = $1 AND camp_id = $2
 `
@@ -101,12 +103,13 @@ func (q *Queries) GetSeason(ctx context.Context, arg GetSeasonParams) (Season, e
 		&i.SeasonName,
 		&i.StartDate,
 		&i.EndDate,
+		&i.Archived,
 	)
 	return i, err
 }
 
 const listSeasons = `-- name: ListSeasons :many
-SELECT id, camp_id, season_name, start_date, end_date
+SELECT id, camp_id, season_name, start_date, end_date, archived
 FROM seasons
 WHERE camp_id = $1
 ORDER BY start_date DESC, id DESC
@@ -127,6 +130,7 @@ func (q *Queries) ListSeasons(ctx context.Context, campID pgtype.UUID) ([]Season
 			&i.SeasonName,
 			&i.StartDate,
 			&i.EndDate,
+			&i.Archived,
 		); err != nil {
 			return nil, err
 		}
@@ -142,7 +146,7 @@ const updateSeason = `-- name: UpdateSeason :one
 UPDATE seasons
 SET season_name = $3, start_date = $4, end_date = $5
 WHERE id = $1 AND camp_id = $2
-RETURNING id, camp_id, season_name, start_date, end_date
+RETURNING id, camp_id, season_name, start_date, end_date, archived
 `
 
 type UpdateSeasonParams struct {
@@ -168,6 +172,7 @@ func (q *Queries) UpdateSeason(ctx context.Context, arg UpdateSeasonParams) (Sea
 		&i.SeasonName,
 		&i.StartDate,
 		&i.EndDate,
+		&i.Archived,
 	)
 	return i, err
 }

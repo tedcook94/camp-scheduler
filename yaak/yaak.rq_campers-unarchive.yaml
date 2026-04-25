@@ -1,0 +1,22 @@
+type: http_request
+model: http_request
+id: rq_campers-unarchive
+createdAt: "2026-04-25T00:00:00.000000"
+updatedAt: "2026-04-25T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_campers
+name: Unarchive
+description: ""
+url: "${[ base_url ]}/campers/:test-camper-id/unarchive"
+urlParameters:
+  - enabled: true
+    name: ":test-camper-id"
+    value: "${[ test-camper-id ]}"
+    id: null
+method: POST
+headers: []
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+sortPriority: 5.7

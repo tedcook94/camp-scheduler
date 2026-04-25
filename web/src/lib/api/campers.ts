@@ -17,12 +17,15 @@ import type {
 
 export const camperApi = {
 	list: () => api.get<Camper[]>("/api/v1/campers"),
+	listArchived: () => api.get<Camper[]>("/api/v1/campers/archived"),
 	get: (id: string) => api.get<Camper>(`/api/v1/campers/${id}`),
 	create: (data: CreateCamperRequest) =>
 		api.post<Camper>("/api/v1/campers", data),
 	update: (id: string, data: UpdateCamperRequest) =>
 		api.put<Camper>(`/api/v1/campers/${id}`, data),
 	delete: (id: string) => api.delete<void>(`/api/v1/campers/${id}`),
+	archive: (id: string) => api.post<void>(`/api/v1/campers/${id}/archive`),
+	unarchive: (id: string) => api.post<void>(`/api/v1/campers/${id}/unarchive`),
 };
 
 export const enrollmentApi = {

@@ -4167,11 +4167,507 @@ func TestCopySession(t *testing.T) {
 }
 
 func TestSessionCounselorRosterDisableInteraction(t *testing.T) {
-	// Disabling a counselor via the regular Update endpoint is no longer a thing
-	// after counselor_enabled was migrated to the archive flag. This behaviour
-	// will be reinstated against the dedicated archive endpoint in a follow-up
-	// commit; the test is skipped until then.
-	t.Skip("pending archive endpoint - see archive-entities branch")
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	if err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`,
+		"CampRosterDisable").Scan(&campID); err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	counselor := mustPost(t, apiURL(ts, "/counselors"), map[string]any{
+		"first_name": "Rachel", "junior_counselor": false, "gender": "female",
+		"last_name": "Test",
+	}, token)
+	counselorID := str(counselor, "id")
+
+	disabled := mustPost(t, apiURL(ts, "/counselors"), map[string]any{
+		"first_name": "Disabled Dan", "junior_counselor": false, "gender": "female",
+		"last_name": "Test",
+	}, token)
+	disabledID := str(disabled, "id")
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/counselors/"+disabledID+"/archive"), nil, http.StatusOK, token)
+
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31",
+	}, token)
+	session := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Week 1", "season_id": str(season, "id"),
+	}, token)
+	sessionID := str(session, "id")
+
+	rosterURL := apiURL(ts, "/sessions/"+sessionID+"/counselors")
+
+	t.Run("bootstrap excludes archived counselors", func(t *testing.T) {
+		roster := mustGetList(t, rosterURL, token)
+		ids := map[string]bool{}
+		for _, r := range roster {
+			ids[str(r.(map[string]any), "counselor_id")] = true
+		}
+		if !ids[counselorID] {
+			t.Errorf("expected active counselor on roster")
+		}
+		if ids[disabledID] {
+			t.Errorf("archived counselor should not be on bootstrapped roster")
+		}
+	})
+
+	t.Run("add rejects archived counselor", func(t *testing.T) {
+		doRawRequest(t, http.MethodPost, rosterURL, map[string]any{
+			"counselor_id": disabledID,
+		}, http.StatusBadRequest, token)
+	})
+
+	t.Run("archiving rostered counselor removes from rosters", func(t *testing.T) {
+		doRawRequest(t, http.MethodPost, apiURL(ts, "/counselors/"+counselorID+"/archive"), nil, http.StatusOK, token)
+
+		roster := mustGetList(t, rosterURL, token)
+		for _, r := range roster {
+			if str(r.(map[string]any), "counselor_id") == counselorID {
+				t.Fatalf("archived counselor should be removed from roster")
+			}
+		}
+	})
+
+	t.Run("unarchiving does not auto-restore roster membership", func(t *testing.T) {
+		doRawRequest(t, http.MethodPost, apiURL(ts, "/counselors/"+counselorID+"/unarchive"), nil, http.StatusOK, token)
+
+		roster := mustGetList(t, rosterURL, token)
+		for _, r := range roster {
+			if str(r.(map[string]any), "counselor_id") == counselorID {
+				t.Fatalf("unarchiving should not auto-restore roster membership")
+			}
+		}
+	})
+}
+
+func TestArchiveEndpoints(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	if err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`,
+		"CampArchive").Scan(&campID); err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	// Cover one entity per service surface to ensure routes wire correctly.
+	cases := []struct {
+		name       string
+		listPath   string
+		createPath string
+		createBody map[string]any
+	}{
+		{
+			name:       "age group",
+			listPath:   "/age-groups",
+			createPath: "/age-groups",
+			createBody: map[string]any{"name": "Juniors"},
+		},
+		{
+			name:       "time slot",
+			listPath:   "/time-slots",
+			createPath: "/time-slots",
+			createBody: map[string]any{"name": "Morning"},
+		},
+		{
+			name:       "certification",
+			listPath:   "/certifications",
+			createPath: "/certifications",
+			createBody: map[string]any{"name": "Lifeguard"},
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			created := mustPost(t, apiURL(ts, tc.createPath), tc.createBody, token)
+			id := str(created, "id")
+
+			if archived, _ := created["archived"].(bool); archived {
+				t.Fatalf("newly-created %s should not be archived: %v", tc.name, created)
+			}
+
+			active := mustGetList(t, apiURL(ts, tc.listPath), token)
+			if !containsID(active, id) {
+				t.Fatalf("active list should contain newly-created %s", tc.name)
+			}
+
+			doRawRequest(t, http.MethodPost, apiURL(ts, tc.listPath+"/"+id+"/archive"), nil, http.StatusOK, token)
+
+			active = mustGetList(t, apiURL(ts, tc.listPath), token)
+			if containsID(active, id) {
+				t.Fatalf("archived %s should not appear in active list", tc.name)
+			}
+
+			archived := mustGetList(t, apiURL(ts, tc.listPath+"/archived"), token)
+			if !containsID(archived, id) {
+				t.Fatalf("archived list should contain archived %s", tc.name)
+			}
+
+			doRawRequest(t, http.MethodPost, apiURL(ts, tc.listPath+"/"+id+"/unarchive"), nil, http.StatusOK, token)
+
+			active = mustGetList(t, apiURL(ts, tc.listPath), token)
+			if !containsID(active, id) {
+				t.Fatalf("unarchived %s should reappear in active list", tc.name)
+			}
+
+			// Archive/unarchive on an unknown id returns 404.
+			doRawRequest(t, http.MethodPost, apiURL(ts, tc.listPath+"/00000000-0000-0000-0000-000000000000/archive"), nil, http.StatusNotFound, token)
+		})
+	}
+}
+
+func containsID(items []any, id string) bool {
+	for _, item := range items {
+		if str(item.(map[string]any), "id") == id {
+			return true
+		}
+	}
+	return false
+}
+
+// TestArchivedReferencesRejected verifies session and session-config endpoints
+// reject archived parent resources at creation/update time. Archived previous
+// sessions are explicitly allowed so that historical chains stay editable.
+func TestArchivedReferencesRejected(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	if err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`,
+		"CampArchivedRefs").Scan(&campID); err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	// Active and archived seasons.
+	activeSeason := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Active", "start_date": "2026-06-01", "end_date": "2026-06-30",
+	}, token)
+	activeSeasonID := str(activeSeason, "id")
+	archivedSeason := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "OldSeason", "start_date": "2025-06-01", "end_date": "2025-06-30",
+	}, token)
+	archivedSeasonID := str(archivedSeason, "id")
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/seasons/"+archivedSeasonID+"/archive"), nil, http.StatusOK, token)
+
+	t.Run("create session under archived season is rejected", func(t *testing.T) {
+		doRawRequest(t, http.MethodPost, apiURL(ts, "/sessions"), map[string]any{
+			"name": "Bad", "season_id": archivedSeasonID,
+		}, http.StatusBadRequest, token)
+	})
+
+	// Create a session in the active season for update/copy + ref tests.
+	session := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Good", "season_id": activeSeasonID,
+	}, token)
+	sessionID := str(session, "id")
+	sessionBase := "/sessions/" + sessionID
+
+	t.Run("update session to archived season is rejected", func(t *testing.T) {
+		doRawRequest(t, http.MethodPut, apiURL(ts, sessionBase), map[string]any{
+			"name": "Good", "season_id": archivedSeasonID,
+		}, http.StatusBadRequest, token)
+	})
+
+	t.Run("copy session to archived season is rejected", func(t *testing.T) {
+		doRawRequest(t, http.MethodPost, apiURL(ts, sessionBase+"/copy"), map[string]any{
+			"name": "Copy", "season_id": archivedSeasonID,
+		}, http.StatusBadRequest, token)
+	})
+
+	t.Run("archived previous_session is allowed", func(t *testing.T) {
+		// Create then archive a sibling in the same active season.
+		prev := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+			"name": "Prev", "season_id": activeSeasonID,
+		}, token)
+		prevID := str(prev, "id")
+		doRawRequest(t, http.MethodPost, apiURL(ts, "/sessions/"+prevID+"/archive"), nil, http.StatusOK, token)
+
+		// Creating a new session that references the archived previous succeeds.
+		mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+			"name": "WithArchivedPrev", "season_id": activeSeasonID, "previous_session_id": prevID,
+		}, token)
+	})
+
+	// Archived age group and cabin.
+	activeAG := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Juniors"}, token)
+	activeAGID := str(activeAG, "id")
+	archivedAG := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "OldAG"}, token)
+	archivedAGID := str(archivedAG, "id")
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/age-groups/"+archivedAGID+"/archive"), nil, http.StatusOK, token)
+
+	activeCabin := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name": "Birch", "default_age_group_id": activeAGID,
+		"default_group_size": 8, "default_required_counselors": 1, "gender": "female",
+	}, token)
+	activeCabinID := str(activeCabin, "id")
+	archivedCabin := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name": "OldCabin", "default_age_group_id": activeAGID,
+		"default_group_size": 8, "default_required_counselors": 1, "gender": "female",
+	}, token)
+	archivedCabinID := str(archivedCabin, "id")
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/cabins/"+archivedCabinID+"/archive"), nil, http.StatusOK, token)
+
+	t.Run("attach archived age group to session is rejected", func(t *testing.T) {
+		doRawRequest(t, http.MethodPost, apiURL(ts, sessionBase+"/age-groups"), map[string]any{
+			"age_group_id": archivedAGID,
+		}, http.StatusBadRequest, token)
+	})
+
+	// Add a valid SAG so we can test cabin attachment.
+	sag := mustPost(t, apiURL(ts, sessionBase+"/age-groups"), map[string]any{
+		"age_group_id": activeAGID,
+	}, token)
+	sagID := str(sag, "id")
+
+	t.Run("attach archived cabin to session is rejected", func(t *testing.T) {
+		doRawRequest(t, http.MethodPost, apiURL(ts, sessionBase+"/cabins"), map[string]any{
+			"session_age_group_id": sagID, "cabin_id": archivedCabinID,
+			"group_size": 4, "required_counselors": 1,
+		}, http.StatusBadRequest, token)
+	})
+
+	t.Run("update session cabin to archived cabin is rejected", func(t *testing.T) {
+		sc := mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
+			"session_age_group_id": sagID, "cabin_id": activeCabinID,
+			"group_size": 4, "required_counselors": 1,
+		}, token)
+		scID := str(sc, "id")
+		doRawRequest(t, http.MethodPut, apiURL(ts, sessionBase+"/cabins/"+scID), map[string]any{
+			"cabin_id": archivedCabinID, "group_size": 4, "required_counselors": 1,
+		}, http.StatusBadRequest, token)
+	})
+
+	// Archived time slot and activity.
+	activeTS := mustPost(t, apiURL(ts, "/time-slots"), map[string]any{"name": "Morning"}, token)
+	activeTSID := str(activeTS, "id")
+	archivedTS := mustPost(t, apiURL(ts, "/time-slots"), map[string]any{"name": "OldTS"}, token)
+	archivedTSID := str(archivedTS, "id")
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/time-slots/"+archivedTSID+"/archive"), nil, http.StatusOK, token)
+
+	activeActivity := mustPost(t, apiURL(ts, "/activities"), map[string]any{"name": "Swim"}, token)
+	activeActivityID := str(activeActivity, "id")
+	archivedActivity := mustPost(t, apiURL(ts, "/activities"), map[string]any{"name": "OldAct"}, token)
+	archivedActivityID := str(archivedActivity, "id")
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/activities/"+archivedActivityID+"/archive"), nil, http.StatusOK, token)
+
+	t.Run("attach archived time slot to session is rejected", func(t *testing.T) {
+		doRawRequest(t, http.MethodPost, apiURL(ts, sessionBase+"/time-slots"), map[string]any{
+			"time_slot_id": archivedTSID, "sort_order": 1,
+		}, http.StatusBadRequest, token)
+	})
+
+	// Add a valid STS to allow activity attachment + update tests.
+	sts := mustPost(t, apiURL(ts, sessionBase+"/time-slots"), map[string]any{
+		"time_slot_id": activeTSID, "sort_order": 1,
+	}, token)
+	stsID := str(sts, "id")
+
+	t.Run("update session time slot to archived time slot is rejected", func(t *testing.T) {
+		doRawRequest(t, http.MethodPut, apiURL(ts, sessionBase+"/time-slots/"+stsID), map[string]any{
+			"time_slot_id": archivedTSID, "sort_order": 1,
+		}, http.StatusBadRequest, token)
+	})
+
+	t.Run("attach archived activity to session is rejected", func(t *testing.T) {
+		doRawRequest(t, http.MethodPost, apiURL(ts, sessionBase+"/time-slots/"+stsID+"/activities"), map[string]any{
+			"activity_id": archivedActivityID, "capacity": 10, "required_counselors": 1,
+		}, http.StatusBadRequest, token)
+	})
+
+	t.Run("update session activity to archived activity is rejected", func(t *testing.T) {
+		sa := mustPost(t, apiURL(ts, sessionBase+"/time-slots/"+stsID+"/activities"), map[string]any{
+			"activity_id": activeActivityID, "capacity": 10, "required_counselors": 1,
+		}, token)
+		saID := str(sa, "id")
+		doRawRequest(t, http.MethodPut, apiURL(ts, sessionBase+"/time-slots/"+stsID+"/activities/"+saID), map[string]any{
+			"activity_id": archivedActivityID, "capacity": 10, "required_counselors": 1,
+		}, http.StatusBadRequest, token)
+	})
+}
+
+// TestCopySessionSkipsArchivedReferences verifies that copying a session whose
+// configuration references entities later archived produces a clone with those
+// references silently omitted. The copy must succeed; only active references
+// carry over.
+func TestCopySessionSkipsArchivedReferences(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	if err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`,
+		"CampCopyArchiveSkip").Scan(&campID); err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "S", "start_date": "2026-06-01", "end_date": "2026-06-30",
+	}, token)
+	seasonID := str(season, "id")
+
+	source := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "Source", "season_id": seasonID,
+	}, token)
+	sourceID := str(source, "id")
+	sourceBase := "/sessions/" + sourceID
+
+	// Two age groups, two cabins, two time slots, two activities — one of each
+	// will be archived after attaching to the source.
+	keepAG := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Keep"}, token)
+	keepAGID := str(keepAG, "id")
+	dropAG := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Drop"}, token)
+	dropAGID := str(dropAG, "id")
+
+	keepCabin := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name": "KeepCabin", "default_age_group_id": keepAGID,
+		"default_group_size": 8, "default_required_counselors": 1, "gender": "female",
+	}, token)
+	keepCabinID := str(keepCabin, "id")
+	dropCabin := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name": "DropCabin", "default_age_group_id": keepAGID,
+		"default_group_size": 8, "default_required_counselors": 1, "gender": "female",
+	}, token)
+	dropCabinID := str(dropCabin, "id")
+
+	keepTS := mustPost(t, apiURL(ts, "/time-slots"), map[string]any{"name": "KeepTS"}, token)
+	keepTSID := str(keepTS, "id")
+	dropTS := mustPost(t, apiURL(ts, "/time-slots"), map[string]any{"name": "DropTS"}, token)
+	dropTSID := str(dropTS, "id")
+
+	keepAct := mustPost(t, apiURL(ts, "/activities"), map[string]any{"name": "KeepAct"}, token)
+	keepActID := str(keepAct, "id")
+	dropAct := mustPost(t, apiURL(ts, "/activities"), map[string]any{"name": "DropAct"}, token)
+	dropActID := str(dropAct, "id")
+
+	// Attach to source while everything is still active.
+	keepSAG := mustPost(t, apiURL(ts, sourceBase+"/age-groups"), map[string]any{
+		"age_group_id": keepAGID,
+	}, token)
+	keepSAGID := str(keepSAG, "id")
+	dropSAG := mustPost(t, apiURL(ts, sourceBase+"/age-groups"), map[string]any{
+		"age_group_id": dropAGID,
+	}, token)
+	dropSAGID := str(dropSAG, "id")
+
+	// Cabin attached under keep-SAG: keepCabin (will survive), dropCabin
+	// (cabin itself will be archived).
+	mustPost(t, apiURL(ts, sourceBase+"/cabins"), map[string]any{
+		"session_age_group_id": keepSAGID, "cabin_id": keepCabinID,
+		"group_size": 4, "required_counselors": 1,
+	}, token)
+	mustPost(t, apiURL(ts, sourceBase+"/cabins"), map[string]any{
+		"session_age_group_id": keepSAGID, "cabin_id": dropCabinID,
+		"group_size": 4, "required_counselors": 1,
+	}, token)
+	// Cabin attached under drop-SAG: should disappear because parent SAG drops.
+	mustPost(t, apiURL(ts, sourceBase+"/cabins"), map[string]any{
+		"session_age_group_id": dropSAGID, "cabin_id": keepCabinID,
+		"group_size": 4, "required_counselors": 1,
+	}, token)
+
+	keepSTS := mustPost(t, apiURL(ts, sourceBase+"/time-slots"), map[string]any{
+		"time_slot_id": keepTSID, "sort_order": 1,
+	}, token)
+	keepSTSID := str(keepSTS, "id")
+	dropSTS := mustPost(t, apiURL(ts, sourceBase+"/time-slots"), map[string]any{
+		"time_slot_id": dropTSID, "sort_order": 2,
+	}, token)
+	dropSTSID := str(dropSTS, "id")
+
+	// Activity attached under keep-STS: keepAct (will survive), dropAct
+	// (activity itself will be archived).
+	mustPost(t, apiURL(ts, sourceBase+"/time-slots/"+keepSTSID+"/activities"), map[string]any{
+		"activity_id": keepActID, "capacity": 10, "required_counselors": 1,
+	}, token)
+	mustPost(t, apiURL(ts, sourceBase+"/time-slots/"+keepSTSID+"/activities"), map[string]any{
+		"activity_id": dropActID, "capacity": 10, "required_counselors": 1,
+	}, token)
+	// Activity attached under drop-STS: should disappear because parent STS drops.
+	mustPost(t, apiURL(ts, sourceBase+"/time-slots/"+dropSTSID+"/activities"), map[string]any{
+		"activity_id": keepActID, "capacity": 10, "required_counselors": 1,
+	}, token)
+
+	// Now archive the "drop" entities.
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/age-groups/"+dropAGID+"/archive"), nil, http.StatusOK, token)
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/cabins/"+dropCabinID+"/archive"), nil, http.StatusOK, token)
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/time-slots/"+dropTSID+"/archive"), nil, http.StatusOK, token)
+	doRawRequest(t, http.MethodPost, apiURL(ts, "/activities/"+dropActID+"/archive"), nil, http.StatusOK, token)
+
+	// Copy the source. Should succeed; archived references silently dropped.
+	copied := doRequest(t, http.MethodPost, apiURL(ts, sourceBase+"/copy"), map[string]any{
+		"name": "Copy", "season_id": seasonID,
+	}, http.StatusCreated, token)
+	copyID := str(copied, "id")
+	copyBase := "/sessions/" + copyID
+
+	t.Run("only active age group is cloned", func(t *testing.T) {
+		sags := mustGetList(t, apiURL(ts, copyBase+"/age-groups"), token)
+		seen := map[string]bool{}
+		for _, sag := range sags {
+			seen[str(sag.(map[string]any), "age_group_id")] = true
+		}
+		if !seen[keepAGID] {
+			t.Errorf("expected keep age group on copy")
+		}
+		if seen[dropAGID] {
+			t.Errorf("archived age group must not appear on copy")
+		}
+	})
+
+	t.Run("cabins under archived parent or archived cabin are skipped", func(t *testing.T) {
+		cabins := mustGetList(t, apiURL(ts, copyBase+"/cabins"), token)
+		// Expect exactly one cabin on the copy: keepCabin under keepSAG.
+		// dropCabin under keepSAG → dropped (cabin archived).
+		// keepCabin under dropSAG → dropped (parent SAG archived).
+		if len(cabins) != 1 {
+			t.Fatalf("expected 1 cabin on copy, got %d: %v", len(cabins), cabins)
+		}
+		if id := str(cabins[0].(map[string]any), "cabin_id"); id != keepCabinID {
+			t.Errorf("expected keep cabin id %s, got %s", keepCabinID, id)
+		}
+	})
+
+	t.Run("only active time slot is cloned", func(t *testing.T) {
+		stss := mustGetList(t, apiURL(ts, copyBase+"/time-slots"), token)
+		seen := map[string]bool{}
+		for _, sts := range stss {
+			seen[str(sts.(map[string]any), "time_slot_id")] = true
+		}
+		if !seen[keepTSID] {
+			t.Errorf("expected keep time slot on copy")
+		}
+		if seen[dropTSID] {
+			t.Errorf("archived time slot must not appear on copy")
+		}
+	})
+
+	t.Run("activities under archived parent or archived activity are skipped", func(t *testing.T) {
+		// The copy has only keepSTS; list its activities.
+		stss := mustGetList(t, apiURL(ts, copyBase+"/time-slots"), token)
+		var newKeepSTSID string
+		for _, sts := range stss {
+			m := sts.(map[string]any)
+			if str(m, "time_slot_id") == keepTSID {
+				newKeepSTSID = str(m, "id")
+			}
+		}
+		if newKeepSTSID == "" {
+			t.Fatalf("could not locate cloned keep STS")
+		}
+		acts := mustGetList(t, apiURL(ts, copyBase+"/time-slots/"+newKeepSTSID+"/activities"), token)
+		if len(acts) != 1 {
+			t.Fatalf("expected 1 activity on copy, got %d: %v", len(acts), acts)
+		}
+		if id := str(acts[0].(map[string]any), "activity_id"); id != keepActID {
+			t.Errorf("expected keep activity id %s, got %s", keepActID, id)
+		}
+	})
 }
 
 func TestReports(t *testing.T) {

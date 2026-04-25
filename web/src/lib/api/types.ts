@@ -60,12 +60,14 @@ export interface Certification {
 	id: string;
 	camp_id: string;
 	name: string;
+	archived: boolean;
 }
 
 export interface AgeGroup {
 	id: string;
 	camp_id: string;
 	name: string;
+	archived: boolean;
 }
 
 export interface ApiError {
@@ -83,6 +85,7 @@ export interface Cabin {
 	default_group_size: number;
 	default_required_counselors: number;
 	gender: Gender;
+	archived: boolean;
 }
 
 export interface CreateCabinRequest {
@@ -107,6 +110,7 @@ export interface Season {
 	name: string;
 	start_date: string;
 	end_date: string;
+	archived: boolean;
 }
 
 export interface CreateSeasonRequest {
@@ -127,6 +131,7 @@ export interface Session {
 	season_id: string;
 	name: string;
 	previous_session_id: string | null;
+	archived: boolean;
 }
 
 export interface CreateSessionRequest {
@@ -151,6 +156,7 @@ export interface Activity {
 	id: string;
 	camp_id: string;
 	name: string;
+	archived: boolean;
 }
 
 export interface ActivityCertification {
@@ -165,6 +171,7 @@ export interface TimeSlot {
 	id: string;
 	camp_id: string;
 	name: string;
+	archived: boolean;
 }
 
 export interface SessionTimeSlot {

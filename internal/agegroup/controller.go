@@ -22,10 +22,13 @@ func NewController(svc *Service) *Controller {
 func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	ageGroups := rg.Group("/age-groups")
 	ageGroups.GET("", ctrl.List)
+	ageGroups.GET("/archived", ctrl.ListArchived)
 	ageGroups.GET("/:id", ctrl.Get)
 	ageGroups.POST("", ctrl.Create)
 	ageGroups.PUT("/:id", ctrl.Update)
 	ageGroups.DELETE("/:id", ctrl.Delete)
+	ageGroups.POST("/:id/archive", ctrl.Archive)
+	ageGroups.POST("/:id/unarchive", ctrl.Unarchive)
 }
 
 type CreateAgeGroupRequest struct {
@@ -170,6 +173,66 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 			With("id", id).
 			With("error", err).
 			Error("error deleting age group")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.Status(http.StatusOK)
+}
+
+func (ctrl *Controller) ListArchived(c *gin.Context) {
+	log := auth.Logger(c)
+	campID := auth.GetCampID(c)
+
+	groups, err := ctrl.svc.ListArchived(c.Request.Context(), campID)
+	if err != nil {
+		if api.IsBadInput(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		log.
+			With("error", err).
+			Error("error listing archived age groups")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, groups)
+}
+
+func (ctrl *Controller) Archive(c *gin.Context) {
+	ctrl.setArchived(c, true)
+}
+
+func (ctrl *Controller) Unarchive(c *gin.Context) {
+	ctrl.setArchived(c, false)
+}
+
+func (ctrl *Controller) setArchived(c *gin.Context, archived bool) {
+	log := auth.Logger(c)
+	campID := auth.GetCampID(c)
+	id := c.Param("id")
+
+	var err error
+	if archived {
+		err = ctrl.svc.Archive(c.Request.Context(), campID, id)
+	} else {
+		err = ctrl.svc.Unarchive(c.Request.Context(), campID, id)
+	}
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "age group not found"})
+			return
+		}
+		if api.IsBadInput(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		log.
+			With("id", id).
+			With("archived", archived).
+			With("error", err).
+			Error("error setting age group archived")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}

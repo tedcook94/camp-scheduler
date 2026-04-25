@@ -284,6 +284,18 @@ func (svc *Service) setArchived(ctx context.Context, campID, id string, archived
 		return ErrNotFound
 	}
 
+	// On archive, remove from all session counselor rosters so the solver
+	// and preference filtering stop considering them. Unarchiving does not
+	// auto-restore membership; admins must re-add manually.
+	if archived {
+		if err := qtx.RemoveCounselorFromAllSessions(ctx, db.RemoveCounselorFromAllSessionsParams{
+			CounselorID: uid,
+			CampID:      campUUID,
+		}); err != nil {
+			return fmt.Errorf("error removing archived counselor %s from session rosters: %w", id, err)
+		}
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("error committing archive counselor transaction: %w", err)
 	}

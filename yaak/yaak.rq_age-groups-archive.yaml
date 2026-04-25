@@ -1,0 +1,22 @@
+type: http_request
+model: http_request
+id: rq_age-groups-archive
+createdAt: "2026-04-25T00:00:00.000000"
+updatedAt: "2026-04-25T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_age-groups
+name: Archive
+description: ""
+url: "${[ base_url ]}/age-groups/:test-age-group-id/archive"
+urlParameters:
+  - enabled: true
+    name: ":test-age-group-id"
+    value: "${[ test-age-group-id ]}"
+    id: null
+method: POST
+headers: []
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+sortPriority: 5.6

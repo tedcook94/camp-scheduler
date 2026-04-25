@@ -107,6 +107,25 @@ func (q *Queries) GetAssignmentRun(ctx context.Context, arg GetAssignmentRunPara
 	return i, err
 }
 
+const getSelectedRunBySessionAndType = `-- name: GetSelectedRunBySessionAndType :one
+SELECT id
+FROM assignment_runs
+WHERE camp_id = $1 AND session_id = $2 AND run_type = $3 AND status = 'selected'
+`
+
+type GetSelectedRunBySessionAndTypeParams struct {
+	CampID    pgtype.UUID
+	SessionID pgtype.UUID
+	RunType   string
+}
+
+func (q *Queries) GetSelectedRunBySessionAndType(ctx context.Context, arg GetSelectedRunBySessionAndTypeParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, getSelectedRunBySessionAndType, arg.CampID, arg.SessionID, arg.RunType)
+	var id pgtype.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const listAssignmentRunsBySession = `-- name: ListAssignmentRunsBySession :many
 SELECT
     ar.id,

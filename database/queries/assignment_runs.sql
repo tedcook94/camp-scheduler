@@ -57,3 +57,8 @@ SELECT id
 FROM sessions
 WHERE camp_id = $1
   AND previous_session = ANY(@previous_session_ids::uuid[]);
+
+-- name: GetSelectedRunBySessionAndType :one
+SELECT id
+FROM assignment_runs
+WHERE camp_id = $1 AND session_id = $2 AND run_type = $3 AND status = 'selected';

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"camp-scheduler/internal/config"
@@ -558,37 +557,37 @@ func createSessionActivities(ctx context.Context, q *db.Queries, campID pgtype.U
 
 func createCounselors(ctx context.Context, q *db.Queries, campID pgtype.UUID) (map[string]db.Counselor, error) {
 	defs := []struct {
-		name   string
+		first  string
+		last   string
 		junior bool
 		gender string
 	}{
-		{"Sarah Johnson", false, "female"},
-		{"Mike Chen", false, "male"},
-		{"Emily Davis", false, "female"},
-		{"James Wilson", false, "male"},
-		{"Lisa Rodriguez", false, "female"},
-		{"David Brown", false, "male"},
-		{"Rachel Kim", false, "female"},
-		{"Tom Anderson", false, "male"},
-		{"Karen Martinez", false, "female"},
-		{"Alex Thompson", true, "male"},
-		{"Jordan Lee", true, "female"},
-		{"Taylor White", true, "male"},
+		{"Sarah", "Johnson", false, "female"},
+		{"Mike", "Chen", false, "male"},
+		{"Emily", "Davis", false, "female"},
+		{"James", "Wilson", false, "male"},
+		{"Lisa", "Rodriguez", false, "female"},
+		{"David", "Brown", false, "male"},
+		{"Rachel", "Kim", false, "female"},
+		{"Tom", "Anderson", false, "male"},
+		{"Karen", "Martinez", false, "female"},
+		{"Alex", "Thompson", true, "male"},
+		{"Jordan", "Lee", true, "female"},
+		{"Taylor", "White", true, "male"},
 	}
 	m := make(map[string]db.Counselor)
 	for _, d := range defs {
-		first, last, _ := strings.Cut(d.name, " ")
 		c, err := q.CreateCounselor(ctx, db.CreateCounselorParams{
 			CampID:          campID,
-			FirstName:       first,
-			LastName:        last,
+			FirstName:       d.first,
+			LastName:        d.last,
 			JuniorCounselor: d.junior,
 			Gender:          d.gender,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("error creating counselor %s: %w", d.name, err)
+			return nil, fmt.Errorf("error creating counselor %s %s: %w", d.first, d.last, err)
 		}
-		m[d.name] = db.Counselor{
+		m[d.first+" "+d.last] = db.Counselor{
 			ID:               c.ID,
 			CampID:           c.CampID,
 			JuniorCounselor:  c.JuniorCounselor,
@@ -806,41 +805,53 @@ func setCounselorHistory(ctx context.Context, q *db.Queries, campID pgtype.UUID,
 }
 
 func createCampers(ctx context.Context, q *db.Queries, campID pgtype.UUID, ageGroups map[string]db.AgeGroup) (map[string]db.Camper, error) {
-	bears := []string{"Emma", "Liam", "Olivia", "Noah", "Ava", "William", "Sophia", "Mason", "Isabella", "Lucas", "Mia", "Ethan"}
-	eagles := []string{"Aiden", "Charlotte", "Benjamin", "Harper", "Daniel", "Amelia", "Henry", "Evelyn", "Jack", "Abigail", "Owen", "Grace"}
-	wolves := []string{"Logan", "Chloe", "Caleb", "Zoe", "Nathan", "Lily", "Ryan", "Hannah", "Connor", "Maya", "Dylan", "Stella"}
-
-	// Explicit per-name gender keeps demo names realistic. Each age group
-	// contributes 6 female and 6 male campers, matching the one-female and
-	// one-male cabin per age group.
-	camperGender := map[string]string{
-		// bears
-		"Emma": "female", "Liam": "male", "Olivia": "female", "Noah": "male",
-		"Ava": "female", "William": "male", "Sophia": "female", "Mason": "male",
-		"Isabella": "female", "Lucas": "male", "Mia": "female", "Ethan": "male",
-		// eagles
-		"Aiden": "male", "Charlotte": "female", "Benjamin": "male", "Harper": "female",
-		"Daniel": "male", "Amelia": "female", "Henry": "male", "Evelyn": "female",
-		"Jack": "male", "Abigail": "female", "Owen": "male", "Grace": "female",
-		// wolves
-		"Logan": "male", "Chloe": "female", "Caleb": "male", "Zoe": "female",
-		"Nathan": "male", "Lily": "female", "Ryan": "male", "Hannah": "female",
-		"Connor": "male", "Maya": "female", "Dylan": "male", "Stella": "female",
+	type camperDef struct {
+		first  string
+		last   string
+		gender string
+	}
+	// Each age group contributes 6 female and 6 male campers, matching the
+	// one-female and one-male cabin per age group. Last names are realistic
+	// surnames so the demo data exercises the new first_name/last_name
+	// columns end-to-end.
+	bears := []camperDef{
+		{"Emma", "Patel", "female"}, {"Liam", "Nguyen", "male"},
+		{"Olivia", "Garcia", "female"}, {"Noah", "Smith", "male"},
+		{"Ava", "Cohen", "female"}, {"William", "Tran", "male"},
+		{"Sophia", "Hughes", "female"}, {"Mason", "Reyes", "male"},
+		{"Isabella", "Walker", "female"}, {"Lucas", "Park", "male"},
+		{"Mia", "Foster", "female"}, {"Ethan", "Bailey", "male"},
+	}
+	eagles := []camperDef{
+		{"Aiden", "Bennett", "male"}, {"Charlotte", "Wright", "female"},
+		{"Benjamin", "Carter", "male"}, {"Harper", "Mitchell", "female"},
+		{"Daniel", "Murphy", "male"}, {"Amelia", "Cooper", "female"},
+		{"Henry", "Rivera", "male"}, {"Evelyn", "Stewart", "female"},
+		{"Jack", "Morris", "male"}, {"Abigail", "Sanders", "female"},
+		{"Owen", "Coleman", "male"}, {"Grace", "Hayes", "female"},
+	}
+	wolves := []camperDef{
+		{"Logan", "Russell", "male"}, {"Chloe", "Brooks", "female"},
+		{"Caleb", "Diaz", "male"}, {"Zoe", "Wood", "female"},
+		{"Nathan", "Bell", "male"}, {"Lily", "Barnes", "female"},
+		{"Ryan", "Powell", "male"}, {"Hannah", "Long", "female"},
+		{"Connor", "Perry", "male"}, {"Maya", "Ross", "female"},
+		{"Dylan", "Jenkins", "male"}, {"Stella", "Price", "female"},
 	}
 
-	allNames := append(append(bears, eagles...), wolves...)
+	all := append(append(bears, eagles...), wolves...)
 	m := make(map[string]db.Camper)
-	for _, name := range allNames {
+	for _, d := range all {
 		c, err := q.CreateCamper(ctx, db.CreateCamperParams{
 			CampID:    campID,
-			FirstName: name,
-			LastName:  "",
-			Gender:    camperGender[name],
+			FirstName: d.first,
+			LastName:  d.last,
+			Gender:    d.gender,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("error creating camper %s: %w", name, err)
+			return nil, fmt.Errorf("error creating camper %s %s: %w", d.first, d.last, err)
 		}
-		m[name] = db.Camper{
+		m[d.first] = db.Camper{
 			ID:        c.ID,
 			CampID:    c.CampID,
 			FirstName: c.FirstName,

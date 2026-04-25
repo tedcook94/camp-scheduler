@@ -91,10 +91,11 @@ type Camp struct {
 }
 
 type Camper struct {
-	ID         pgtype.UUID
-	CampID     pgtype.UUID
-	CamperName string
-	Gender     string
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	Gender    string
+	FirstName string
+	LastName  string
 }
 
 type CamperCabinAssignment struct {

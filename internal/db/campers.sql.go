@@ -12,24 +12,39 @@ import (
 )
 
 const createCamper = `-- name: CreateCamper :one
-INSERT INTO campers (camp_id, camper_name, gender)
-VALUES ($1, $2, $3)
-RETURNING id, camp_id, camper_name, gender
+INSERT INTO campers (camp_id, first_name, last_name, gender)
+VALUES ($1, $2, $3, $4)
+RETURNING id, camp_id, first_name, last_name, gender
 `
 
 type CreateCamperParams struct {
-	CampID     pgtype.UUID
-	CamperName string
-	Gender     string
+	CampID    pgtype.UUID
+	FirstName string
+	LastName  string
+	Gender    string
 }
 
-func (q *Queries) CreateCamper(ctx context.Context, arg CreateCamperParams) (Camper, error) {
-	row := q.db.QueryRow(ctx, createCamper, arg.CampID, arg.CamperName, arg.Gender)
-	var i Camper
+type CreateCamperRow struct {
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	FirstName string
+	LastName  string
+	Gender    string
+}
+
+func (q *Queries) CreateCamper(ctx context.Context, arg CreateCamperParams) (CreateCamperRow, error) {
+	row := q.db.QueryRow(ctx, createCamper,
+		arg.CampID,
+		arg.FirstName,
+		arg.LastName,
+		arg.Gender,
+	)
+	var i CreateCamperRow
 	err := row.Scan(
 		&i.ID,
 		&i.CampID,
-		&i.CamperName,
+		&i.FirstName,
+		&i.LastName,
 		&i.Gender,
 	)
 	return i, err
@@ -54,7 +69,7 @@ func (q *Queries) DeleteCamper(ctx context.Context, arg DeleteCamperParams) (int
 }
 
 const getCamper = `-- name: GetCamper :one
-SELECT id, camp_id, camper_name, gender
+SELECT id, camp_id, first_name, last_name, gender
 FROM campers
 WHERE id = $1 AND camp_id = $2
 `
@@ -64,38 +79,56 @@ type GetCamperParams struct {
 	CampID pgtype.UUID
 }
 
-func (q *Queries) GetCamper(ctx context.Context, arg GetCamperParams) (Camper, error) {
+type GetCamperRow struct {
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	FirstName string
+	LastName  string
+	Gender    string
+}
+
+func (q *Queries) GetCamper(ctx context.Context, arg GetCamperParams) (GetCamperRow, error) {
 	row := q.db.QueryRow(ctx, getCamper, arg.ID, arg.CampID)
-	var i Camper
+	var i GetCamperRow
 	err := row.Scan(
 		&i.ID,
 		&i.CampID,
-		&i.CamperName,
+		&i.FirstName,
+		&i.LastName,
 		&i.Gender,
 	)
 	return i, err
 }
 
 const listCampers = `-- name: ListCampers :many
-SELECT id, camp_id, camper_name, gender
+SELECT id, camp_id, first_name, last_name, gender
 FROM campers
 WHERE camp_id = $1
-ORDER BY camper_name
+ORDER BY last_name, first_name
 `
 
-func (q *Queries) ListCampers(ctx context.Context, campID pgtype.UUID) ([]Camper, error) {
+type ListCampersRow struct {
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	FirstName string
+	LastName  string
+	Gender    string
+}
+
+func (q *Queries) ListCampers(ctx context.Context, campID pgtype.UUID) ([]ListCampersRow, error) {
 	rows, err := q.db.Query(ctx, listCampers, campID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Camper
+	var items []ListCampersRow
 	for rows.Next() {
-		var i Camper
+		var i ListCampersRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.CampID,
-			&i.CamperName,
+			&i.FirstName,
+			&i.LastName,
 			&i.Gender,
 		); err != nil {
 			return nil, err
@@ -110,31 +143,43 @@ func (q *Queries) ListCampers(ctx context.Context, campID pgtype.UUID) ([]Camper
 
 const updateCamper = `-- name: UpdateCamper :one
 UPDATE campers
-SET camper_name = $3,
-    gender = $4
+SET first_name = $3,
+    last_name = $4,
+    gender = $5
 WHERE id = $1 AND camp_id = $2
-RETURNING id, camp_id, camper_name, gender
+RETURNING id, camp_id, first_name, last_name, gender
 `
 
 type UpdateCamperParams struct {
-	ID         pgtype.UUID
-	CampID     pgtype.UUID
-	CamperName string
-	Gender     string
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	FirstName string
+	LastName  string
+	Gender    string
 }
 
-func (q *Queries) UpdateCamper(ctx context.Context, arg UpdateCamperParams) (Camper, error) {
+type UpdateCamperRow struct {
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	FirstName string
+	LastName  string
+	Gender    string
+}
+
+func (q *Queries) UpdateCamper(ctx context.Context, arg UpdateCamperParams) (UpdateCamperRow, error) {
 	row := q.db.QueryRow(ctx, updateCamper,
 		arg.ID,
 		arg.CampID,
-		arg.CamperName,
+		arg.FirstName,
+		arg.LastName,
 		arg.Gender,
 	)
-	var i Camper
+	var i UpdateCamperRow
 	err := row.Scan(
 		&i.ID,
 		&i.CampID,
-		&i.CamperName,
+		&i.FirstName,
+		&i.LastName,
 		&i.Gender,
 	)
 	return i, err

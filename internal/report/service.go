@@ -73,16 +73,20 @@ type CabinUnassigned struct {
 }
 
 type CounselorRow struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Junior bool   `json:"junior"`
-	Gender string `json:"gender"`
+	ID        string `json:"id"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Name      string `json:"name"`
+	Junior    bool   `json:"junior"`
+	Gender    string `json:"gender"`
 }
 
 type CamperRow struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Gender string `json:"gender"`
+	ID        string `json:"id"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Name      string `json:"name"`
+	Gender    string `json:"gender"`
 }
 
 type ActivityReport struct {

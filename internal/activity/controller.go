@@ -22,10 +22,13 @@ func NewController(svc *Service) *Controller {
 func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	activities := rg.Group("/activities")
 	activities.GET("", ctrl.List)
+	activities.GET("/archived", ctrl.ListArchived)
 	activities.GET("/:activityId", ctrl.Get)
 	activities.POST("", ctrl.Create)
 	activities.PUT("/:activityId", ctrl.Update)
 	activities.DELETE("/:activityId", ctrl.Delete)
+	activities.POST("/:activityId/archive", ctrl.Archive)
+	activities.POST("/:activityId/unarchive", ctrl.Unarchive)
 
 	certs := activities.Group("/:activityId/certifications")
 	certs.GET("", ctrl.ListCertifications)
@@ -294,6 +297,66 @@ func (ctrl *Controller) RemoveCertification(c *gin.Context) {
 			With("id", id).
 			With("error", err).
 			Error("error removing certification from activity")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.Status(http.StatusOK)
+}
+
+func (ctrl *Controller) ListArchived(c *gin.Context) {
+	log := auth.Logger(c)
+	campID := auth.GetCampID(c)
+
+	items, err := ctrl.svc.ListArchived(c.Request.Context(), campID)
+	if err != nil {
+		if api.IsBadInput(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		log.
+			With("error", err).
+			Error("error listing archived activities")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, items)
+}
+
+func (ctrl *Controller) Archive(c *gin.Context) {
+	ctrl.setArchived(c, true)
+}
+
+func (ctrl *Controller) Unarchive(c *gin.Context) {
+	ctrl.setArchived(c, false)
+}
+
+func (ctrl *Controller) setArchived(c *gin.Context, archived bool) {
+	log := auth.Logger(c)
+	campID := auth.GetCampID(c)
+	id := c.Param("activityId")
+
+	var err error
+	if archived {
+		err = ctrl.svc.Archive(c.Request.Context(), campID, id)
+	} else {
+		err = ctrl.svc.Unarchive(c.Request.Context(), campID, id)
+	}
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "activity not found"})
+			return
+		}
+		if api.IsBadInput(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		log.
+			With("id", id).
+			With("archived", archived).
+			With("error", err).
+			Error("error setting activity archived")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}

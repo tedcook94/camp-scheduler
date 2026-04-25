@@ -22,10 +22,13 @@ func NewController(svc *Service) *Controller {
 func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	sessions := rg.Group("/sessions")
 	sessions.GET("", ctrl.List)
+	sessions.GET("/archived", ctrl.ListArchived)
 	sessions.GET("/:sessionId", ctrl.Get)
 	sessions.POST("", ctrl.Create)
 	sessions.PUT("/:sessionId", ctrl.Update)
 	sessions.DELETE("/:sessionId", ctrl.Delete)
+	sessions.POST("/:sessionId/archive", ctrl.Archive)
+	sessions.POST("/:sessionId/unarchive", ctrl.Unarchive)
 	sessions.POST("/:sessionId/copy", ctrl.Copy)
 }
 
@@ -223,4 +226,64 @@ func (ctrl *Controller) Copy(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, session)
+}
+
+func (ctrl *Controller) ListArchived(c *gin.Context) {
+	log := auth.Logger(c)
+	campID := auth.GetCampID(c)
+
+	items, err := ctrl.svc.ListArchived(c.Request.Context(), campID)
+	if err != nil {
+		if api.IsBadInput(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		log.
+			With("error", err).
+			Error("error listing archived sessions")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, items)
+}
+
+func (ctrl *Controller) Archive(c *gin.Context) {
+	ctrl.setArchived(c, true)
+}
+
+func (ctrl *Controller) Unarchive(c *gin.Context) {
+	ctrl.setArchived(c, false)
+}
+
+func (ctrl *Controller) setArchived(c *gin.Context, archived bool) {
+	log := auth.Logger(c)
+	campID := auth.GetCampID(c)
+	id := c.Param("sessionId")
+
+	var err error
+	if archived {
+		err = ctrl.svc.Archive(c.Request.Context(), campID, id)
+	} else {
+		err = ctrl.svc.Unarchive(c.Request.Context(), campID, id)
+	}
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
+			return
+		}
+		if api.IsBadInput(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		log.
+			With("id", id).
+			With("archived", archived).
+			With("error", err).
+			Error("error setting session archived")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.Status(http.StatusOK)
 }

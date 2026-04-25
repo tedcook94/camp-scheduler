@@ -1,0 +1,18 @@
+type: http_request
+model: http_request
+id: rq_sessions-list-archived
+createdAt: "2026-04-25T00:00:00.000000"
+updatedAt: "2026-04-25T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_sessions
+name: List Archived
+description: ""
+url: "${[ base_url ]}/sessions/archived"
+urlParameters: []
+method: GET
+headers: []
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+sortPriority: 5.5

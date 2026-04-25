@@ -110,44 +110,57 @@ export const userApi = {
 
 export const certificationApi = {
 	list: () => api.get<Certification[]>("/api/v1/certifications"),
+	listArchived: () => api.get<Certification[]>("/api/v1/certifications/archived"),
 	get: (id: string) => api.get<Certification>(`/api/v1/certifications/${id}`),
 	create: (name: string) => api.post<Certification>("/api/v1/certifications", { name }),
 	update: (id: string, name: string) =>
 		api.put<Certification>(`/api/v1/certifications/${id}`, { name }),
 	delete: (id: string) => api.delete<void>(`/api/v1/certifications/${id}`),
+	archive: (id: string) => api.post<void>(`/api/v1/certifications/${id}/archive`),
+	unarchive: (id: string) => api.post<void>(`/api/v1/certifications/${id}/unarchive`),
 };
 
 export const ageGroupApi = {
 	list: () => api.get<AgeGroup[]>("/api/v1/age-groups"),
+	listArchived: () => api.get<AgeGroup[]>("/api/v1/age-groups/archived"),
 	get: (id: string) => api.get<AgeGroup>(`/api/v1/age-groups/${id}`),
 	create: (name: string) => api.post<AgeGroup>("/api/v1/age-groups", { name }),
 	update: (id: string, name: string) =>
 		api.put<AgeGroup>(`/api/v1/age-groups/${id}`, { name }),
 	delete: (id: string) => api.delete<void>(`/api/v1/age-groups/${id}`),
+	archive: (id: string) => api.post<void>(`/api/v1/age-groups/${id}/archive`),
+	unarchive: (id: string) => api.post<void>(`/api/v1/age-groups/${id}/unarchive`),
 };
 
 export const cabinApi = {
 	list: () => api.get<Cabin[]>("/api/v1/cabins"),
+	listArchived: () => api.get<Cabin[]>("/api/v1/cabins/archived"),
 	get: (id: string) => api.get<Cabin>(`/api/v1/cabins/${id}`),
 	create: (data: CreateCabinRequest) =>
 		api.post<Cabin>("/api/v1/cabins", data),
 	update: (id: string, data: UpdateCabinRequest) =>
 		api.put<Cabin>(`/api/v1/cabins/${id}`, data),
 	delete: (id: string) => api.delete<void>(`/api/v1/cabins/${id}`),
+	archive: (id: string) => api.post<void>(`/api/v1/cabins/${id}/archive`),
+	unarchive: (id: string) => api.post<void>(`/api/v1/cabins/${id}/unarchive`),
 };
 
 export const seasonApi = {
 	list: () => api.get<Season[]>("/api/v1/seasons"),
+	listArchived: () => api.get<Season[]>("/api/v1/seasons/archived"),
 	get: (id: string) => api.get<Season>(`/api/v1/seasons/${id}`),
 	create: (data: CreateSeasonRequest) =>
 		api.post<Season>("/api/v1/seasons", data),
 	update: (id: string, data: UpdateSeasonRequest) =>
 		api.put<Season>(`/api/v1/seasons/${id}`, data),
 	delete: (id: string) => api.delete<void>(`/api/v1/seasons/${id}`),
+	archive: (id: string) => api.post<void>(`/api/v1/seasons/${id}/archive`),
+	unarchive: (id: string) => api.post<void>(`/api/v1/seasons/${id}/unarchive`),
 };
 
 export const sessionApi = {
 	list: () => api.get<Session[]>("/api/v1/sessions"),
+	listArchived: () => api.get<Session[]>("/api/v1/sessions/archived"),
 	get: (id: string) => api.get<Session>(`/api/v1/sessions/${id}`),
 	create: (data: CreateSessionRequest) =>
 		api.post<Session>("/api/v1/sessions", data),
@@ -156,15 +169,20 @@ export const sessionApi = {
 	delete: (id: string) => api.delete<void>(`/api/v1/sessions/${id}`),
 	copy: (sourceId: string, data: CopySessionRequest) =>
 		api.post<Session>(`/api/v1/sessions/${sourceId}/copy`, data),
+	archive: (id: string) => api.post<void>(`/api/v1/sessions/${id}/archive`),
+	unarchive: (id: string) => api.post<void>(`/api/v1/sessions/${id}/unarchive`),
 };
 
 export const activityApi = {
 	list: () => api.get<Activity[]>("/api/v1/activities"),
+	listArchived: () => api.get<Activity[]>("/api/v1/activities/archived"),
 	get: (id: string) => api.get<Activity>(`/api/v1/activities/${id}`),
 	create: (name: string) => api.post<Activity>("/api/v1/activities", { name }),
 	update: (id: string, name: string) =>
 		api.put<Activity>(`/api/v1/activities/${id}`, { name }),
 	delete: (id: string) => api.delete<void>(`/api/v1/activities/${id}`),
+	archive: (id: string) => api.post<void>(`/api/v1/activities/${id}/archive`),
+	unarchive: (id: string) => api.post<void>(`/api/v1/activities/${id}/unarchive`),
 };
 
 export const activityCertificationApi = {
@@ -180,11 +198,14 @@ export const activityCertificationApi = {
 
 export const timeSlotApi = {
 	list: () => api.get<TimeSlot[]>("/api/v1/time-slots"),
+	listArchived: () => api.get<TimeSlot[]>("/api/v1/time-slots/archived"),
 	get: (id: string) => api.get<TimeSlot>(`/api/v1/time-slots/${id}`),
 	create: (name: string) => api.post<TimeSlot>("/api/v1/time-slots", { name }),
 	update: (id: string, name: string) =>
 		api.put<TimeSlot>(`/api/v1/time-slots/${id}`, { name }),
 	delete: (id: string) => api.delete<void>(`/api/v1/time-slots/${id}`),
+	archive: (id: string) => api.post<void>(`/api/v1/time-slots/${id}/archive`),
+	unarchive: (id: string) => api.post<void>(`/api/v1/time-slots/${id}/unarchive`),
 };
 
 export const sessionTimeSlotApi = {
@@ -223,12 +244,15 @@ export const sessionActivityApi = {
 
 export const counselorApi = {
 	list: () => api.get<Counselor[]>("/api/v1/counselors"),
+	listArchived: () => api.get<Counselor[]>("/api/v1/counselors/archived"),
 	get: (id: string) => api.get<Counselor>(`/api/v1/counselors/${id}`),
 	create: (data: CreateCounselorRequest) =>
 		api.post<Counselor>("/api/v1/counselors", data),
 	update: (id: string, data: UpdateCounselorRequest) =>
 		api.put<Counselor>(`/api/v1/counselors/${id}`, data),
 	delete: (id: string) => api.delete<void>(`/api/v1/counselors/${id}`),
+	archive: (id: string) => api.post<void>(`/api/v1/counselors/${id}/archive`),
+	unarchive: (id: string) => api.post<void>(`/api/v1/counselors/${id}/unarchive`),
 };
 
 export const counselorCertificationApi = {

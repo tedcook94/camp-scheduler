@@ -22,10 +22,13 @@ func NewController(svc *Service) *Controller {
 func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	seasons := rg.Group("/seasons")
 	seasons.GET("", ctrl.List)
+	seasons.GET("/archived", ctrl.ListArchived)
 	seasons.GET("/:id", ctrl.Get)
 	seasons.POST("", ctrl.Create)
 	seasons.PUT("/:id", ctrl.Update)
 	seasons.DELETE("/:id", ctrl.Delete)
+	seasons.POST("/:id/archive", ctrl.Archive)
+	seasons.POST("/:id/unarchive", ctrl.Unarchive)
 }
 
 type CreateSeasonRequest struct {
@@ -176,6 +179,66 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 			With("id", id).
 			With("error", err).
 			Error("error deleting season")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.Status(http.StatusOK)
+}
+
+func (ctrl *Controller) ListArchived(c *gin.Context) {
+	log := auth.Logger(c)
+	campID := auth.GetCampID(c)
+
+	items, err := ctrl.svc.ListArchived(c.Request.Context(), campID)
+	if err != nil {
+		if api.IsBadInput(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		log.
+			With("error", err).
+			Error("error listing archived seasons")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, items)
+}
+
+func (ctrl *Controller) Archive(c *gin.Context) {
+	ctrl.setArchived(c, true)
+}
+
+func (ctrl *Controller) Unarchive(c *gin.Context) {
+	ctrl.setArchived(c, false)
+}
+
+func (ctrl *Controller) setArchived(c *gin.Context, archived bool) {
+	log := auth.Logger(c)
+	campID := auth.GetCampID(c)
+	id := c.Param("id")
+
+	var err error
+	if archived {
+		err = ctrl.svc.Archive(c.Request.Context(), campID, id)
+	} else {
+		err = ctrl.svc.Unarchive(c.Request.Context(), campID, id)
+	}
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "season not found"})
+			return
+		}
+		if api.IsBadInput(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		log.
+			With("id", id).
+			With("archived", archived).
+			With("error", err).
+			Error("error setting season archived")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}

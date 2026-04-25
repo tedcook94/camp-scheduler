@@ -157,7 +157,7 @@ viable configurations and understand trade-offs.
 - [x] Reports
 - [x] First and last name for campers and counselors
 - [x] "Dirty" flag for when changes have been made since assignment run
-- [ ] Archive (soft delete) objects
+- [x] Archive (soft delete) objects
 - [ ] Overrides (locking assignments before solver runs)
 - [ ] Data import (CSV/spreadsheet)
 - [ ] Migrate auth to BetterAuth (camps as orgs, enable MFA)

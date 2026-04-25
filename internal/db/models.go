@@ -63,6 +63,7 @@ type AssignmentRun struct {
 	RunType   string
 	Status    string
 	CreatedAt pgtype.Timestamptz
+	IsStale   bool
 }
 
 type AssignmentRunSelectedSolution struct {

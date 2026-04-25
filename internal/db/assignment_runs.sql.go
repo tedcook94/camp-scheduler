@@ -14,7 +14,7 @@ import (
 const createAssignmentRun = `-- name: CreateAssignmentRun :one
 INSERT INTO assignment_runs (camp_id, session_id, run_type, status)
 VALUES ($1, $2, $3, $4)
-RETURNING id, camp_id, session_id, run_type, status, created_at
+RETURNING id, camp_id, session_id, run_type, status, created_at, is_stale
 `
 
 type CreateAssignmentRunParams struct {
@@ -39,6 +39,7 @@ func (q *Queries) CreateAssignmentRun(ctx context.Context, arg CreateAssignmentR
 		&i.RunType,
 		&i.Status,
 		&i.CreatedAt,
+		&i.IsStale,
 	)
 	return i, err
 }
@@ -81,7 +82,7 @@ func (q *Queries) DeleteAssignmentRunsBySessionAndType(ctx context.Context, arg 
 }
 
 const getAssignmentRun = `-- name: GetAssignmentRun :one
-SELECT id, camp_id, session_id, run_type, status, created_at
+SELECT id, camp_id, session_id, run_type, status, created_at, is_stale
 FROM assignment_runs
 WHERE id = $1 AND camp_id = $2
 `
@@ -101,6 +102,7 @@ func (q *Queries) GetAssignmentRun(ctx context.Context, arg GetAssignmentRunPara
 		&i.RunType,
 		&i.Status,
 		&i.CreatedAt,
+		&i.IsStale,
 	)
 	return i, err
 }
@@ -113,6 +115,7 @@ SELECT
     ar.run_type,
     ar.status,
     ar.created_at,
+    ar.is_stale,
     arss.solution_id AS selected_solution_id
 FROM assignment_runs ar
 LEFT JOIN assignment_run_selected_solutions arss ON arss.run_id = ar.id AND arss.camp_id = ar.camp_id
@@ -132,6 +135,7 @@ type ListAssignmentRunsBySessionRow struct {
 	RunType            string
 	Status             string
 	CreatedAt          pgtype.Timestamptz
+	IsStale            bool
 	SelectedSolutionID pgtype.UUID
 }
 
@@ -151,11 +155,44 @@ func (q *Queries) ListAssignmentRunsBySession(ctx context.Context, arg ListAssig
 			&i.RunType,
 			&i.Status,
 			&i.CreatedAt,
+			&i.IsStale,
 			&i.SelectedSolutionID,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSessionsByPreviousSession = `-- name: ListSessionsByPreviousSession :many
+SELECT id
+FROM sessions
+WHERE camp_id = $1
+  AND previous_session = ANY($2::uuid[])
+`
+
+type ListSessionsByPreviousSessionParams struct {
+	CampID             pgtype.UUID
+	PreviousSessionIds []pgtype.UUID
+}
+
+func (q *Queries) ListSessionsByPreviousSession(ctx context.Context, arg ListSessionsByPreviousSessionParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, listSessionsByPreviousSession, arg.CampID, arg.PreviousSessionIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -197,11 +234,34 @@ func (q *Queries) LockAssignmentRunsBySessionAndType(ctx context.Context, arg Lo
 	return items, nil
 }
 
+const markAssignmentRunsStale = `-- name: MarkAssignmentRunsStale :execrows
+UPDATE assignment_runs
+SET is_stale = true
+WHERE camp_id = $1
+  AND session_id = ANY($2::uuid[])
+  AND run_type = ANY($3::text[])
+  AND is_stale = false
+`
+
+type MarkAssignmentRunsStaleParams struct {
+	CampID     pgtype.UUID
+	SessionIds []pgtype.UUID
+	RunTypes   []string
+}
+
+func (q *Queries) MarkAssignmentRunsStale(ctx context.Context, arg MarkAssignmentRunsStaleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markAssignmentRunsStale, arg.CampID, arg.SessionIds, arg.RunTypes)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updateAssignmentRunStatus = `-- name: UpdateAssignmentRunStatus :one
 UPDATE assignment_runs
 SET status = $3
 WHERE id = $1 AND camp_id = $2
-RETURNING id, camp_id, session_id, run_type, status, created_at
+RETURNING id, camp_id, session_id, run_type, status, created_at, is_stale
 `
 
 type UpdateAssignmentRunStatusParams struct {
@@ -220,6 +280,7 @@ func (q *Queries) UpdateAssignmentRunStatus(ctx context.Context, arg UpdateAssig
 		&i.RunType,
 		&i.Status,
 		&i.CreatedAt,
+		&i.IsStale,
 	)
 	return i, err
 }

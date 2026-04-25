@@ -40,6 +40,8 @@ type EnrollmentResponse struct {
 	CampID            string `json:"camp_id"`
 	CamperID          string `json:"camper_id"`
 	SessionAgeGroupID string `json:"session_age_group_id"`
+	CamperFirstName   string `json:"camper_first_name"`
+	CamperLastName    string `json:"camper_last_name"`
 	CamperName        string `json:"camper_name"`
 	SessionID         string `json:"session_id"`
 	AgeGroupID        string `json:"age_group_id"`

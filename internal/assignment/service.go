@@ -626,12 +626,14 @@ func toRunResponseFromGet(r db.AssignmentRun, selectedSolutionID *string) RunRes
 
 func toAssignmentResponse(a db.ListCounselorCabinAssignmentsBySolutionRow) AssignmentResponse {
 	return AssignmentResponse{
-		ID:            api.UUIDToString(a.ID),
-		CounselorID:   api.UUIDToString(a.CounselorID),
-		CounselorName: a.CounselorName,
-		CabinID:       api.UUIDToString(a.CabinID),
-		CabinName:     a.CabinName,
-		AgeGroupName:  a.AgeGroupName,
+		ID:                 api.UUIDToString(a.ID),
+		CounselorID:        api.UUIDToString(a.CounselorID),
+		CounselorFirstName: a.CounselorFirstName,
+		CounselorLastName:  a.CounselorLastName,
+		CounselorName:      a.CounselorName,
+		CabinID:            api.UUIDToString(a.CabinID),
+		CabinName:          a.CabinName,
+		AgeGroupName:       a.AgeGroupName,
 	}
 }
 
@@ -646,13 +648,15 @@ func toExplanationResponse(e db.ListCounselorCabinExplanationsBySolutionRow) Exp
 	}
 
 	return ExplanationResponse{
-		ID:              api.UUIDToString(e.ID),
-		CounselorID:     api.UUIDToString(e.CounselorID),
-		CounselorName:   e.CounselorName,
-		ExplanationType: e.ExplanationType,
-		ConstraintName:  constraintName,
-		Rank:            rank,
-		Message:         e.Message,
+		ID:                 api.UUIDToString(e.ID),
+		CounselorID:        api.UUIDToString(e.CounselorID),
+		CounselorFirstName: e.CounselorFirstName,
+		CounselorLastName:  e.CounselorLastName,
+		CounselorName:      e.CounselorName,
+		ExplanationType:    e.ExplanationType,
+		ConstraintName:     constraintName,
+		Rank:               rank,
+		Message:            e.Message,
 	}
 }
 
@@ -674,8 +678,10 @@ func toCabinUnassignedCounselorResponses(rows []db.ListCounselorCabinUnassignedB
 	out := make([]UnassignedCounselorResponse, len(rows))
 	for i, r := range rows {
 		out[i] = UnassignedCounselorResponse{
-			CounselorID:   api.UUIDToString(r.CounselorID),
-			CounselorName: r.CounselorName,
+			CounselorID:        api.UUIDToString(r.CounselorID),
+			CounselorFirstName: r.CounselorFirstName,
+			CounselorLastName:  r.CounselorLastName,
+			CounselorName:      r.CounselorName,
 		}
 	}
 	return out
@@ -697,9 +703,11 @@ func toActivityUnassignedCounselorResponses(
 	for i, r := range rows {
 		cID := api.UUIDToString(r.CounselorID)
 		out[i] = UnassignedCounselorResponse{
-			CounselorID:      cID,
-			CounselorName:    r.CounselorName,
-			MissingTimeSlots: slotsByCounselor[cID],
+			CounselorID:        cID,
+			CounselorFirstName: r.CounselorFirstName,
+			CounselorLastName:  r.CounselorLastName,
+			CounselorName:      r.CounselorName,
+			MissingTimeSlots:   slotsByCounselor[cID],
 		}
 	}
 	return out

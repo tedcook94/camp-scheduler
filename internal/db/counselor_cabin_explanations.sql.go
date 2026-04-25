@@ -64,7 +64,9 @@ func (q *Queries) CreateCounselorCabinExplanation(ctx context.Context, arg Creat
 
 const listCounselorCabinExplanationsBySolution = `-- name: ListCounselorCabinExplanationsBySolution :many
 SELECT e.id, e.camp_id, e.solution_id, e.counselor_id, e.explanation_type, e.constraint_name, e.rank, e.message,
-       (co.first_name || ' ' || co.last_name)::text AS counselor_name
+       co.first_name AS counselor_first_name,
+       co.last_name AS counselor_last_name,
+       btrim(co.first_name || ' ' || co.last_name)::text AS counselor_name
 FROM counselor_cabin_explanations e
 JOIN counselors co ON co.id = e.counselor_id
 WHERE e.solution_id = $1 AND e.camp_id = $2
@@ -77,15 +79,17 @@ type ListCounselorCabinExplanationsBySolutionParams struct {
 }
 
 type ListCounselorCabinExplanationsBySolutionRow struct {
-	ID              pgtype.UUID
-	CampID          pgtype.UUID
-	SolutionID      pgtype.UUID
-	CounselorID     pgtype.UUID
-	ExplanationType string
-	ConstraintName  pgtype.Text
-	Rank            pgtype.Int4
-	Message         string
-	CounselorName   string
+	ID                 pgtype.UUID
+	CampID             pgtype.UUID
+	SolutionID         pgtype.UUID
+	CounselorID        pgtype.UUID
+	ExplanationType    string
+	ConstraintName     pgtype.Text
+	Rank               pgtype.Int4
+	Message            string
+	CounselorFirstName string
+	CounselorLastName  string
+	CounselorName      string
 }
 
 func (q *Queries) ListCounselorCabinExplanationsBySolution(ctx context.Context, arg ListCounselorCabinExplanationsBySolutionParams) ([]ListCounselorCabinExplanationsBySolutionRow, error) {
@@ -106,6 +110,8 @@ func (q *Queries) ListCounselorCabinExplanationsBySolution(ctx context.Context, 
 			&i.ConstraintName,
 			&i.Rank,
 			&i.Message,
+			&i.CounselorFirstName,
+			&i.CounselorLastName,
 			&i.CounselorName,
 		); err != nil {
 			return nil, err

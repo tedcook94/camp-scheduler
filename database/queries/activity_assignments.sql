@@ -5,7 +5,9 @@ RETURNING id, camp_id, solution_id, counselor_id, session_activity_id;
 
 -- name: ListActivityAssignmentsBySolution :many
 SELECT a.id, a.camp_id, a.solution_id, a.counselor_id, a.session_activity_id,
-       (co.first_name || ' ' || co.last_name)::text AS counselor_name,
+       co.first_name AS counselor_first_name,
+       co.last_name AS counselor_last_name,
+       btrim(co.first_name || ' ' || co.last_name)::text AS counselor_name,
        act.activity_name AS activity_name,
        ts.time_slot_name AS time_slot_name,
        sts.sort_order AS sort_order

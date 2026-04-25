@@ -21,14 +21,16 @@ func NewCounselorService(queries *db.Queries) *CounselorService {
 }
 
 type SessionCounselorResponse struct {
-	ID               string `json:"id"`
-	CampID           string `json:"camp_id"`
-	SessionID        string `json:"session_id"`
-	CounselorID      string `json:"counselor_id"`
-	CounselorName    string `json:"counselor_name"`
-	JuniorCounselor  bool   `json:"junior_counselor"`
-	CounselorEnabled bool   `json:"counselor_enabled"`
-	Gender           string `json:"gender"`
+	ID                 string `json:"id"`
+	CampID             string `json:"camp_id"`
+	SessionID          string `json:"session_id"`
+	CounselorID        string `json:"counselor_id"`
+	CounselorFirstName string `json:"counselor_first_name"`
+	CounselorLastName  string `json:"counselor_last_name"`
+	CounselorName      string `json:"counselor_name"`
+	JuniorCounselor    bool   `json:"junior_counselor"`
+	CounselorEnabled   bool   `json:"counselor_enabled"`
+	Gender             string `json:"gender"`
 }
 
 type AddSessionCounselorRequest struct {
@@ -57,14 +59,16 @@ func (svc *CounselorService) List(ctx context.Context, campID, sessionID string)
 	result := make([]SessionCounselorResponse, len(rows))
 	for i, r := range rows {
 		result[i] = SessionCounselorResponse{
-			ID:               api.UUIDToString(r.ID),
-			CampID:           api.UUIDToString(r.CampID),
-			SessionID:        api.UUIDToString(r.SessionID),
-			CounselorID:      api.UUIDToString(r.CounselorID),
-			CounselorName:    r.CounselorName,
-			JuniorCounselor:  r.JuniorCounselor,
-			CounselorEnabled: r.CounselorEnabled,
-			Gender:           r.Gender,
+			ID:                 api.UUIDToString(r.ID),
+			CampID:             api.UUIDToString(r.CampID),
+			SessionID:          api.UUIDToString(r.SessionID),
+			CounselorID:        api.UUIDToString(r.CounselorID),
+			CounselorFirstName: r.CounselorFirstName,
+			CounselorLastName:  r.CounselorLastName,
+			CounselorName:      r.CounselorName,
+			JuniorCounselor:    r.JuniorCounselor,
+			CounselorEnabled:   r.CounselorEnabled,
+			Gender:             r.Gender,
 		}
 	}
 	return result, nil
@@ -114,14 +118,16 @@ func (svc *CounselorService) Add(ctx context.Context, campID, sessionID string, 
 	}
 
 	return SessionCounselorResponse{
-		ID:               api.UUIDToString(row.ID),
-		CampID:           api.UUIDToString(row.CampID),
-		SessionID:        api.UUIDToString(row.SessionID),
-		CounselorID:      api.UUIDToString(row.CounselorID),
-		CounselorName:    counselor.FullName(c.FirstName, c.LastName),
-		JuniorCounselor:  c.JuniorCounselor,
-		CounselorEnabled: c.CounselorEnabled,
-		Gender:           c.Gender,
+		ID:                 api.UUIDToString(row.ID),
+		CampID:             api.UUIDToString(row.CampID),
+		SessionID:          api.UUIDToString(row.SessionID),
+		CounselorID:        api.UUIDToString(row.CounselorID),
+		CounselorFirstName: c.FirstName,
+		CounselorLastName:  c.LastName,
+		CounselorName:      counselor.FullName(c.FirstName, c.LastName),
+		JuniorCounselor:    c.JuniorCounselor,
+		CounselorEnabled:   c.CounselorEnabled,
+		Gender:             c.Gender,
 	}, nil
 }
 

@@ -5,7 +5,9 @@ RETURNING id, camp_id, solution_id, counselor_id, session_activity_id, explanati
 
 -- name: ListActivityExplanationsBySolution :many
 SELECT e.id, e.camp_id, e.solution_id, e.counselor_id, e.session_activity_id, e.explanation_type, e.constraint_name, e.rank, e.message,
-       (co.first_name || ' ' || co.last_name)::text AS counselor_name,
+       co.first_name AS counselor_first_name,
+       co.last_name AS counselor_last_name,
+       btrim(co.first_name || ' ' || co.last_name)::text AS counselor_name,
        sts.sort_order AS time_slot_sort_order
 FROM activity_explanations e
 JOIN counselors co ON co.id = e.counselor_id

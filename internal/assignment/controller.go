@@ -100,9 +100,11 @@ type SolutionDetailResponse struct {
 // the time slots the counselor was not assigned to despite having at least
 // one eligible activity slot in that time slot.
 type UnassignedCounselorResponse struct {
-	CounselorID      string                  `json:"counselor_id"`
-	CounselorName    string                  `json:"counselor_name"`
-	MissingTimeSlots []UnassignedTimeSlotRef `json:"missing_time_slots,omitempty"`
+	CounselorID        string                  `json:"counselor_id"`
+	CounselorFirstName string                  `json:"counselor_first_name,omitempty"`
+	CounselorLastName  string                  `json:"counselor_last_name,omitempty"`
+	CounselorName      string                  `json:"counselor_name"`
+	MissingTimeSlots   []UnassignedTimeSlotRef `json:"missing_time_slots,omitempty"`
 }
 
 type UnassignedTimeSlotRef struct {
@@ -111,30 +113,38 @@ type UnassignedTimeSlotRef struct {
 }
 
 type AssignmentResponse struct {
-	ID                string `json:"id"`
-	CounselorID       string `json:"counselor_id,omitempty"`
-	CounselorName     string `json:"counselor_name,omitempty"`
-	CamperID          string `json:"camper_id,omitempty"`
-	CamperName        string `json:"camper_name,omitempty"`
-	CabinID           string `json:"cabin_id,omitempty"`
-	CabinName         string `json:"cabin_name,omitempty"`
-	AgeGroupName      string `json:"age_group_name,omitempty"`
-	SessionActivityID string `json:"session_activity_id,omitempty"`
-	ActivityName      string `json:"activity_name,omitempty"`
-	TimeSlotName      string `json:"time_slot_name,omitempty"`
-	SortOrder         int32  `json:"sort_order,omitempty"`
+	ID                 string `json:"id"`
+	CounselorID        string `json:"counselor_id,omitempty"`
+	CounselorFirstName string `json:"counselor_first_name,omitempty"`
+	CounselorLastName  string `json:"counselor_last_name,omitempty"`
+	CounselorName      string `json:"counselor_name,omitempty"`
+	CamperID           string `json:"camper_id,omitempty"`
+	CamperFirstName    string `json:"camper_first_name,omitempty"`
+	CamperLastName     string `json:"camper_last_name,omitempty"`
+	CamperName         string `json:"camper_name,omitempty"`
+	CabinID            string `json:"cabin_id,omitempty"`
+	CabinName          string `json:"cabin_name,omitempty"`
+	AgeGroupName       string `json:"age_group_name,omitempty"`
+	SessionActivityID  string `json:"session_activity_id,omitempty"`
+	ActivityName       string `json:"activity_name,omitempty"`
+	TimeSlotName       string `json:"time_slot_name,omitempty"`
+	SortOrder          int32  `json:"sort_order,omitempty"`
 }
 
 type ExplanationResponse struct {
-	ID              string  `json:"id"`
-	CounselorID     string  `json:"counselor_id,omitempty"`
-	CounselorName   string  `json:"counselor_name,omitempty"`
-	CamperID        string  `json:"camper_id,omitempty"`
-	CamperName      string  `json:"camper_name,omitempty"`
-	ExplanationType string  `json:"explanation_type"`
-	ConstraintName  *string `json:"constraint_name"`
-	Rank            *int32  `json:"rank,omitempty"`
-	Message         string  `json:"message"`
+	ID                 string  `json:"id"`
+	CounselorID        string  `json:"counselor_id,omitempty"`
+	CounselorFirstName string  `json:"counselor_first_name,omitempty"`
+	CounselorLastName  string  `json:"counselor_last_name,omitempty"`
+	CounselorName      string  `json:"counselor_name,omitempty"`
+	CamperID           string  `json:"camper_id,omitempty"`
+	CamperFirstName    string  `json:"camper_first_name,omitempty"`
+	CamperLastName     string  `json:"camper_last_name,omitempty"`
+	CamperName         string  `json:"camper_name,omitempty"`
+	ExplanationType    string  `json:"explanation_type"`
+	ConstraintName     *string `json:"constraint_name"`
+	Rank               *int32  `json:"rank,omitempty"`
+	Message            string  `json:"message"`
 }
 
 func (ctrl *Controller) TriggerRun(c *gin.Context) {

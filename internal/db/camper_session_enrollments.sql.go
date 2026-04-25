@@ -67,7 +67,9 @@ SELECT
     e.camp_id,
     e.camper_id,
     e.session_age_group_id,
-    (c.first_name || ' ' || c.last_name)::text AS camper_name,
+    c.first_name AS camper_first_name,
+    c.last_name AS camper_last_name,
+    btrim(c.first_name || ' ' || c.last_name)::text AS camper_name,
     sag.session_id,
     sag.age_group_id
 FROM camper_session_enrollments e
@@ -87,6 +89,8 @@ type GetSessionEnrollmentRow struct {
 	CampID            pgtype.UUID
 	CamperID          pgtype.UUID
 	SessionAgeGroupID pgtype.UUID
+	CamperFirstName   string
+	CamperLastName    string
 	CamperName        string
 	SessionID         pgtype.UUID
 	AgeGroupID        pgtype.UUID
@@ -100,6 +104,8 @@ func (q *Queries) GetSessionEnrollment(ctx context.Context, arg GetSessionEnroll
 		&i.CampID,
 		&i.CamperID,
 		&i.SessionAgeGroupID,
+		&i.CamperFirstName,
+		&i.CamperLastName,
 		&i.CamperName,
 		&i.SessionID,
 		&i.AgeGroupID,
@@ -113,7 +119,9 @@ SELECT
     e.camp_id,
     e.camper_id,
     e.session_age_group_id,
-    (c.first_name || ' ' || c.last_name)::text AS camper_name,
+    c.first_name AS camper_first_name,
+    c.last_name AS camper_last_name,
+    btrim(c.first_name || ' ' || c.last_name)::text AS camper_name,
     sag.session_id,
     sag.age_group_id
 FROM camper_session_enrollments e
@@ -135,6 +143,8 @@ type ListEnrollmentsByCamperRow struct {
 	CampID            pgtype.UUID
 	CamperID          pgtype.UUID
 	SessionAgeGroupID pgtype.UUID
+	CamperFirstName   string
+	CamperLastName    string
 	CamperName        string
 	SessionID         pgtype.UUID
 	AgeGroupID        pgtype.UUID
@@ -154,6 +164,8 @@ func (q *Queries) ListEnrollmentsByCamper(ctx context.Context, arg ListEnrollmen
 			&i.CampID,
 			&i.CamperID,
 			&i.SessionAgeGroupID,
+			&i.CamperFirstName,
+			&i.CamperLastName,
 			&i.CamperName,
 			&i.SessionID,
 			&i.AgeGroupID,
@@ -174,7 +186,9 @@ SELECT
     e.camp_id,
     e.camper_id,
     e.session_age_group_id,
-    (c.first_name || ' ' || c.last_name)::text AS camper_name,
+    c.first_name AS camper_first_name,
+    c.last_name AS camper_last_name,
+    btrim(c.first_name || ' ' || c.last_name)::text AS camper_name,
     sag.session_id,
     sag.age_group_id
 FROM camper_session_enrollments e
@@ -194,6 +208,8 @@ type ListEnrollmentsBySessionAgeGroupRow struct {
 	CampID            pgtype.UUID
 	CamperID          pgtype.UUID
 	SessionAgeGroupID pgtype.UUID
+	CamperFirstName   string
+	CamperLastName    string
 	CamperName        string
 	SessionID         pgtype.UUID
 	AgeGroupID        pgtype.UUID
@@ -213,6 +229,8 @@ func (q *Queries) ListEnrollmentsBySessionAgeGroup(ctx context.Context, arg List
 			&i.CampID,
 			&i.CamperID,
 			&i.SessionAgeGroupID,
+			&i.CamperFirstName,
+			&i.CamperLastName,
 			&i.CamperName,
 			&i.SessionID,
 			&i.AgeGroupID,
@@ -233,7 +251,9 @@ SELECT
     e.camp_id,
     e.camper_id,
     e.session_age_group_id,
-    (c.first_name || ' ' || c.last_name)::text AS camper_name,
+    c.first_name AS camper_first_name,
+    c.last_name AS camper_last_name,
+    btrim(c.first_name || ' ' || c.last_name)::text AS camper_name,
     c.gender,
     sag.session_id,
     sag.age_group_id
@@ -254,6 +274,8 @@ type ListSessionEnrollmentsRow struct {
 	CampID            pgtype.UUID
 	CamperID          pgtype.UUID
 	SessionAgeGroupID pgtype.UUID
+	CamperFirstName   string
+	CamperLastName    string
 	CamperName        string
 	Gender            string
 	SessionID         pgtype.UUID
@@ -274,6 +296,8 @@ func (q *Queries) ListSessionEnrollments(ctx context.Context, arg ListSessionEnr
 			&i.CampID,
 			&i.CamperID,
 			&i.SessionAgeGroupID,
+			&i.CamperFirstName,
+			&i.CamperLastName,
 			&i.CamperName,
 			&i.Gender,
 			&i.SessionID,

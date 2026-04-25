@@ -45,7 +45,9 @@ func (q *Queries) CreateCounselorCabinAssignment(ctx context.Context, arg Create
 const listCounselorCabinAssignmentsBySolution = `-- name: ListCounselorCabinAssignmentsBySolution :many
 SELECT a.id, a.camp_id, a.solution_id, a.counselor_id,
        sagc.cabin_id AS cabin_id,
-       (co.first_name || ' ' || co.last_name)::text AS counselor_name,
+       co.first_name AS counselor_first_name,
+       co.last_name AS counselor_last_name,
+       btrim(co.first_name || ' ' || co.last_name)::text AS counselor_name,
        cb.cabin_name AS cabin_name,
        ag.age_group_name AS age_group_name
 FROM counselor_cabin_assignments a
@@ -64,14 +66,16 @@ type ListCounselorCabinAssignmentsBySolutionParams struct {
 }
 
 type ListCounselorCabinAssignmentsBySolutionRow struct {
-	ID            pgtype.UUID
-	CampID        pgtype.UUID
-	SolutionID    pgtype.UUID
-	CounselorID   pgtype.UUID
-	CabinID       pgtype.UUID
-	CounselorName string
-	CabinName     string
-	AgeGroupName  string
+	ID                 pgtype.UUID
+	CampID             pgtype.UUID
+	SolutionID         pgtype.UUID
+	CounselorID        pgtype.UUID
+	CabinID            pgtype.UUID
+	CounselorFirstName string
+	CounselorLastName  string
+	CounselorName      string
+	CabinName          string
+	AgeGroupName       string
 }
 
 func (q *Queries) ListCounselorCabinAssignmentsBySolution(ctx context.Context, arg ListCounselorCabinAssignmentsBySolutionParams) ([]ListCounselorCabinAssignmentsBySolutionRow, error) {
@@ -89,6 +93,8 @@ func (q *Queries) ListCounselorCabinAssignmentsBySolution(ctx context.Context, a
 			&i.SolutionID,
 			&i.CounselorID,
 			&i.CabinID,
+			&i.CounselorFirstName,
+			&i.CounselorLastName,
 			&i.CounselorName,
 			&i.CabinName,
 			&i.AgeGroupName,

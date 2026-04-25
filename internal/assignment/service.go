@@ -621,6 +621,7 @@ func toRunResponse(r db.ListAssignmentRunsBySessionRow) RunResponse {
 		SessionID:          api.UUIDToString(r.SessionID),
 		RunType:            r.RunType,
 		Status:             r.Status,
+		IsStale:            r.IsStale,
 		SelectedSolutionID: api.UUIDToStringPtr(r.SelectedSolutionID),
 		CreatedAt:          r.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
 	}
@@ -633,6 +634,7 @@ func toRunResponseFromGet(r db.AssignmentRun, selectedSolutionID *string) RunRes
 		SessionID:          api.UUIDToString(r.SessionID),
 		RunType:            r.RunType,
 		Status:             r.Status,
+		IsStale:            r.IsStale,
 		SelectedSolutionID: selectedSolutionID,
 		CreatedAt:          r.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
 	}

@@ -68,6 +68,7 @@ type RunResponse struct {
 	SessionID          string  `json:"session_id"`
 	RunType            string  `json:"run_type"`
 	Status             string  `json:"status"`
+	IsStale            bool    `json:"is_stale"`
 	SelectedSolutionID *string `json:"selected_solution_id"`
 	CreatedAt          string  `json:"created_at"`
 }

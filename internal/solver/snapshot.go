@@ -109,8 +109,9 @@ func loadCabins(ctx context.Context, queries *db.Queries, sessionID, campID pgty
 }
 
 // loadSessionRoster returns the rows from the session counselor roster,
-// filtered to only currently-enabled counselors. Disabled counselors left on
-// the roster are skipped as a safety net so they never reach a solver.
+// filtered to only currently active (non-archived) counselors. Archived
+// counselors left on the roster are skipped as a safety net so they never
+// reach a solver.
 func loadSessionRoster(ctx context.Context, queries *db.Queries, sessionID, campID pgtype.UUID) ([]db.ListSessionCounselorsRow, error) {
 	rows, err := queries.ListSessionCounselors(ctx, db.ListSessionCounselorsParams{
 		SessionID: sessionID,
@@ -119,13 +120,13 @@ func loadSessionRoster(ctx context.Context, queries *db.Queries, sessionID, camp
 	if err != nil {
 		return nil, fmt.Errorf("error listing session counselors: %w", err)
 	}
-	enabled := rows[:0]
+	active := rows[:0]
 	for _, r := range rows {
-		if r.CounselorEnabled {
-			enabled = append(enabled, r)
+		if !r.Archived {
+			active = append(active, r)
 		}
 	}
-	return enabled, nil
+	return active, nil
 }
 
 // buildRosterSet turns a roster slice into a lookup set keyed by counselor ID.

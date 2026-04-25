@@ -14,7 +14,7 @@ import (
 const createSession = `-- name: CreateSession :one
 INSERT INTO sessions (camp_id, season_id, session_name, previous_session)
 VALUES ($1, $2, $3, $4)
-RETURNING id, camp_id, season_id, session_name, previous_session
+RETURNING id, camp_id, season_id, session_name, previous_session, archived
 `
 
 type CreateSessionParams struct {
@@ -38,6 +38,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 		&i.SeasonID,
 		&i.SessionName,
 		&i.PreviousSession,
+		&i.Archived,
 	)
 	return i, err
 }
@@ -61,7 +62,7 @@ func (q *Queries) DeleteSession(ctx context.Context, arg DeleteSessionParams) (i
 }
 
 const getSession = `-- name: GetSession :one
-SELECT id, camp_id, season_id, session_name, previous_session
+SELECT id, camp_id, season_id, session_name, previous_session, archived
 FROM sessions
 WHERE id = $1 AND camp_id = $2
 `
@@ -80,6 +81,7 @@ func (q *Queries) GetSession(ctx context.Context, arg GetSessionParams) (Session
 		&i.SeasonID,
 		&i.SessionName,
 		&i.PreviousSession,
+		&i.Archived,
 	)
 	return i, err
 }
@@ -104,7 +106,7 @@ func (q *Queries) HasDependentSessions(ctx context.Context, arg HasDependentSess
 }
 
 const listSessions = `-- name: ListSessions :many
-SELECT id, camp_id, season_id, session_name, previous_session
+SELECT id, camp_id, season_id, session_name, previous_session, archived
 FROM sessions
 WHERE camp_id = $1
 ORDER BY session_name
@@ -125,6 +127,7 @@ func (q *Queries) ListSessions(ctx context.Context, campID pgtype.UUID) ([]Sessi
 			&i.SeasonID,
 			&i.SessionName,
 			&i.PreviousSession,
+			&i.Archived,
 		); err != nil {
 			return nil, err
 		}
@@ -142,7 +145,7 @@ SET season_id = $3,
     session_name = $4,
     previous_session = $5
 WHERE id = $1 AND camp_id = $2
-RETURNING id, camp_id, season_id, session_name, previous_session
+RETURNING id, camp_id, season_id, session_name, previous_session, archived
 `
 
 type UpdateSessionParams struct {
@@ -168,6 +171,7 @@ func (q *Queries) UpdateSession(ctx context.Context, arg UpdateSessionParams) (S
 		&i.SeasonID,
 		&i.SessionName,
 		&i.PreviousSession,
+		&i.Archived,
 	)
 	return i, err
 }

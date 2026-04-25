@@ -35,7 +35,7 @@ type SessionCounselorResponse struct {
 	CounselorLastName  string `json:"counselor_last_name"`
 	CounselorName      string `json:"counselor_name"`
 	JuniorCounselor    bool   `json:"junior_counselor"`
-	CounselorEnabled   bool   `json:"counselor_enabled"`
+	Archived           bool   `json:"archived"`
 	Gender             string `json:"gender"`
 }
 
@@ -73,7 +73,7 @@ func (svc *CounselorService) List(ctx context.Context, campID, sessionID string)
 			CounselorLastName:  r.CounselorLastName,
 			CounselorName:      r.CounselorName,
 			JuniorCounselor:    r.JuniorCounselor,
-			CounselorEnabled:   r.CounselorEnabled,
+			Archived:           r.Archived,
 			Gender:             r.Gender,
 		}
 	}
@@ -111,14 +111,14 @@ func (svc *CounselorService) Add(ctx context.Context, campID, sessionID string, 
 	}
 
 	// Load the counselor first so we can validate eligibility (must belong to
-	// the camp and be enabled) and so we have the details needed to build the
-	// response without a second round-trip after the insert.
+	// the camp and not be archived) and so we have the details needed to build
+	// the response without a second round-trip after the insert.
 	c, err := qtx.GetCounselor(ctx, db.GetCounselorParams{ID: counselorUUID, CampID: campUUID})
 	if err != nil {
 		return SessionCounselorResponse{}, fmt.Errorf("error loading counselor %s: %w", req.CounselorID, err)
 	}
-	if !c.CounselorEnabled {
-		return SessionCounselorResponse{}, api.BadInput("counselor is disabled and cannot be added to a session")
+	if c.Archived {
+		return SessionCounselorResponse{}, api.BadInput("counselor is archived and cannot be added to a session")
 	}
 
 	row, err := qtx.AddSessionCounselor(ctx, db.AddSessionCounselorParams{
@@ -147,7 +147,7 @@ func (svc *CounselorService) Add(ctx context.Context, campID, sessionID string, 
 		CounselorLastName:  c.LastName,
 		CounselorName:      counselor.FullName(c.FirstName, c.LastName),
 		JuniorCounselor:    c.JuniorCounselor,
-		CounselorEnabled:   c.CounselorEnabled,
+		Archived:           c.Archived,
 		Gender:             c.Gender,
 	}, nil
 }

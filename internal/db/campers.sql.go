@@ -14,7 +14,7 @@ import (
 const createCamper = `-- name: CreateCamper :one
 INSERT INTO campers (camp_id, first_name, last_name, gender)
 VALUES ($1, $2, $3, $4)
-RETURNING id, camp_id, first_name, last_name, gender
+RETURNING id, camp_id, first_name, last_name, gender, archived
 `
 
 type CreateCamperParams struct {
@@ -30,6 +30,7 @@ type CreateCamperRow struct {
 	FirstName string
 	LastName  string
 	Gender    string
+	Archived  bool
 }
 
 func (q *Queries) CreateCamper(ctx context.Context, arg CreateCamperParams) (CreateCamperRow, error) {
@@ -46,6 +47,7 @@ func (q *Queries) CreateCamper(ctx context.Context, arg CreateCamperParams) (Cre
 		&i.FirstName,
 		&i.LastName,
 		&i.Gender,
+		&i.Archived,
 	)
 	return i, err
 }
@@ -69,7 +71,7 @@ func (q *Queries) DeleteCamper(ctx context.Context, arg DeleteCamperParams) (int
 }
 
 const getCamper = `-- name: GetCamper :one
-SELECT id, camp_id, first_name, last_name, gender
+SELECT id, camp_id, first_name, last_name, gender, archived
 FROM campers
 WHERE id = $1 AND camp_id = $2
 `
@@ -85,6 +87,7 @@ type GetCamperRow struct {
 	FirstName string
 	LastName  string
 	Gender    string
+	Archived  bool
 }
 
 func (q *Queries) GetCamper(ctx context.Context, arg GetCamperParams) (GetCamperRow, error) {
@@ -96,12 +99,13 @@ func (q *Queries) GetCamper(ctx context.Context, arg GetCamperParams) (GetCamper
 		&i.FirstName,
 		&i.LastName,
 		&i.Gender,
+		&i.Archived,
 	)
 	return i, err
 }
 
 const listCampers = `-- name: ListCampers :many
-SELECT id, camp_id, first_name, last_name, gender
+SELECT id, camp_id, first_name, last_name, gender, archived
 FROM campers
 WHERE camp_id = $1
 ORDER BY last_name, first_name
@@ -113,6 +117,7 @@ type ListCampersRow struct {
 	FirstName string
 	LastName  string
 	Gender    string
+	Archived  bool
 }
 
 func (q *Queries) ListCampers(ctx context.Context, campID pgtype.UUID) ([]ListCampersRow, error) {
@@ -130,6 +135,7 @@ func (q *Queries) ListCampers(ctx context.Context, campID pgtype.UUID) ([]ListCa
 			&i.FirstName,
 			&i.LastName,
 			&i.Gender,
+			&i.Archived,
 		); err != nil {
 			return nil, err
 		}
@@ -147,7 +153,7 @@ SET first_name = $3,
     last_name = $4,
     gender = $5
 WHERE id = $1 AND camp_id = $2
-RETURNING id, camp_id, first_name, last_name, gender
+RETURNING id, camp_id, first_name, last_name, gender, archived
 `
 
 type UpdateCamperParams struct {
@@ -164,6 +170,7 @@ type UpdateCamperRow struct {
 	FirstName string
 	LastName  string
 	Gender    string
+	Archived  bool
 }
 
 func (q *Queries) UpdateCamper(ctx context.Context, arg UpdateCamperParams) (UpdateCamperRow, error) {
@@ -181,6 +188,7 @@ func (q *Queries) UpdateCamper(ctx context.Context, arg UpdateCamperParams) (Upd
 		&i.FirstName,
 		&i.LastName,
 		&i.Gender,
+		&i.Archived,
 	)
 	return i, err
 }

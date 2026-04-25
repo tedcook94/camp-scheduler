@@ -3,7 +3,7 @@ SELECT sc.id, sc.camp_id, sc.session_id, sc.counselor_id,
        c.first_name AS counselor_first_name,
        c.last_name AS counselor_last_name,
        btrim(c.first_name || ' ' || c.last_name)::text AS counselor_name,
-       c.junior_counselor, c.counselor_enabled, c.gender
+       c.junior_counselor, c.archived, c.gender
 FROM session_counselors sc
 JOIN counselors c ON c.id = sc.counselor_id AND c.camp_id = sc.camp_id
 WHERE sc.session_id = $1 AND sc.camp_id = $2

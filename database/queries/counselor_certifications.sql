@@ -18,5 +18,5 @@ WHERE id = $1 AND camp_id = $2 AND counselor_id = $3;
 SELECT cc.counselor_id, cc.certification_id
 FROM counselor_certifications cc
 JOIN counselors co ON co.id = cc.counselor_id AND co.camp_id = cc.camp_id
-WHERE cc.camp_id = $1 AND co.counselor_enabled = true
+WHERE cc.camp_id = $1 AND co.archived = false
 ORDER BY cc.counselor_id, cc.certification_id;

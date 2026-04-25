@@ -14,7 +14,7 @@ import (
 const createActivity = `-- name: CreateActivity :one
 INSERT INTO activities (camp_id, activity_name)
 VALUES ($1, $2)
-RETURNING id, camp_id, activity_name
+RETURNING id, camp_id, activity_name, archived
 `
 
 type CreateActivityParams struct {
@@ -25,7 +25,12 @@ type CreateActivityParams struct {
 func (q *Queries) CreateActivity(ctx context.Context, arg CreateActivityParams) (Activity, error) {
 	row := q.db.QueryRow(ctx, createActivity, arg.CampID, arg.ActivityName)
 	var i Activity
-	err := row.Scan(&i.ID, &i.CampID, &i.ActivityName)
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.ActivityName,
+		&i.Archived,
+	)
 	return i, err
 }
 
@@ -48,7 +53,7 @@ func (q *Queries) DeleteActivity(ctx context.Context, arg DeleteActivityParams) 
 }
 
 const getActivity = `-- name: GetActivity :one
-SELECT id, camp_id, activity_name
+SELECT id, camp_id, activity_name, archived
 FROM activities
 WHERE id = $1 AND camp_id = $2
 `
@@ -61,12 +66,17 @@ type GetActivityParams struct {
 func (q *Queries) GetActivity(ctx context.Context, arg GetActivityParams) (Activity, error) {
 	row := q.db.QueryRow(ctx, getActivity, arg.ID, arg.CampID)
 	var i Activity
-	err := row.Scan(&i.ID, &i.CampID, &i.ActivityName)
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.ActivityName,
+		&i.Archived,
+	)
 	return i, err
 }
 
 const listActivities = `-- name: ListActivities :many
-SELECT id, camp_id, activity_name
+SELECT id, camp_id, activity_name, archived
 FROM activities
 WHERE camp_id = $1
 ORDER BY activity_name
@@ -81,7 +91,12 @@ func (q *Queries) ListActivities(ctx context.Context, campID pgtype.UUID) ([]Act
 	var items []Activity
 	for rows.Next() {
 		var i Activity
-		if err := rows.Scan(&i.ID, &i.CampID, &i.ActivityName); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.ActivityName,
+			&i.Archived,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -96,7 +111,7 @@ const updateActivity = `-- name: UpdateActivity :one
 UPDATE activities
 SET activity_name = $3
 WHERE id = $1 AND camp_id = $2
-RETURNING id, camp_id, activity_name
+RETURNING id, camp_id, activity_name, archived
 `
 
 type UpdateActivityParams struct {
@@ -108,6 +123,11 @@ type UpdateActivityParams struct {
 func (q *Queries) UpdateActivity(ctx context.Context, arg UpdateActivityParams) (Activity, error) {
 	row := q.db.QueryRow(ctx, updateActivity, arg.ID, arg.CampID, arg.ActivityName)
 	var i Activity
-	err := row.Scan(&i.ID, &i.CampID, &i.ActivityName)
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.ActivityName,
+		&i.Archived,
+	)
 	return i, err
 }

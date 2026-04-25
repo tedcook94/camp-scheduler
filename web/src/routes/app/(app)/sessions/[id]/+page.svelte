@@ -1372,10 +1372,10 @@
 												{sc.junior_counselor ? "Junior" : "Senior"}
 											</Table.TableCell>
 											<Table.TableCell>
-												{#if !sc.counselor_enabled}
-													<span class="text-muted-foreground">Disabled</span>
+												{#if sc.archived}
+													<span class="text-muted-foreground">Archived</span>
 												{:else}
-													Enabled
+													Active
 												{/if}
 											</Table.TableCell>
 											<Table.TableCell>

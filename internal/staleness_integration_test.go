@@ -196,7 +196,7 @@ func TestStalenessFlagging(t *testing.T) {
 
 		mustPut(t, apiURL(f.ts, "/counselors/"+f.counselor1ID), map[string]any{
 			"first_name": "Alice2", "last_name": "Test",
-			"junior_counselor": false, "gender": "female", "counselor_enabled": true,
+			"junior_counselor": false, "gender": "female",
 		}, f.token)
 
 		cabin, activity := f.runs(t)

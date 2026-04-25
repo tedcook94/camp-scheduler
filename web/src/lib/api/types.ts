@@ -213,7 +213,7 @@ export interface Counselor {
 	last_name: string;
 	name: string;
 	junior_counselor: boolean;
-	enabled: boolean;
+	archived: boolean;
 	gender: Gender;
 }
 
@@ -228,7 +228,6 @@ export interface UpdateCounselorRequest {
 	first_name: string;
 	last_name: string;
 	junior_counselor: boolean;
-	enabled: boolean;
 	gender: Gender;
 }
 
@@ -353,7 +352,7 @@ export interface SessionCounselor {
 	counselor_last_name: string;
 	counselor_name: string;
 	junior_counselor: boolean;
-	counselor_enabled: boolean;
+	archived: boolean;
 	gender: Gender;
 }
 

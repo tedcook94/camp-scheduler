@@ -14,7 +14,7 @@ import (
 const createTimeSlot = `-- name: CreateTimeSlot :one
 INSERT INTO time_slots (camp_id, time_slot_name)
 VALUES ($1, $2)
-RETURNING id, camp_id, time_slot_name
+RETURNING id, camp_id, time_slot_name, archived
 `
 
 type CreateTimeSlotParams struct {
@@ -25,7 +25,12 @@ type CreateTimeSlotParams struct {
 func (q *Queries) CreateTimeSlot(ctx context.Context, arg CreateTimeSlotParams) (TimeSlot, error) {
 	row := q.db.QueryRow(ctx, createTimeSlot, arg.CampID, arg.TimeSlotName)
 	var i TimeSlot
-	err := row.Scan(&i.ID, &i.CampID, &i.TimeSlotName)
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.TimeSlotName,
+		&i.Archived,
+	)
 	return i, err
 }
 
@@ -48,7 +53,7 @@ func (q *Queries) DeleteTimeSlot(ctx context.Context, arg DeleteTimeSlotParams) 
 }
 
 const getTimeSlot = `-- name: GetTimeSlot :one
-SELECT id, camp_id, time_slot_name
+SELECT id, camp_id, time_slot_name, archived
 FROM time_slots
 WHERE id = $1 AND camp_id = $2
 `
@@ -61,12 +66,17 @@ type GetTimeSlotParams struct {
 func (q *Queries) GetTimeSlot(ctx context.Context, arg GetTimeSlotParams) (TimeSlot, error) {
 	row := q.db.QueryRow(ctx, getTimeSlot, arg.ID, arg.CampID)
 	var i TimeSlot
-	err := row.Scan(&i.ID, &i.CampID, &i.TimeSlotName)
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.TimeSlotName,
+		&i.Archived,
+	)
 	return i, err
 }
 
 const listTimeSlots = `-- name: ListTimeSlots :many
-SELECT id, camp_id, time_slot_name
+SELECT id, camp_id, time_slot_name, archived
 FROM time_slots
 WHERE camp_id = $1
 ORDER BY time_slot_name
@@ -81,7 +91,12 @@ func (q *Queries) ListTimeSlots(ctx context.Context, campID pgtype.UUID) ([]Time
 	var items []TimeSlot
 	for rows.Next() {
 		var i TimeSlot
-		if err := rows.Scan(&i.ID, &i.CampID, &i.TimeSlotName); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.TimeSlotName,
+			&i.Archived,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -96,7 +111,7 @@ const updateTimeSlot = `-- name: UpdateTimeSlot :one
 UPDATE time_slots
 SET time_slot_name = $3
 WHERE id = $1 AND camp_id = $2
-RETURNING id, camp_id, time_slot_name
+RETURNING id, camp_id, time_slot_name, archived
 `
 
 type UpdateTimeSlotParams struct {
@@ -108,6 +123,11 @@ type UpdateTimeSlotParams struct {
 func (q *Queries) UpdateTimeSlot(ctx context.Context, arg UpdateTimeSlotParams) (TimeSlot, error) {
 	row := q.db.QueryRow(ctx, updateTimeSlot, arg.ID, arg.CampID, arg.TimeSlotName)
 	var i TimeSlot
-	err := row.Scan(&i.ID, &i.CampID, &i.TimeSlotName)
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.TimeSlotName,
+		&i.Archived,
+	)
 	return i, err
 }

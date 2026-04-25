@@ -39,7 +39,6 @@ type UpdateCounselorRequest struct {
 	FirstName       string `json:"first_name" binding:"required"`
 	LastName        string `json:"last_name" binding:"required"`
 	JuniorCounselor bool   `json:"junior_counselor"`
-	Enabled         bool   `json:"enabled"`
 	Gender          string `json:"gender" binding:"required,oneof=male female"`
 }
 
@@ -50,7 +49,7 @@ type CounselorResponse struct {
 	LastName        string `json:"last_name"`
 	Name            string `json:"name"`
 	JuniorCounselor bool   `json:"junior_counselor"`
-	Enabled         bool   `json:"enabled"`
+	Archived        bool   `json:"archived"`
 	Gender          string `json:"gender"`
 }
 

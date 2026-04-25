@@ -32,7 +32,7 @@
 	let loading = $state(true);
 	let loadError = $state(false);
 
-	let sortKey = $state<"last_name" | "junior_counselor" | "enabled" | "gender">("last_name");
+	let sortKey = $state<"last_name" | "junior_counselor" | "gender">("last_name");
 	let sortDirection = $state<SortDirection>("asc");
 	let sortedCounselors = $derived.by(() => {
 		const items = [...counselors];
@@ -49,9 +49,7 @@
 			items,
 			sortKey === "junior_counselor"
 				? (c: Counselor) => (c.junior_counselor ? "Junior" : "Senior")
-				: sortKey === "enabled"
-					? (c: Counselor) => (c.enabled ? "Active" : "Inactive")
-					: sortKey,
+				: sortKey,
 			sortDirection
 		);
 	});
@@ -71,7 +69,6 @@
 	let formFirstName = $state("");
 	let formLastName = $state("");
 	let formJunior = $state(false);
-	let formEnabled = $state(true);
 	let formGender = $state<Gender | "">("");
 	let submitting = $state(false);
 	let firstNameError = $state("");
@@ -107,7 +104,6 @@
 		formFirstName = "";
 		formLastName = "";
 		formJunior = false;
-		formEnabled = true;
 		formGender = "";
 		firstNameError = "";
 		lastNameError = "";
@@ -120,7 +116,6 @@
 		formFirstName = counselor.first_name;
 		formLastName = counselor.last_name;
 		formJunior = counselor.junior_counselor;
-		formEnabled = counselor.enabled;
 		formGender = counselor.gender;
 		firstNameError = "";
 		lastNameError = "";
@@ -159,7 +154,6 @@
 					first_name,
 					last_name,
 					junior_counselor: formJunior,
-					enabled: formEnabled,
 					gender: formGender as Gender,
 				});
 				counselors = counselors.map((c) => (c.id === updated.id ? updated : c));
@@ -241,7 +235,6 @@
 					<SortableTableHead label="Name" active={sortKey === "last_name"} direction={sortDirection} onclick={() => toggleSort("last_name")} />
 					<SortableTableHead label="Type" active={sortKey === "junior_counselor"} direction={sortDirection} onclick={() => toggleSort("junior_counselor")} />
 					<SortableTableHead label="Gender" active={sortKey === "gender"} direction={sortDirection} onclick={() => toggleSort("gender")} />
-					<SortableTableHead label="Status" active={sortKey === "enabled"} direction={sortDirection} onclick={() => toggleSort("enabled")} />
 					<Table.TableHead class="w-24">
 						<span class="sr-only">Actions</span>
 					</Table.TableHead>
@@ -259,11 +252,6 @@
 						<Table.TableCell>
 							<Badge variant={counselor.gender === "female" ? "secondary" : "outline"}>
 								{counselor.gender === "female" ? "Female" : "Male"}
-							</Badge>
-						</Table.TableCell>
-						<Table.TableCell>
-							<Badge variant={counselor.enabled ? "default" : "outline"}>
-								{counselor.enabled ? "Active" : "Inactive"}
 							</Badge>
 						</Table.TableCell>
 						<Table.TableCell>
@@ -373,16 +361,7 @@
 				{/if}
 			</div>
 			{#if editingCounselor}
-				<div class="flex items-center gap-2">
-					<input
-						id="counselor-enabled"
-						type="checkbox"
-						bind:checked={formEnabled}
-						disabled={submitting}
-						class="size-4 rounded border-gray-300"
-					/>
-					<Label for="counselor-enabled">Enabled</Label>
-				</div>
+				<!-- Archive controls will be added back as a dedicated section in a later commit. -->
 			{/if}
 			<Dialog.DialogFooter>
 				<Button type="button" variant="outline" disabled={submitting} onclick={() => (dialogOpen = false)}>

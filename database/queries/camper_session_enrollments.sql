@@ -4,7 +4,9 @@ SELECT
     e.camp_id,
     e.camper_id,
     e.session_age_group_id,
-    (c.first_name || ' ' || c.last_name)::text AS camper_name,
+    c.first_name AS camper_first_name,
+    c.last_name AS camper_last_name,
+    btrim(c.first_name || ' ' || c.last_name)::text AS camper_name,
     c.gender,
     sag.session_id,
     sag.age_group_id
@@ -20,7 +22,9 @@ SELECT
     e.camp_id,
     e.camper_id,
     e.session_age_group_id,
-    (c.first_name || ' ' || c.last_name)::text AS camper_name,
+    c.first_name AS camper_first_name,
+    c.last_name AS camper_last_name,
+    btrim(c.first_name || ' ' || c.last_name)::text AS camper_name,
     sag.session_id,
     sag.age_group_id
 FROM camper_session_enrollments e
@@ -43,7 +47,9 @@ SELECT
     e.camp_id,
     e.camper_id,
     e.session_age_group_id,
-    (c.first_name || ' ' || c.last_name)::text AS camper_name,
+    c.first_name AS camper_first_name,
+    c.last_name AS camper_last_name,
+    btrim(c.first_name || ' ' || c.last_name)::text AS camper_name,
     sag.session_id,
     sag.age_group_id
 FROM camper_session_enrollments e
@@ -60,7 +66,9 @@ SELECT
     e.camp_id,
     e.camper_id,
     e.session_age_group_id,
-    (c.first_name || ' ' || c.last_name)::text AS camper_name,
+    c.first_name AS camper_first_name,
+    c.last_name AS camper_last_name,
+    btrim(c.first_name || ' ' || c.last_name)::text AS camper_name,
     sag.session_id,
     sag.age_group_id
 FROM camper_session_enrollments e

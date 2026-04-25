@@ -68,7 +68,9 @@ func (q *Queries) CreateActivityExplanation(ctx context.Context, arg CreateActiv
 
 const listActivityExplanationsBySolution = `-- name: ListActivityExplanationsBySolution :many
 SELECT e.id, e.camp_id, e.solution_id, e.counselor_id, e.session_activity_id, e.explanation_type, e.constraint_name, e.rank, e.message,
-       (co.first_name || ' ' || co.last_name)::text AS counselor_name,
+       co.first_name AS counselor_first_name,
+       co.last_name AS counselor_last_name,
+       btrim(co.first_name || ' ' || co.last_name)::text AS counselor_name,
        sts.sort_order AS time_slot_sort_order
 FROM activity_explanations e
 JOIN counselors co ON co.id = e.counselor_id
@@ -84,17 +86,19 @@ type ListActivityExplanationsBySolutionParams struct {
 }
 
 type ListActivityExplanationsBySolutionRow struct {
-	ID                pgtype.UUID
-	CampID            pgtype.UUID
-	SolutionID        pgtype.UUID
-	CounselorID       pgtype.UUID
-	SessionActivityID pgtype.UUID
-	ExplanationType   string
-	ConstraintName    pgtype.Text
-	Rank              pgtype.Int4
-	Message           string
-	CounselorName     string
-	TimeSlotSortOrder pgtype.Int4
+	ID                 pgtype.UUID
+	CampID             pgtype.UUID
+	SolutionID         pgtype.UUID
+	CounselorID        pgtype.UUID
+	SessionActivityID  pgtype.UUID
+	ExplanationType    string
+	ConstraintName     pgtype.Text
+	Rank               pgtype.Int4
+	Message            string
+	CounselorFirstName string
+	CounselorLastName  string
+	CounselorName      string
+	TimeSlotSortOrder  pgtype.Int4
 }
 
 func (q *Queries) ListActivityExplanationsBySolution(ctx context.Context, arg ListActivityExplanationsBySolutionParams) ([]ListActivityExplanationsBySolutionRow, error) {
@@ -116,6 +120,8 @@ func (q *Queries) ListActivityExplanationsBySolution(ctx context.Context, arg Li
 			&i.ConstraintName,
 			&i.Rank,
 			&i.Message,
+			&i.CounselorFirstName,
+			&i.CounselorLastName,
 			&i.CounselorName,
 			&i.TimeSlotSortOrder,
 		); err != nil {

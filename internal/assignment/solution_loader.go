@@ -124,12 +124,14 @@ func loadCabinSolution(ctx context.Context, q *db.Queries, campUUID, runUUID pgt
 	}
 	for _, a := range camperAssigns {
 		assignments = append(assignments, AssignmentResponse{
-			ID:           api.UUIDToString(a.ID),
-			CamperID:     api.UUIDToString(a.CamperID),
-			CamperName:   a.CamperName,
-			CabinID:      api.UUIDToString(a.CabinID),
-			CabinName:    a.CabinName,
-			AgeGroupName: a.AgeGroupName,
+			ID:              api.UUIDToString(a.ID),
+			CamperID:        api.UUIDToString(a.CamperID),
+			CamperFirstName: a.CamperFirstName,
+			CamperLastName:  a.CamperLastName,
+			CamperName:      a.CamperName,
+			CabinID:         api.UUIDToString(a.CabinID),
+			CabinName:       a.CabinName,
+			AgeGroupName:    a.AgeGroupName,
 		})
 	}
 
@@ -149,6 +151,8 @@ func loadCabinSolution(ctx context.Context, q *db.Queries, campUUID, runUUID pgt
 		explanations = append(explanations, ExplanationResponse{
 			ID:              api.UUIDToString(e.ID),
 			CamperID:        api.UUIDToString(e.CamperID),
+			CamperFirstName: e.CamperFirstName,
+			CamperLastName:  e.CamperLastName,
 			CamperName:      e.CamperName,
 			ExplanationType: e.ExplanationType,
 			ConstraintName:  constraintName,
@@ -226,13 +230,15 @@ func loadActivitySolution(ctx context.Context, q *db.Queries, campUUID, runUUID 
 	assignmentResponses := make([]AssignmentResponse, len(assignments))
 	for i, a := range assignments {
 		assignmentResponses[i] = AssignmentResponse{
-			ID:                api.UUIDToString(a.ID),
-			CounselorID:       api.UUIDToString(a.CounselorID),
-			CounselorName:     a.CounselorName,
-			SessionActivityID: api.UUIDToString(a.SessionActivityID),
-			ActivityName:      a.ActivityName,
-			TimeSlotName:      a.TimeSlotName,
-			SortOrder:         a.SortOrder,
+			ID:                 api.UUIDToString(a.ID),
+			CounselorID:        api.UUIDToString(a.CounselorID),
+			CounselorFirstName: a.CounselorFirstName,
+			CounselorLastName:  a.CounselorLastName,
+			CounselorName:      a.CounselorName,
+			SessionActivityID:  api.UUIDToString(a.SessionActivityID),
+			ActivityName:       a.ActivityName,
+			TimeSlotName:       a.TimeSlotName,
+			SortOrder:          a.SortOrder,
 		}
 	}
 
@@ -247,13 +253,15 @@ func loadActivitySolution(ctx context.Context, q *db.Queries, campUUID, runUUID 
 			rank = &e.Rank.Int32
 		}
 		explanationResponses[i] = ExplanationResponse{
-			ID:              api.UUIDToString(e.ID),
-			CounselorID:     api.UUIDToString(e.CounselorID),
-			CounselorName:   e.CounselorName,
-			ExplanationType: e.ExplanationType,
-			ConstraintName:  constraintName,
-			Rank:            rank,
-			Message:         e.Message,
+			ID:                 api.UUIDToString(e.ID),
+			CounselorID:        api.UUIDToString(e.CounselorID),
+			CounselorFirstName: e.CounselorFirstName,
+			CounselorLastName:  e.CounselorLastName,
+			CounselorName:      e.CounselorName,
+			ExplanationType:    e.ExplanationType,
+			ConstraintName:     constraintName,
+			Rank:               rank,
+			Message:            e.Message,
 		}
 	}
 

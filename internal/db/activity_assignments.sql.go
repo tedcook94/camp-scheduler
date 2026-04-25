@@ -44,7 +44,9 @@ func (q *Queries) CreateActivityAssignment(ctx context.Context, arg CreateActivi
 
 const listActivityAssignmentsBySolution = `-- name: ListActivityAssignmentsBySolution :many
 SELECT a.id, a.camp_id, a.solution_id, a.counselor_id, a.session_activity_id,
-       (co.first_name || ' ' || co.last_name)::text AS counselor_name,
+       co.first_name AS counselor_first_name,
+       co.last_name AS counselor_last_name,
+       btrim(co.first_name || ' ' || co.last_name)::text AS counselor_name,
        act.activity_name AS activity_name,
        ts.time_slot_name AS time_slot_name,
        sts.sort_order AS sort_order
@@ -64,15 +66,17 @@ type ListActivityAssignmentsBySolutionParams struct {
 }
 
 type ListActivityAssignmentsBySolutionRow struct {
-	ID                pgtype.UUID
-	CampID            pgtype.UUID
-	SolutionID        pgtype.UUID
-	CounselorID       pgtype.UUID
-	SessionActivityID pgtype.UUID
-	CounselorName     string
-	ActivityName      string
-	TimeSlotName      string
-	SortOrder         int32
+	ID                 pgtype.UUID
+	CampID             pgtype.UUID
+	SolutionID         pgtype.UUID
+	CounselorID        pgtype.UUID
+	SessionActivityID  pgtype.UUID
+	CounselorFirstName string
+	CounselorLastName  string
+	CounselorName      string
+	ActivityName       string
+	TimeSlotName       string
+	SortOrder          int32
 }
 
 func (q *Queries) ListActivityAssignmentsBySolution(ctx context.Context, arg ListActivityAssignmentsBySolutionParams) ([]ListActivityAssignmentsBySolutionRow, error) {
@@ -90,6 +94,8 @@ func (q *Queries) ListActivityAssignmentsBySolution(ctx context.Context, arg Lis
 			&i.SolutionID,
 			&i.CounselorID,
 			&i.SessionActivityID,
+			&i.CounselorFirstName,
+			&i.CounselorLastName,
 			&i.CounselorName,
 			&i.ActivityName,
 			&i.TimeSlotName,

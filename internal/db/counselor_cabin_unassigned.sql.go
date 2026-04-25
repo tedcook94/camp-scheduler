@@ -37,7 +37,9 @@ func (q *Queries) CreateCounselorCabinUnassigned(ctx context.Context, arg Create
 
 const listCounselorCabinUnassignedBySolution = `-- name: ListCounselorCabinUnassignedBySolution :many
 SELECT u.id, u.camp_id, u.solution_id, u.counselor_id,
-       (co.first_name || ' ' || co.last_name)::text AS counselor_name
+       co.first_name AS counselor_first_name,
+       co.last_name AS counselor_last_name,
+       btrim(co.first_name || ' ' || co.last_name)::text AS counselor_name
 FROM counselor_cabin_unassigned u
 JOIN counselors co ON co.id = u.counselor_id
 WHERE u.solution_id = $1 AND u.camp_id = $2
@@ -50,11 +52,13 @@ type ListCounselorCabinUnassignedBySolutionParams struct {
 }
 
 type ListCounselorCabinUnassignedBySolutionRow struct {
-	ID            pgtype.UUID
-	CampID        pgtype.UUID
-	SolutionID    pgtype.UUID
-	CounselorID   pgtype.UUID
-	CounselorName string
+	ID                 pgtype.UUID
+	CampID             pgtype.UUID
+	SolutionID         pgtype.UUID
+	CounselorID        pgtype.UUID
+	CounselorFirstName string
+	CounselorLastName  string
+	CounselorName      string
 }
 
 func (q *Queries) ListCounselorCabinUnassignedBySolution(ctx context.Context, arg ListCounselorCabinUnassignedBySolutionParams) ([]ListCounselorCabinUnassignedBySolutionRow, error) {
@@ -71,6 +75,8 @@ func (q *Queries) ListCounselorCabinUnassignedBySolution(ctx context.Context, ar
 			&i.CampID,
 			&i.SolutionID,
 			&i.CounselorID,
+			&i.CounselorFirstName,
+			&i.CounselorLastName,
 			&i.CounselorName,
 		); err != nil {
 			return nil, err

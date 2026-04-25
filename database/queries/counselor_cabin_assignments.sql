@@ -6,7 +6,9 @@ RETURNING id, camp_id, solution_id, counselor_id, session_age_group_cabin_id;
 -- name: ListCounselorCabinAssignmentsBySolution :many
 SELECT a.id, a.camp_id, a.solution_id, a.counselor_id,
        sagc.cabin_id AS cabin_id,
-       (co.first_name || ' ' || co.last_name)::text AS counselor_name,
+       co.first_name AS counselor_first_name,
+       co.last_name AS counselor_last_name,
+       btrim(co.first_name || ' ' || co.last_name)::text AS counselor_name,
        cb.cabin_name AS cabin_name,
        ag.age_group_name AS age_group_name
 FROM counselor_cabin_assignments a

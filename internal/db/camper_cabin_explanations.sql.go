@@ -64,7 +64,9 @@ func (q *Queries) CreateCamperCabinExplanation(ctx context.Context, arg CreateCa
 
 const listCamperCabinExplanationsBySolution = `-- name: ListCamperCabinExplanationsBySolution :many
 SELECT e.id, e.camp_id, e.solution_id, e.camper_id, e.explanation_type, e.constraint_name, e.rank, e.message,
-       (cm.first_name || ' ' || cm.last_name)::text AS camper_name
+       cm.first_name AS camper_first_name,
+       cm.last_name AS camper_last_name,
+       btrim(cm.first_name || ' ' || cm.last_name)::text AS camper_name
 FROM camper_cabin_explanations e
 JOIN campers cm ON cm.id = e.camper_id
 WHERE e.solution_id = $1 AND e.camp_id = $2
@@ -85,6 +87,8 @@ type ListCamperCabinExplanationsBySolutionRow struct {
 	ConstraintName  pgtype.Text
 	Rank            pgtype.Int4
 	Message         string
+	CamperFirstName string
+	CamperLastName  string
 	CamperName      string
 }
 
@@ -106,6 +110,8 @@ func (q *Queries) ListCamperCabinExplanationsBySolution(ctx context.Context, arg
 			&i.ConstraintName,
 			&i.Rank,
 			&i.Message,
+			&i.CamperFirstName,
+			&i.CamperLastName,
 			&i.CamperName,
 		); err != nil {
 			return nil, err

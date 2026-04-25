@@ -176,12 +176,14 @@ func (svc *Service) Delete(ctx context.Context, campID, sessionID, id string) er
 	return nil
 }
 
-func toEnrollmentFields(id, campID, camperID, sessionAgeGroupID pgtype.UUID, camperName string, sessionID, ageGroupID pgtype.UUID) EnrollmentResponse {
+func toEnrollmentFields(id, campID, camperID, sessionAgeGroupID pgtype.UUID, first, last, camperName string, sessionID, ageGroupID pgtype.UUID) EnrollmentResponse {
 	return EnrollmentResponse{
 		ID:                api.UUIDToString(id),
 		CampID:            api.UUIDToString(campID),
 		CamperID:          api.UUIDToString(camperID),
 		SessionAgeGroupID: api.UUIDToString(sessionAgeGroupID),
+		CamperFirstName:   first,
+		CamperLastName:    last,
 		CamperName:        camperName,
 		SessionID:         api.UUIDToString(sessionID),
 		AgeGroupID:        api.UUIDToString(ageGroupID),
@@ -189,13 +191,13 @@ func toEnrollmentFields(id, campID, camperID, sessionAgeGroupID pgtype.UUID, cam
 }
 
 func toEnrollmentResponseFromList(r db.ListSessionEnrollmentsRow) EnrollmentResponse {
-	return toEnrollmentFields(r.ID, r.CampID, r.CamperID, r.SessionAgeGroupID, r.CamperName, r.SessionID, r.AgeGroupID)
+	return toEnrollmentFields(r.ID, r.CampID, r.CamperID, r.SessionAgeGroupID, r.CamperFirstName, r.CamperLastName, r.CamperName, r.SessionID, r.AgeGroupID)
 }
 
 func toEnrollmentResponseFromGet(r db.GetSessionEnrollmentRow) EnrollmentResponse {
-	return toEnrollmentFields(r.ID, r.CampID, r.CamperID, r.SessionAgeGroupID, r.CamperName, r.SessionID, r.AgeGroupID)
+	return toEnrollmentFields(r.ID, r.CampID, r.CamperID, r.SessionAgeGroupID, r.CamperFirstName, r.CamperLastName, r.CamperName, r.SessionID, r.AgeGroupID)
 }
 
 func toEnrollmentResponseFromCamperList(r db.ListEnrollmentsByCamperRow) EnrollmentResponse {
-	return toEnrollmentFields(r.ID, r.CampID, r.CamperID, r.SessionAgeGroupID, r.CamperName, r.SessionID, r.AgeGroupID)
+	return toEnrollmentFields(r.ID, r.CampID, r.CamperID, r.SessionAgeGroupID, r.CamperFirstName, r.CamperLastName, r.CamperName, r.SessionID, r.AgeGroupID)
 }

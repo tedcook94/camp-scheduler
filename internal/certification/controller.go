@@ -37,9 +37,10 @@ type UpdateCertificationRequest struct {
 }
 
 type CertificationResponse struct {
-	ID     string `json:"id"`
-	CampID string `json:"camp_id"`
-	Name   string `json:"name"`
+	ID       string `json:"id"`
+	CampID   string `json:"camp_id"`
+	Name     string `json:"name"`
+	Archived bool   `json:"archived"`
 }
 
 func (ctrl *Controller) List(c *gin.Context) {

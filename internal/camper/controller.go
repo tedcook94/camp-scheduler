@@ -47,6 +47,7 @@ type CamperResponse struct {
 	LastName  string `json:"last_name"`
 	Name      string `json:"name"`
 	Gender    string `json:"gender"`
+	Archived  bool   `json:"archived"`
 }
 
 func (ctrl *Controller) List(c *gin.Context) {

@@ -42,6 +42,24 @@ func (svc *Service) List(ctx context.Context, campID string) ([]TimeSlotResponse
 	return result, nil
 }
 
+func (svc *Service) ListArchived(ctx context.Context, campID string) ([]TimeSlotResponse, error) {
+	uid, err := api.ParseUUID(campID)
+	if err != nil {
+		return nil, err
+	}
+
+	slots, err := svc.queries.ListArchivedTimeSlots(ctx, uid)
+	if err != nil {
+		return nil, fmt.Errorf("error listing archived time slots: %w", err)
+	}
+
+	result := make([]TimeSlotResponse, len(slots))
+	for i, s := range slots {
+		result[i] = toTimeSlotResponse(s)
+	}
+	return result, nil
+}
+
 func (svc *Service) GetByID(ctx context.Context, campID, id string) (TimeSlotResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {
@@ -146,8 +164,59 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 
 func toTimeSlotResponse(s db.TimeSlot) TimeSlotResponse {
 	return TimeSlotResponse{
-		ID:     api.UUIDToString(s.ID),
-		CampID: api.UUIDToString(s.CampID),
-		Name:   s.TimeSlotName,
+		ID:       api.UUIDToString(s.ID),
+		CampID:   api.UUIDToString(s.CampID),
+		Name:     s.TimeSlotName,
+		Archived: s.Archived,
 	}
+}
+
+func (svc *Service) Archive(ctx context.Context, campID, id string) error {
+	return svc.setArchived(ctx, campID, id, true)
+}
+
+func (svc *Service) Unarchive(ctx context.Context, campID, id string) error {
+	return svc.setArchived(ctx, campID, id, false)
+}
+
+func (svc *Service) setArchived(ctx context.Context, campID, id string, archived bool) error {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return err
+	}
+
+	uid, err := api.ParseUUID(id)
+	if err != nil {
+		return err
+	}
+
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning archive time slot transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	var rows int64
+	if archived {
+		rows, err = qtx.ArchiveTimeSlot(ctx, db.ArchiveTimeSlotParams{ID: uid, CampID: campUUID})
+	} else {
+		rows, err = qtx.UnarchiveTimeSlot(ctx, db.UnarchiveTimeSlotParams{ID: uid, CampID: campUUID})
+	}
+	if err != nil {
+		return fmt.Errorf("error setting time slot %s archived=%t: %w", id, archived, err)
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+
+	if err := svc.marker.MarkCamp(ctx, qtx, campUUID, []staleness.RunType{staleness.RunTypeActivity}); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing archive time slot transaction: %w", err)
+	}
+
+	return nil
 }

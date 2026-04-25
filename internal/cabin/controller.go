@@ -53,6 +53,7 @@ type CabinResponse struct {
 	DefaultGroupSize          int32  `json:"default_group_size"`
 	DefaultRequiredCounselors int32  `json:"default_required_counselors"`
 	Gender                    string `json:"gender"`
+	Archived                  bool   `json:"archived"`
 }
 
 func (ctrl *Controller) List(c *gin.Context) {

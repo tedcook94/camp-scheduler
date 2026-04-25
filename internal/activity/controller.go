@@ -44,9 +44,10 @@ type UpdateActivityRequest struct {
 }
 
 type ActivityResponse struct {
-	ID     string `json:"id"`
-	CampID string `json:"camp_id"`
-	Name   string `json:"name"`
+	ID       string `json:"id"`
+	CampID   string `json:"camp_id"`
+	Name     string `json:"name"`
+	Archived bool   `json:"archived"`
 }
 
 type AddCertificationRequest struct {

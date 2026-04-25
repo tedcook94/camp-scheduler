@@ -56,6 +56,7 @@ type SessionResponse struct {
 	SeasonID          string  `json:"season_id"`
 	Name              string  `json:"name"`
 	PreviousSessionID *string `json:"previous_session_id"`
+	Archived          bool    `json:"archived"`
 }
 
 func (ctrl *Controller) List(c *gin.Context) {

@@ -9,6 +9,7 @@ import (
 	"camp-scheduler/internal/db"
 	"camp-scheduler/internal/staleness"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -31,6 +32,43 @@ func NewActivityService(queries *db.Queries, pool *pgxpool.Pool, marker *stalene
 
 func (svc *ActivityService) markActivityStale(ctx context.Context, q *db.Queries, campID, sessionID pgtype.UUID) error {
 	return svc.marker.MarkSessions(ctx, q, campID, []pgtype.UUID{sessionID}, []staleness.RunType{staleness.RunTypeActivity})
+}
+
+// ensureTimeSlotActive rejects attaching an archived time slot to a session.
+// The solver ignores archived rows, so silently allowing them would create
+// dead session config.
+func (svc *ActivityService) ensureTimeSlotActive(ctx context.Context, q *db.Queries, campID, timeSlotID pgtype.UUID) error {
+	ts, err := q.GetTimeSlot(ctx, db.GetTimeSlotParams{
+		ID:     timeSlotID,
+		CampID: campID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return api.BadInput("time slot not found")
+		}
+		return fmt.Errorf("error looking up time slot: %w", err)
+	}
+	if ts.Archived {
+		return api.BadInput("cannot use an archived time slot")
+	}
+	return nil
+}
+
+func (svc *ActivityService) ensureActivityActive(ctx context.Context, q *db.Queries, campID, activityID pgtype.UUID) error {
+	a, err := q.GetActivity(ctx, db.GetActivityParams{
+		ID:     activityID,
+		CampID: campID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return api.BadInput("activity not found")
+		}
+		return fmt.Errorf("error looking up activity: %w", err)
+	}
+	if a.Archived {
+		return api.BadInput("cannot use an archived activity")
+	}
+	return nil
 }
 
 func (svc *ActivityService) ListTimeSlots(ctx context.Context, campID, sessionID string) ([]SessionTimeSlotResponse, error) {
@@ -110,6 +148,10 @@ func (svc *ActivityService) CreateTimeSlot(ctx context.Context, campID, sessionI
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := svc.queries.WithTx(tx)
 
+	if err := svc.ensureTimeSlotActive(ctx, qtx, campUUID, timeSlotUUID); err != nil {
+		return SessionTimeSlotResponse{}, err
+	}
+
 	row, err := qtx.CreateSessionTimeSlot(ctx, db.CreateSessionTimeSlotParams{
 		CampID:     campUUID,
 		SessionID:  sessionUUID,
@@ -158,6 +200,10 @@ func (svc *ActivityService) UpdateTimeSlot(ctx context.Context, campID, sessionI
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := svc.queries.WithTx(tx)
+
+	if err := svc.ensureTimeSlotActive(ctx, qtx, campUUID, timeSlotUUID); err != nil {
+		return SessionTimeSlotResponse{}, err
+	}
 
 	row, err := qtx.UpdateSessionTimeSlot(ctx, db.UpdateSessionTimeSlotParams{
 		ID:         uid,
@@ -435,6 +481,10 @@ func (svc *ActivityService) CreateActivity(ctx context.Context, campID, sessionI
 		return SessionActivityResponse{}, err
 	}
 
+	if err := svc.ensureActivityActive(ctx, qtx, campUUID, activityUUID); err != nil {
+		return SessionActivityResponse{}, err
+	}
+
 	if req.RequiredCounselors > req.Capacity {
 		return SessionActivityResponse{}, ErrInvalidCounselorCount
 	}
@@ -492,6 +542,10 @@ func (svc *ActivityService) UpdateActivity(ctx context.Context, campID, sessionI
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := svc.queries.WithTx(tx)
+
+	if err := svc.ensureActivityActive(ctx, qtx, campUUID, activityUUID); err != nil {
+		return SessionActivityResponse{}, err
+	}
 
 	row, err := qtx.UpdateSessionActivity(ctx, db.UpdateSessionActivityParams{
 		ID:                 uid,

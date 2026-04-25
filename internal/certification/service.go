@@ -42,6 +42,24 @@ func (svc *Service) List(ctx context.Context, campID string) ([]CertificationRes
 	return result, nil
 }
 
+func (svc *Service) ListArchived(ctx context.Context, campID string) ([]CertificationResponse, error) {
+	uid, err := api.ParseUUID(campID)
+	if err != nil {
+		return nil, err
+	}
+
+	certs, err := svc.queries.ListArchivedCertifications(ctx, uid)
+	if err != nil {
+		return nil, fmt.Errorf("error listing archived certifications: %w", err)
+	}
+
+	result := make([]CertificationResponse, len(certs))
+	for i, c := range certs {
+		result[i] = toCertificationResponse(c)
+	}
+	return result, nil
+}
+
 func (svc *Service) GetByID(ctx context.Context, campID, id string) (CertificationResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {
@@ -146,8 +164,59 @@ func (svc *Service) Delete(ctx context.Context, campID, id string) error {
 
 func toCertificationResponse(c db.Certification) CertificationResponse {
 	return CertificationResponse{
-		ID:     api.UUIDToString(c.ID),
-		CampID: api.UUIDToString(c.CampID),
-		Name:   c.CertificationName,
+		ID:       api.UUIDToString(c.ID),
+		CampID:   api.UUIDToString(c.CampID),
+		Name:     c.CertificationName,
+		Archived: c.Archived,
 	}
+}
+
+func (svc *Service) Archive(ctx context.Context, campID, id string) error {
+	return svc.setArchived(ctx, campID, id, true)
+}
+
+func (svc *Service) Unarchive(ctx context.Context, campID, id string) error {
+	return svc.setArchived(ctx, campID, id, false)
+}
+
+func (svc *Service) setArchived(ctx context.Context, campID, id string, archived bool) error {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return err
+	}
+
+	uid, err := api.ParseUUID(id)
+	if err != nil {
+		return err
+	}
+
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning archive certification transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := svc.queries.WithTx(tx)
+
+	var rows int64
+	if archived {
+		rows, err = qtx.ArchiveCertification(ctx, db.ArchiveCertificationParams{ID: uid, CampID: campUUID})
+	} else {
+		rows, err = qtx.UnarchiveCertification(ctx, db.UnarchiveCertificationParams{ID: uid, CampID: campUUID})
+	}
+	if err != nil {
+		return fmt.Errorf("error setting certification %s archived=%t: %w", id, archived, err)
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+
+	if err := svc.marker.MarkCamp(ctx, qtx, campUUID, []staleness.RunType{staleness.RunTypeActivity}); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing archive certification transaction: %w", err)
+	}
+
+	return nil
 }

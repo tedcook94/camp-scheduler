@@ -106,7 +106,7 @@ func (svc *Service) TriggerCabinRun(ctx context.Context, campID, sessionID strin
 		return RunDetailResponse{}, ErrNoSolutions
 	}
 
-	runID, err := solver.StoreCabinSolutions(ctx, svc.pool, campID, sessionID, snapshot, solutions)
+	runID, err := solver.StoreCabinSolutions(ctx, svc.pool, svc.marker, campID, sessionID, snapshot, solutions)
 	if err != nil {
 		return RunDetailResponse{}, fmt.Errorf("error storing cabin solutions: %w", err)
 	}
@@ -268,7 +268,7 @@ func (svc *Service) TriggerActivityRun(ctx context.Context, campID, sessionID st
 		return RunDetailResponse{}, ErrNoSolutions
 	}
 
-	runID, err := solver.StoreActivitySolutions(ctx, svc.pool, campID, sessionID, snapshot, solutions)
+	runID, err := solver.StoreActivitySolutions(ctx, svc.pool, svc.marker, campID, sessionID, snapshot, solutions)
 	if err != nil {
 		return RunDetailResponse{}, fmt.Errorf("error storing activity solutions: %w", err)
 	}
@@ -413,7 +413,29 @@ func (svc *Service) DeleteRun(ctx context.Context, campID, runID string) error {
 		return err
 	}
 
-	rows, err := svc.queries.DeleteAssignmentRun(ctx, db.DeleteAssignmentRunParams{
+	tx, err := svc.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error beginning delete assignment run transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := db.New(tx)
+
+	// Capture session/run_type/selected status before delete so that, if the
+	// run was the selected one, we can mark dependent sessions stale in the
+	// same transaction.
+	run, err := qtx.GetAssignmentRun(ctx, db.GetAssignmentRunParams{
+		ID:     runUUID,
+		CampID: campUUID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrRunNotFound
+		}
+		return fmt.Errorf("error getting assignment run %s: %w", runID, err)
+	}
+	wasSelected := run.Status == "selected"
+
+	rows, err := qtx.DeleteAssignmentRun(ctx, db.DeleteAssignmentRunParams{
 		ID:     runUUID,
 		CampID: campUUID,
 	})
@@ -422,6 +444,19 @@ func (svc *Service) DeleteRun(ctx context.Context, campID, runID string) error {
 	}
 	if rows == 0 {
 		return ErrRunNotFound
+	}
+
+	if wasSelected {
+		if err := svc.marker.MarkDependentSessions(ctx, qtx, campUUID,
+			[]pgtype.UUID{run.SessionID},
+			[]staleness.RunType{staleness.RunType(run.RunType)},
+		); err != nil {
+			return fmt.Errorf("error marking dependent sessions stale after deleting selected run: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing delete assignment run transaction: %w", err)
 	}
 
 	return nil

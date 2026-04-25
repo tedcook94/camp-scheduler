@@ -7,6 +7,7 @@ import (
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
+	"camp-scheduler/internal/staleness"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -14,7 +15,7 @@ import (
 
 const RunTypeActivitySchedule = "activity_schedule"
 
-func StoreActivitySolutions(ctx context.Context, pool *pgxpool.Pool, campID, sessionID string, snapshot ActivitySnapshot, solutions []ActivitySolution) (string, error) {
+func StoreActivitySolutions(ctx context.Context, pool *pgxpool.Pool, marker *staleness.Marker, campID, sessionID string, snapshot ActivitySnapshot, solutions []ActivitySolution) (string, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {
 		return "", err
@@ -32,6 +33,11 @@ func StoreActivitySolutions(ctx context.Context, pool *pgxpool.Pool, campID, ses
 	defer tx.Rollback(ctx)
 
 	qtx := db.New(tx)
+
+	priorWasSelected, err := priorRunWasSelected(ctx, qtx, campUUID, sessionUUID, RunTypeActivitySchedule)
+	if err != nil {
+		return "", err
+	}
 
 	if _, err := qtx.DeleteAssignmentRunsBySessionAndType(ctx, db.DeleteAssignmentRunsBySessionAndTypeParams{
 		CampID:    campUUID,
@@ -54,6 +60,15 @@ func StoreActivitySolutions(ctx context.Context, pool *pgxpool.Pool, campID, ses
 	for i, solution := range solutions {
 		if err := storeActivitySolution(ctx, qtx, campUUID, run.ID, i, snapshot, solution); err != nil {
 			return "", fmt.Errorf("error storing activity solution %d: %w", i, err)
+		}
+	}
+
+	if priorWasSelected {
+		if err := marker.MarkDependentSessions(ctx, qtx, campUUID,
+			[]pgtype.UUID{sessionUUID},
+			[]staleness.RunType{staleness.RunTypeActivity},
+		); err != nil {
+			return "", fmt.Errorf("error marking dependent sessions stale after replacing selected activity run: %w", err)
 		}
 	}
 

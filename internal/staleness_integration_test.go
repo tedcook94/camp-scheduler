@@ -451,4 +451,129 @@ func TestStalenessFlagging(t *testing.T) {
 			t.Fatalf("expected DC cabin run stale after moving history onto session C")
 		}
 	})
+
+	t.Run("re-triggering a selected source run marks dependents stale", func(t *testing.T) {
+		ts, token, s1ID, s2ID, s1RunID, s2RunID, s1SolID := setupCascadeFixture(t, "Camp Stale Retrigger")
+
+		// Select s1's solution. Cascade marks s2 stale.
+		doRequest(t, http.MethodPost,
+			apiURL(ts, "/sessions/"+s1ID+"/assignment-runs/"+s1RunID+"/solutions/"+s1SolID+"/select"),
+			nil, http.StatusOK, token)
+
+		// Re-run s2 to clear the cascade-induced staleness.
+		freshS2 := mustPost(t, apiURL(ts, "/sessions/"+s2ID+"/assignment-runs"),
+			map[string]any{"run_type": "cabin"}, token)
+		s2RunID = str(freshS2, "id")
+		if boolField(t, mustGet(t, apiURL(ts, "/assignment-runs/"+s2RunID), token), "is_stale") {
+			t.Fatalf("freshly re-run s2 should not be stale before retrigger")
+		}
+
+		// Re-trigger s1's cabin run. The prior selected solution disappears,
+		// so dependent s2 must be marked stale.
+		newS1 := mustPost(t, apiURL(ts, "/sessions/"+s1ID+"/assignment-runs"),
+			map[string]any{"run_type": "cabin"}, token)
+		newS1RunID := str(newS1, "id")
+		if boolField(t, mustGet(t, apiURL(ts, "/assignment-runs/"+newS1RunID), token), "is_stale") {
+			t.Fatalf("freshly triggered s1 run should not be stale")
+		}
+		if !boolField(t, mustGet(t, apiURL(ts, "/assignment-runs/"+s2RunID), token), "is_stale") {
+			t.Fatalf("expected s2 stale after re-triggering selected s1 run")
+		}
+	})
+
+	t.Run("deleting a selected source run marks dependents stale", func(t *testing.T) {
+		ts, token, s1ID, s2ID, s1RunID, s2RunID, s1SolID := setupCascadeFixture(t, "Camp Stale Delete")
+
+		doRequest(t, http.MethodPost,
+			apiURL(ts, "/sessions/"+s1ID+"/assignment-runs/"+s1RunID+"/solutions/"+s1SolID+"/select"),
+			nil, http.StatusOK, token)
+
+		freshS2 := mustPost(t, apiURL(ts, "/sessions/"+s2ID+"/assignment-runs"),
+			map[string]any{"run_type": "cabin"}, token)
+		s2RunID = str(freshS2, "id")
+		if boolField(t, mustGet(t, apiURL(ts, "/assignment-runs/"+s2RunID), token), "is_stale") {
+			t.Fatalf("freshly re-run s2 should not be stale before delete")
+		}
+
+		// Delete s1's selected run. Dependent s2 must be marked stale.
+		doRawRequest(t, http.MethodDelete,
+			apiURL(ts, "/sessions/"+s1ID+"/assignment-runs/"+s1RunID),
+			nil, http.StatusOK, token)
+
+		if !boolField(t, mustGet(t, apiURL(ts, "/assignment-runs/"+s2RunID), token), "is_stale") {
+			t.Fatalf("expected s2 stale after deleting selected s1 run")
+		}
+	})
+}
+
+// setupCascadeFixture builds two sessions S1, S2 (S2.previous = S1) with the
+// minimum cabin-run inputs and triggers a cabin run on each. Returns the test
+// server, auth token, session IDs, run IDs, and S1's first solution ID — the
+// shape needed by the previous-session cascade tests.
+func setupCascadeFixture(t *testing.T, name string) (
+	ts *httptest.Server,
+	token, s1ID, s2ID, s1RunID, s2RunID, s1SolID string,
+) {
+	t.Helper()
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	if err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, name).Scan(&campID); err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token = mustLogin(t, ts, pool, campID)
+
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "Summer", "start_date": "2026-06-01", "end_date": "2026-08-31",
+	}, token)
+	seasonID := str(season, "id")
+
+	ag := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "J"}, token)
+	agID := str(ag, "id")
+	cab := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name": "P", "default_age_group_id": agID,
+		"default_group_size": 8, "default_required_counselors": 1, "gender": "female",
+	}, token)
+	cabID := str(cab, "id")
+
+	s1 := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "S1", "season_id": seasonID,
+	}, token)
+	s1ID = str(s1, "id")
+	s2 := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "S2", "season_id": seasonID, "previous_session_id": s1ID,
+	}, token)
+	s2ID = str(s2, "id")
+
+	for _, sid := range []string{s1ID, s2ID} {
+		sag := mustPost(t, apiURL(ts, "/sessions/"+sid+"/age-groups"), map[string]any{
+			"age_group_id": agID,
+		}, token)
+		sagID := str(sag, "id")
+		mustPost(t, apiURL(ts, "/sessions/"+sid+"/cabins"), map[string]any{
+			"session_age_group_id": sagID, "cabin_id": cabID,
+			"group_size": 8, "required_counselors": 1,
+		}, token)
+	}
+
+	mustPost(t, apiURL(ts, "/counselors"), map[string]any{
+		"first_name": "Alice", "last_name": "Test",
+		"junior_counselor": false, "gender": "female",
+	}, token)
+	mustPost(t, apiURL(ts, "/counselors"), map[string]any{
+		"first_name": "Bob", "last_name": "Test",
+		"junior_counselor": false, "gender": "female",
+	}, token)
+
+	s1Run := mustPost(t, apiURL(ts, "/sessions/"+s1ID+"/assignment-runs"),
+		map[string]any{"run_type": "cabin"}, token)
+	s1RunID = str(s1Run, "id")
+	s1SolID = str(asMap(list(s1Run, "solutions")[0]), "id")
+
+	s2Run := mustPost(t, apiURL(ts, "/sessions/"+s2ID+"/assignment-runs"),
+		map[string]any{"run_type": "cabin"}, token)
+	s2RunID = str(s2Run, "id")
+
+	return ts, token, s1ID, s2ID, s1RunID, s2RunID, s1SolID
 }

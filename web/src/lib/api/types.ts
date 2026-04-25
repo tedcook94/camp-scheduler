@@ -508,6 +508,7 @@ export interface RunResponse {
 	session_id: string;
 	run_type: RunType;
 	status: "completed" | "selected";
+	is_stale: boolean;
 	selected_solution_id: string | null;
 	created_at: string;
 }

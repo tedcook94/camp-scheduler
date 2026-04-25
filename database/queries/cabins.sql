@@ -68,3 +68,13 @@ JOIN age_groups ag ON ag.id = u.default_age_group_id;
 -- name: DeleteCabin :execrows
 DELETE FROM cabins
 WHERE id = $1 AND camp_id = $2;
+
+-- name: ArchiveCabin :execrows
+UPDATE cabins
+SET archived = true
+WHERE id = $1 AND camp_id = $2;
+
+-- name: UnarchiveCabin :execrows
+UPDATE cabins
+SET archived = false
+WHERE id = $1 AND camp_id = $2;

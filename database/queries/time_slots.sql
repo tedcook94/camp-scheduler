@@ -35,3 +35,13 @@ RETURNING id, camp_id, time_slot_name, archived;
 -- name: DeleteTimeSlot :execrows
 DELETE FROM time_slots
 WHERE id = $1 AND camp_id = $2;
+
+-- name: ArchiveTimeSlot :execrows
+UPDATE time_slots
+SET archived = true
+WHERE id = $1 AND camp_id = $2;
+
+-- name: UnarchiveTimeSlot :execrows
+UPDATE time_slots
+SET archived = false
+WHERE id = $1 AND camp_id = $2;

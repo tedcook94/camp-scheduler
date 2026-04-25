@@ -11,6 +11,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveCabin = `-- name: ArchiveCabin :execrows
+UPDATE cabins
+SET archived = true
+WHERE id = $1 AND camp_id = $2
+`
+
+type ArchiveCabinParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) ArchiveCabin(ctx context.Context, arg ArchiveCabinParams) (int64, error) {
+	result, err := q.db.Exec(ctx, archiveCabin, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createCabin = `-- name: CreateCabin :one
 WITH inserted AS (
     INSERT INTO cabins (camp_id, default_age_group_id, cabin_name,
@@ -286,6 +305,25 @@ func (q *Queries) ListCabins(ctx context.Context, campID pgtype.UUID) ([]ListCab
 		return nil, err
 	}
 	return items, nil
+}
+
+const unarchiveCabin = `-- name: UnarchiveCabin :execrows
+UPDATE cabins
+SET archived = false
+WHERE id = $1 AND camp_id = $2
+`
+
+type UnarchiveCabinParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) UnarchiveCabin(ctx context.Context, arg UnarchiveCabinParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unarchiveCabin, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateCabin = `-- name: UpdateCabin :one

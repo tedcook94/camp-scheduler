@@ -36,6 +36,26 @@ RETURNING id, camp_id, season_name, start_date, end_date, archived;
 DELETE FROM seasons
 WHERE id = $1 AND camp_id = $2;
 
+-- name: ArchiveSeason :execrows
+UPDATE seasons
+SET archived = true
+WHERE id = $1 AND camp_id = $2;
+
+-- name: UnarchiveSeason :execrows
+UPDATE seasons
+SET archived = false
+WHERE id = $1 AND camp_id = $2;
+
+-- name: ArchiveSessionsBySeason :execrows
+UPDATE sessions
+SET archived = true
+WHERE season_id = $1 AND camp_id = $2 AND archived = false;
+
+-- name: ListSessionIDsBySeason :many
+SELECT id
+FROM sessions
+WHERE season_id = $1 AND camp_id = $2;
+
 -- name: GetMostRecentSeason :one
 SELECT id, camp_id, season_name, start_date, end_date, archived
 FROM seasons

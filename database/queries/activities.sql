@@ -35,3 +35,13 @@ RETURNING id, camp_id, activity_name, archived;
 -- name: DeleteActivity :execrows
 DELETE FROM activities
 WHERE id = $1 AND camp_id = $2;
+
+-- name: ArchiveActivity :execrows
+UPDATE activities
+SET archived = true
+WHERE id = $1 AND camp_id = $2;
+
+-- name: UnarchiveActivity :execrows
+UPDATE activities
+SET archived = false
+WHERE id = $1 AND camp_id = $2;

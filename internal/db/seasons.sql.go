@@ -11,6 +11,44 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveSeason = `-- name: ArchiveSeason :execrows
+UPDATE seasons
+SET archived = true
+WHERE id = $1 AND camp_id = $2
+`
+
+type ArchiveSeasonParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) ArchiveSeason(ctx context.Context, arg ArchiveSeasonParams) (int64, error) {
+	result, err := q.db.Exec(ctx, archiveSeason, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const archiveSessionsBySeason = `-- name: ArchiveSessionsBySeason :execrows
+UPDATE sessions
+SET archived = true
+WHERE season_id = $1 AND camp_id = $2 AND archived = false
+`
+
+type ArchiveSessionsBySeasonParams struct {
+	SeasonID pgtype.UUID
+	CampID   pgtype.UUID
+}
+
+func (q *Queries) ArchiveSessionsBySeason(ctx context.Context, arg ArchiveSessionsBySeasonParams) (int64, error) {
+	result, err := q.db.Exec(ctx, archiveSessionsBySeason, arg.SeasonID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createSeason = `-- name: CreateSeason :one
 INSERT INTO seasons (camp_id, season_name, start_date, end_date)
 VALUES ($1, $2, $3, $4)
@@ -208,6 +246,56 @@ func (q *Queries) ListSeasons(ctx context.Context, campID pgtype.UUID) ([]Season
 		return nil, err
 	}
 	return items, nil
+}
+
+const listSessionIDsBySeason = `-- name: ListSessionIDsBySeason :many
+SELECT id
+FROM sessions
+WHERE season_id = $1 AND camp_id = $2
+`
+
+type ListSessionIDsBySeasonParams struct {
+	SeasonID pgtype.UUID
+	CampID   pgtype.UUID
+}
+
+func (q *Queries) ListSessionIDsBySeason(ctx context.Context, arg ListSessionIDsBySeasonParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, listSessionIDsBySeason, arg.SeasonID, arg.CampID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const unarchiveSeason = `-- name: UnarchiveSeason :execrows
+UPDATE seasons
+SET archived = false
+WHERE id = $1 AND camp_id = $2
+`
+
+type UnarchiveSeasonParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) UnarchiveSeason(ctx context.Context, arg UnarchiveSeasonParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unarchiveSeason, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateSeason = `-- name: UpdateSeason :one

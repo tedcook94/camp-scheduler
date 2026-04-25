@@ -35,3 +35,13 @@ RETURNING id, camp_id, age_group_name, archived;
 -- name: DeleteAgeGroup :execrows
 DELETE FROM age_groups
 WHERE id = $1 AND camp_id = $2;
+
+-- name: ArchiveAgeGroup :execrows
+UPDATE age_groups
+SET archived = true
+WHERE id = $1 AND camp_id = $2;
+
+-- name: UnarchiveAgeGroup :execrows
+UPDATE age_groups
+SET archived = false
+WHERE id = $1 AND camp_id = $2;

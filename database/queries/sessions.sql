@@ -43,3 +43,13 @@ SELECT EXISTS (
 -- name: DeleteSession :execrows
 DELETE FROM sessions
 WHERE id = $1 AND camp_id = $2;
+
+-- name: ArchiveSession :execrows
+UPDATE sessions
+SET archived = true
+WHERE id = $1 AND camp_id = $2;
+
+-- name: UnarchiveSession :execrows
+UPDATE sessions
+SET archived = false
+WHERE id = $1 AND camp_id = $2;

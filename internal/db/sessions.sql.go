@@ -105,10 +105,78 @@ func (q *Queries) HasDependentSessions(ctx context.Context, arg HasDependentSess
 	return has_dependents, err
 }
 
-const listSessions = `-- name: ListSessions :many
+const listAllSessions = `-- name: ListAllSessions :many
 SELECT id, camp_id, season_id, session_name, previous_session, archived
 FROM sessions
 WHERE camp_id = $1
+ORDER BY session_name
+`
+
+func (q *Queries) ListAllSessions(ctx context.Context, campID pgtype.UUID) ([]Session, error) {
+	rows, err := q.db.Query(ctx, listAllSessions, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Session
+	for rows.Next() {
+		var i Session
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.SeasonID,
+			&i.SessionName,
+			&i.PreviousSession,
+			&i.Archived,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listArchivedSessions = `-- name: ListArchivedSessions :many
+SELECT id, camp_id, season_id, session_name, previous_session, archived
+FROM sessions
+WHERE camp_id = $1 AND archived = true
+ORDER BY session_name
+`
+
+func (q *Queries) ListArchivedSessions(ctx context.Context, campID pgtype.UUID) ([]Session, error) {
+	rows, err := q.db.Query(ctx, listArchivedSessions, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Session
+	for rows.Next() {
+		var i Session
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.SeasonID,
+			&i.SessionName,
+			&i.PreviousSession,
+			&i.Archived,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSessions = `-- name: ListSessions :many
+SELECT id, camp_id, season_id, session_name, previous_session, archived
+FROM sessions
+WHERE camp_id = $1 AND archived = false
 ORDER BY session_name
 `
 

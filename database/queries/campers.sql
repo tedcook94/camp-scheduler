@@ -1,7 +1,19 @@
 -- name: ListCampers :many
 SELECT id, camp_id, first_name, last_name, gender, archived
 FROM campers
+WHERE camp_id = $1 AND archived = false
+ORDER BY last_name, first_name;
+
+-- name: ListAllCampers :many
+SELECT id, camp_id, first_name, last_name, gender, archived
+FROM campers
 WHERE camp_id = $1
+ORDER BY last_name, first_name;
+
+-- name: ListArchivedCampers :many
+SELECT id, camp_id, first_name, last_name, gender, archived
+FROM campers
+WHERE camp_id = $1 AND archived = true
 ORDER BY last_name, first_name;
 
 -- name: GetCamper :one

@@ -260,13 +260,14 @@ func (svc *Service) loadHeaders(ctx context.Context, campUUID, sessionUUID pgtyp
 }
 
 // loadPeopleByID fetches all counselors and campers for the camp once and
-// indexes them by ID so per-assignment lookups don't fan out.
+// indexes them by ID so per-assignment lookups don't fan out. Includes archived
+// people because historical assignment runs may reference them.
 func (svc *Service) loadPeopleByID(ctx context.Context, campUUID pgtype.UUID) (map[string]db.Counselor, map[string]db.Camper, error) {
-	counselors, err := svc.queries.ListCounselors(ctx, campUUID)
+	counselors, err := svc.queries.ListAllCounselors(ctx, campUUID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error listing counselors: %w", err)
 	}
-	campers, err := svc.queries.ListCampers(ctx, campUUID)
+	campers, err := svc.queries.ListAllCampers(ctx, campUUID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error listing campers: %w", err)
 	}

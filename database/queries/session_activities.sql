@@ -45,9 +45,11 @@ SELECT
     sa.required_counselors,
     a.id AS activity_id,
     a.activity_name,
+    a.archived AS activity_archived,
     sts.id AS session_time_slot_id,
     sts.time_slot_id,
     ts.time_slot_name,
+    ts.archived AS time_slot_archived,
     sts.sort_order
 FROM session_activities sa
 JOIN activities a ON a.id = sa.activity_id

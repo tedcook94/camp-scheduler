@@ -1,7 +1,19 @@
 -- name: ListCounselors :many
 SELECT id, camp_id, first_name, last_name, junior_counselor, archived, gender
 FROM counselors
+WHERE camp_id = $1 AND archived = false
+ORDER BY last_name, first_name;
+
+-- name: ListAllCounselors :many
+SELECT id, camp_id, first_name, last_name, junior_counselor, archived, gender
+FROM counselors
 WHERE camp_id = $1
+ORDER BY last_name, first_name;
+
+-- name: ListArchivedCounselors :many
+SELECT id, camp_id, first_name, last_name, junior_counselor, archived, gender
+FROM counselors
+WHERE camp_id = $1 AND archived = true
 ORDER BY last_name, first_name;
 
 -- name: GetCounselor :one

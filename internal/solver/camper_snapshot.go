@@ -61,9 +61,12 @@ func loadCamperCabins(ctx context.Context, queries *db.Queries, sessionID, campI
 		return nil, fmt.Errorf("error listing session cabins for camper solver: %w", err)
 	}
 
-	cabins := make([]CamperCabin, len(rows))
-	for i, r := range rows {
-		cabins[i] = CamperCabin{
+	cabins := make([]CamperCabin, 0, len(rows))
+	for _, r := range rows {
+		if r.CabinArchived || r.AgeGroupArchived {
+			continue
+		}
+		cabins = append(cabins, CamperCabin{
 			ID:                     api.UUIDToString(r.ID),
 			Name:                   r.CabinName,
 			AgeGroupID:             api.UUIDToString(r.AgeGroupID),
@@ -71,7 +74,7 @@ func loadCamperCabins(ctx context.Context, queries *db.Queries, sessionID, campI
 			SessionAgeGroupCabinID: api.UUIDToString(r.SessionAgeGroupCabinID),
 			Capacity:               int(r.GroupSize),
 			Gender:                 r.Gender,
-		}
+		})
 	}
 	return cabins, nil
 }
@@ -87,16 +90,20 @@ func loadCampers(ctx context.Context, queries *db.Queries, sessionID, campID pgt
 		return nil, fmt.Errorf("error listing session enrollments for camper solver: %w", err)
 	}
 
-	campers := make([]Camper, len(rows))
-	for i, r := range rows {
-		campers[i] = Camper{
+	campers := make([]Camper, 0, len(rows))
+	for _, r := range rows {
+		// Skip enrollments whose underlying camper has been archived.
+		if r.CamperArchived {
+			continue
+		}
+		campers = append(campers, Camper{
 			ID:         api.UUIDToString(r.CamperID),
 			FirstName:  r.CamperFirstName,
 			LastName:   r.CamperLastName,
 			Name:       r.CamperName,
 			AgeGroupID: api.UUIDToString(r.AgeGroupID),
 			Gender:     r.Gender,
-		}
+		})
 	}
 	return campers, nil
 }

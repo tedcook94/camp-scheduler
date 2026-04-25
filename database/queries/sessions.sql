@@ -1,7 +1,19 @@
 -- name: ListSessions :many
 SELECT id, camp_id, season_id, session_name, previous_session, archived
 FROM sessions
+WHERE camp_id = $1 AND archived = false
+ORDER BY session_name;
+
+-- name: ListAllSessions :many
+SELECT id, camp_id, season_id, session_name, previous_session, archived
+FROM sessions
 WHERE camp_id = $1
+ORDER BY session_name;
+
+-- name: ListArchivedSessions :many
+SELECT id, camp_id, season_id, session_name, previous_session, archived
+FROM sessions
+WHERE camp_id = $1 AND archived = true
 ORDER BY session_name;
 
 -- name: GetSession :one

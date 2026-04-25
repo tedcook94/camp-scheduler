@@ -104,10 +104,96 @@ func (q *Queries) GetCamper(ctx context.Context, arg GetCamperParams) (GetCamper
 	return i, err
 }
 
-const listCampers = `-- name: ListCampers :many
+const listAllCampers = `-- name: ListAllCampers :many
 SELECT id, camp_id, first_name, last_name, gender, archived
 FROM campers
 WHERE camp_id = $1
+ORDER BY last_name, first_name
+`
+
+type ListAllCampersRow struct {
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	FirstName string
+	LastName  string
+	Gender    string
+	Archived  bool
+}
+
+func (q *Queries) ListAllCampers(ctx context.Context, campID pgtype.UUID) ([]ListAllCampersRow, error) {
+	rows, err := q.db.Query(ctx, listAllCampers, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAllCampersRow
+	for rows.Next() {
+		var i ListAllCampersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.FirstName,
+			&i.LastName,
+			&i.Gender,
+			&i.Archived,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listArchivedCampers = `-- name: ListArchivedCampers :many
+SELECT id, camp_id, first_name, last_name, gender, archived
+FROM campers
+WHERE camp_id = $1 AND archived = true
+ORDER BY last_name, first_name
+`
+
+type ListArchivedCampersRow struct {
+	ID        pgtype.UUID
+	CampID    pgtype.UUID
+	FirstName string
+	LastName  string
+	Gender    string
+	Archived  bool
+}
+
+func (q *Queries) ListArchivedCampers(ctx context.Context, campID pgtype.UUID) ([]ListArchivedCampersRow, error) {
+	rows, err := q.db.Query(ctx, listArchivedCampers, campID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListArchivedCampersRow
+	for rows.Next() {
+		var i ListArchivedCampersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampID,
+			&i.FirstName,
+			&i.LastName,
+			&i.Gender,
+			&i.Archived,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCampers = `-- name: ListCampers :many
+SELECT id, camp_id, first_name, last_name, gender, archived
+FROM campers
+WHERE camp_id = $1 AND archived = false
 ORDER BY last_name, first_name
 `
 

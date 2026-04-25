@@ -1,7 +1,19 @@
 -- name: ListAgeGroups :many
 SELECT id, camp_id, age_group_name, archived
 FROM age_groups
+WHERE camp_id = $1 AND archived = false
+ORDER BY age_group_name;
+
+-- name: ListAllAgeGroups :many
+SELECT id, camp_id, age_group_name, archived
+FROM age_groups
 WHERE camp_id = $1
+ORDER BY age_group_name;
+
+-- name: ListArchivedAgeGroups :many
+SELECT id, camp_id, age_group_name, archived
+FROM age_groups
+WHERE camp_id = $1 AND archived = true
 ORDER BY age_group_name;
 
 -- name: GetAgeGroup :one

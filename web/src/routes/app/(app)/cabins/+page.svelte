@@ -119,6 +119,23 @@
 		formGender = cabin.gender;
 		clearErrors();
 		dialogOpen = true;
+		ensureArchivedParentLoaded(cabin.default_age_group_id);
+	}
+
+	let archivedAgeGroups = $state<AgeGroup[]>([]);
+	let archivedAgeGroupsLoaded = $state(false);
+
+	async function ensureArchivedParentLoaded(ageGroupId: string) {
+		if (!ageGroupId) return;
+		if (ageGroups.some((ag) => ag.id === ageGroupId)) return;
+		if (archivedAgeGroups.some((ag) => ag.id === ageGroupId)) return;
+		if (archivedAgeGroupsLoaded) return;
+		try {
+			archivedAgeGroups = await ageGroupApi.listArchived();
+			archivedAgeGroupsLoaded = true;
+		} catch {
+			// ignore — dropdown will just show id
+		}
 	}
 
 	async function handleSubmit(e: SubmitEvent) {
@@ -412,7 +429,12 @@
 				<Select.Select type="single" bind:value={formAgeGroupId} disabled={submitting} onValueChange={() => (ageGroupError = "")}>
 					<Select.SelectTrigger id="cabin-age-group" class="w-full">
 						{#if formAgeGroupId}
-							{ageGroups.find((ag) => ag.id === formAgeGroupId)?.name ?? "Select age group"}
+							{@const selected = ageGroups.find((ag) => ag.id === formAgeGroupId) ?? archivedAgeGroups.find((ag) => ag.id === formAgeGroupId)}
+							{#if selected}
+								{selected.name}{#if selected.archived}<span class="text-muted-foreground"> (archived)</span>{/if}
+							{:else}
+								Select age group
+							{/if}
 						{:else}
 							<span class="text-muted-foreground">Select age group</span>
 						{/if}
@@ -420,6 +442,9 @@
 					<Select.SelectContent>
 						{#each ageGroups as ag (ag.id)}
 							<Select.SelectItem value={ag.id}>{ag.name}</Select.SelectItem>
+						{/each}
+						{#each archivedAgeGroups.filter((ag) => ag.id === formAgeGroupId) as ag (ag.id)}
+							<Select.SelectItem value={ag.id} disabled>{ag.name} (archived)</Select.SelectItem>
 						{/each}
 					</Select.SelectContent>
 				</Select.Select>

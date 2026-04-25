@@ -74,6 +74,9 @@
 
 	// Lookup helpers
 	let seasonMap = $derived(new Map(seasons.map((s) => [s.id, s.name])));
+	let archivedSeasons = $state<Season[]>([]);
+	let archivedSeasonsLoaded = $state(false);
+	let archivedSeasonMap = $derived(new Map(archivedSeasons.map((s) => [s.id, s.name])));
 	let sessionMap = $derived(new Map(sessions.map((s) => [s.id, s.name])));
 
 	// Archived sessions are loaded lazily so previous_session selectors can
@@ -176,6 +179,7 @@
 		formPreviousSessionId = session.previous_session_id;
 		clearErrors();
 		dialogOpen = true;
+		ensureArchivedSeasonLoaded(session.season_id);
 		if (session.previous_session_id) {
 			void ensureArchivedPreviousLoaded(session.previous_session_id);
 		}
@@ -192,6 +196,19 @@
 			const message =
 				err instanceof ApiClientError ? err.message : "Failed to load archived sessions";
 			toast.error(message);
+		}
+	}
+
+	async function ensureArchivedSeasonLoaded(seasonId: string) {
+		if (!seasonId) return;
+		if (seasons.some((s) => s.id === seasonId)) return;
+		if (archivedSeasons.some((s) => s.id === seasonId)) return;
+		if (archivedSeasonsLoaded) return;
+		try {
+			archivedSeasons = await seasonApi.listArchived();
+			archivedSeasonsLoaded = true;
+		} catch {
+			// ignore
 		}
 	}
 
@@ -590,7 +607,12 @@
 				>
 					<Select.SelectTrigger id="session-season" class="w-full">
 						{#if formSeasonId}
-							{seasonMap.get(formSeasonId) ?? "Select season"}
+							{@const name = seasonMap.get(formSeasonId) ?? archivedSeasonMap.get(formSeasonId)}
+							{#if name}
+								{name}{#if archivedSeasonMap.has(formSeasonId)}<span class="text-muted-foreground"> (archived)</span>{/if}
+							{:else}
+								Select season
+							{/if}
 						{:else}
 							<span class="text-muted-foreground">Select season</span>
 						{/if}
@@ -598,6 +620,9 @@
 					<Select.SelectContent>
 						{#each seasons as season (season.id)}
 							<Select.SelectItem value={season.id}>{season.name}</Select.SelectItem>
+						{/each}
+						{#each archivedSeasons.filter((s) => s.id === formSeasonId) as season (season.id)}
+							<Select.SelectItem value={season.id} disabled>{season.name} (archived)</Select.SelectItem>
 						{/each}
 					</Select.SelectContent>
 				</Select.Select>

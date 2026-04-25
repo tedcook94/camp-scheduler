@@ -14,6 +14,6 @@ headers: []
 authentication: {}
 authenticationType: null
 body:
-  text: '{"name": "Counselor Name", "junior_counselor": false, "gender": "female"}'
+  text: '{"first_name": "First", "last_name": "Last", "junior_counselor": false, "gender": "female"}'
 bodyType: application/json
 sortPriority: 2.0

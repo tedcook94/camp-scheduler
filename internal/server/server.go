@@ -195,7 +195,7 @@ func (s *Server) routes() {
 	timeSlotController := timeslot.NewController(timeSlotService)
 	timeSlotController.RegisterRoutes(protected)
 
-	assignmentService := assignment.NewService(queries, s.pool)
+	assignmentService := assignment.NewService(queries, s.pool, marker)
 	assignmentController := assignment.NewController(assignmentService)
 	assignmentController.RegisterRoutes(protected)
 

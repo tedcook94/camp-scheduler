@@ -111,6 +111,41 @@ func (m *Marker) MarkCamp(
 	return nil
 }
 
+// MarkDependentSessions marks runs stale only for sessions whose
+// previous_session is in sessionIDs (the cascade targets, not the sources
+// themselves). Used when the source session's *selected solution* changes:
+// the source run is the one being acted on and shouldn't be marked stale,
+// but any next session that consumes its selected solution must be.
+func (m *Marker) MarkDependentSessions(
+	ctx context.Context,
+	queries *db.Queries,
+	campID pgtype.UUID,
+	sessionIDs []pgtype.UUID,
+	runTypes []RunType,
+) error {
+	if len(sessionIDs) == 0 || len(runTypes) == 0 {
+		return nil
+	}
+	dependents, err := queries.ListSessionsByPreviousSession(ctx, db.ListSessionsByPreviousSessionParams{
+		CampID:             campID,
+		PreviousSessionIds: sessionIDs,
+	})
+	if err != nil {
+		return fmt.Errorf("error finding dependent sessions: %w", err)
+	}
+	if len(dependents) == 0 {
+		return nil
+	}
+	if _, err := queries.MarkAssignmentRunsStale(ctx, db.MarkAssignmentRunsStaleParams{
+		CampID:     campID,
+		SessionIds: dependents,
+		RunTypes:   runTypeStrings(runTypes),
+	}); err != nil {
+		return fmt.Errorf("error marking dependent assignment runs stale: %w", err)
+	}
+	return nil
+}
+
 // MarkSessionsForCounselor marks runs stale for every session where the
 // counselor is on the roster. Used when a counselor's camp-wide attributes
 // change (name, gender, junior flag, enabled flag).

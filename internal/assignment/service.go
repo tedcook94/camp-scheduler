@@ -8,6 +8,7 @@ import (
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/db"
 	"camp-scheduler/internal/solver"
+	"camp-scheduler/internal/staleness"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -76,10 +77,11 @@ func (e *PreconditionError) Error() string {
 type Service struct {
 	queries *db.Queries
 	pool    *pgxpool.Pool
+	marker  *staleness.Marker
 }
 
-func NewService(queries *db.Queries, pool *pgxpool.Pool) *Service {
-	return &Service{queries: queries, pool: pool}
+func NewService(queries *db.Queries, pool *pgxpool.Pool, marker *staleness.Marker) *Service {
+	return &Service{queries: queries, pool: pool, marker: marker}
 }
 
 // TriggerCabinRun replaces the existing cabin run for the session (if any)
@@ -590,6 +592,18 @@ func (svc *Service) SelectSolution(ctx context.Context, campID, runID, solutionI
 			return RunResponse{}, ErrRunNotFound
 		}
 		return RunResponse{}, fmt.Errorf("error updating run status for run %s: %w", runID, err)
+	}
+
+	// Selecting a different solution changes what dependent sessions read from
+	// `previous_session`'s selected solution, so their runs (of the same type)
+	// become stale. The source run keeps whatever stale state it had — selection
+	// does not recompute anything, so only re-running clears the flag.
+	if err := svc.marker.MarkDependentSessions(
+		ctx, qtx, campUUID,
+		[]pgtype.UUID{run.SessionID},
+		[]staleness.RunType{staleness.RunType(run.RunType)},
+	); err != nil {
+		return RunResponse{}, fmt.Errorf("error marking dependent sessions stale: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {

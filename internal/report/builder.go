@@ -89,8 +89,8 @@ func buildCabinReport(
 	}
 	for _, k := range order {
 		g := groups[k]
-		sort.SliceStable(g.Counselors, func(i, j int) bool { return g.Counselors[i].Name < g.Counselors[j].Name })
-		sort.SliceStable(g.Campers, func(i, j int) bool { return g.Campers[i].Name < g.Campers[j].Name })
+		sort.SliceStable(g.Counselors, func(i, j int) bool { return personLess(g.Counselors[i].LastName, g.Counselors[i].FirstName, g.Counselors[j].LastName, g.Counselors[j].FirstName) })
+		sort.SliceStable(g.Campers, func(i, j int) bool { return personLess(g.Campers[i].LastName, g.Campers[i].FirstName, g.Campers[j].LastName, g.Campers[j].FirstName) })
 		out.Cabins = append(out.Cabins, *g)
 	}
 
@@ -98,7 +98,7 @@ func buildCabinReport(
 		out.Unassigned.Counselors = append(out.Unassigned.Counselors, counselorRow(u.CounselorID, u.CounselorName, counselors))
 	}
 	sort.SliceStable(out.Unassigned.Counselors, func(i, j int) bool {
-		return out.Unassigned.Counselors[i].Name < out.Unassigned.Counselors[j].Name
+		return personLess(out.Unassigned.Counselors[i].LastName, out.Unassigned.Counselors[i].FirstName, out.Unassigned.Counselors[j].LastName, out.Unassigned.Counselors[j].FirstName)
 	})
 	// Unassigned campers aren't tracked by the solver as a discrete list
 	// (capacity shortages are caught up-front), so leave that bucket empty
@@ -189,7 +189,7 @@ func buildActivityReport(
 		sort.Strings(actNames)
 		for _, n := range actNames {
 			ag := sb.activities[n]
-			sort.SliceStable(ag.Counselors, func(i, j int) bool { return ag.Counselors[i].Name < ag.Counselors[j].Name })
+			sort.SliceStable(ag.Counselors, func(i, j int) bool { return personLess(ag.Counselors[i].LastName, ag.Counselors[i].FirstName, ag.Counselors[j].LastName, ag.Counselors[j].FirstName) })
 			sb.group.Activities = append(sb.group.Activities, *ag)
 		}
 		out.TimeSlots = append(out.TimeSlots, *sb.group)
@@ -205,7 +205,7 @@ func buildActivityReport(
 		out.Unassigned = append(out.Unassigned, row)
 	}
 	sort.SliceStable(out.Unassigned, func(i, j int) bool {
-		return out.Unassigned[i].Name < out.Unassigned[j].Name
+		return personLess(out.Unassigned[i].LastName, out.Unassigned[i].FirstName, out.Unassigned[j].LastName, out.Unassigned[j].FirstName)
 	})
 
 	return out
@@ -214,6 +214,8 @@ func buildActivityReport(
 func counselorRow(id, fallbackName string, counselors map[string]db.Counselor) CounselorRow {
 	row := CounselorRow{ID: id, Name: fallbackName}
 	if c, ok := counselors[id]; ok {
+		row.FirstName = c.FirstName
+		row.LastName = c.LastName
 		row.Name = counselor.FullName(c.FirstName, c.LastName)
 		row.Junior = c.JuniorCounselor
 		row.Gender = c.Gender
@@ -224,8 +226,52 @@ func counselorRow(id, fallbackName string, counselors map[string]db.Counselor) C
 func camperRow(id, fallbackName string, campers map[string]db.Camper) CamperRow {
 	row := CamperRow{ID: id, Name: fallbackName}
 	if c, ok := campers[id]; ok {
+		row.FirstName = c.FirstName
+		row.LastName = c.LastName
 		row.Name = camper.FullName(c.FirstName, c.LastName)
 		row.Gender = c.Gender
 	}
 	return row
+}
+
+// personLess orders people by last name then first name.
+func personLess(lastA, firstA, lastB, firstB string) bool {
+	if lastA != lastB {
+		return lastA < lastB
+	}
+	return firstA < firstB
+}
+
+// formatLastFirst renders a person's name as "Last, First" for printed
+// reports. Falls back to whichever part is non-empty if either is missing.
+func formatLastFirst(first, last string) string {
+	switch {
+	case first == "" && last == "":
+		return ""
+	case first == "":
+		return last
+	case last == "":
+		return first
+	}
+	return last + ", " + first
+}
+
+// displayName prefers the "Last, First" rendering when first or last
+// names are available, falling back to the row's pre-built display name
+// (typically the joined `*_name` from sqlc) when both parts are empty.
+func displayName(first, last, fallback string) string {
+	if s := formatLastFirst(first, last); s != "" {
+		return s
+	}
+	return fallback
+}
+
+// splitForCSV returns (lastName, firstName) for CSV export. When both
+// parts are empty it places the fallback display name in the last-name
+// column so the row still carries an identifier.
+func splitForCSV(first, last, fallback string) (string, string) {
+	if first == "" && last == "" {
+		return fallback, ""
+	}
+	return last, first
 }

@@ -76,13 +76,13 @@ func WriteCabinPDF(w io.Writer, r *CabinReport, opts PDFOptions) error {
 			if len(r.Unassigned.Counselors) > 0 {
 				writeSubHeading(doc, "Counselors")
 				for _, c := range r.Unassigned.Counselors {
-					writeListItem(doc, c.Name)
+					writeListItem(doc, displayName(c.FirstName, c.LastName, c.Name))
 				}
 			}
 			if len(r.Unassigned.Campers) > 0 {
 				writeSubHeading(doc, "Campers")
 				for _, c := range r.Unassigned.Campers {
-					writeListItem(doc, c.Name)
+					writeListItem(doc, displayName(c.FirstName, c.LastName, c.Name))
 				}
 			}
 		}
@@ -123,10 +123,10 @@ func renderCabinTable(doc *docCtx, ageGroup string, g CabinGroup) {
 	for i := 0; i < rows; i++ {
 		var leftName, rightName string
 		if i < len(g.Counselors) {
-			leftName = g.Counselors[i].Name
+			leftName = displayName(g.Counselors[i].FirstName, g.Counselors[i].LastName, g.Counselors[i].Name)
 		}
 		if i < len(g.Campers) {
-			rightName = g.Campers[i].Name
+			rightName = displayName(g.Campers[i].FirstName, g.Campers[i].LastName, g.Campers[i].Name)
 		}
 		drawCabinRow(doc, ageGroup, g.CabinName, colW, leftName, rightName)
 	}
@@ -245,7 +245,7 @@ func WriteActivityPDF(w io.Writer, r *ActivityReport, opts PDFOptions) error {
 			}
 			key := cellKey{act: act.Name, slot: ts.Name}
 			for _, c := range act.Counselors {
-				cells[key] = append(cells[key], c.Name)
+				cells[key] = append(cells[key], displayName(c.FirstName, c.LastName, c.Name))
 			}
 		}
 	}
@@ -267,9 +267,9 @@ func WriteActivityPDF(w io.Writer, r *ActivityReport, opts PDFOptions) error {
 		ensureSpace(doc.pdf, 22)
 		writeAgeGroupHeading(doc, "Unassigned")
 		for _, u := range r.Unassigned {
-			line := u.Name
+			line := displayName(u.FirstName, u.LastName, u.Name)
 			if len(u.MissingTimeSlots) > 0 {
-				line = fmt.Sprintf("%s — missing: %s", u.Name, strings.Join(u.MissingTimeSlots, ", "))
+				line = fmt.Sprintf("%s — missing: %s", line, strings.Join(u.MissingTimeSlots, ", "))
 			}
 			writeListItem(doc, line)
 		}

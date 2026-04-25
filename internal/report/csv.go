@@ -13,25 +13,29 @@ type CSVOptions struct {
 
 // WriteCabinCSV emits a flat one-row-per-person CSV. Each cabin's
 // counselors and campers are emitted in their group order; an unassigned
-// section follows after a blank separator row when included.
+// section follows after a blank separator row when included. Names are
+// split into Last Name and First Name columns so spreadsheets can sort
+// or filter on either part.
 func WriteCabinCSV(w io.Writer, r *CabinReport, opts CSVOptions) error {
 	cw := csv.NewWriter(w)
 	// defer guards early-error returns; explicit Flush+Error below covers success path.
 	defer cw.Flush()
 
-	header := []string{"Age Group", "Cabin", "Role", "Name"}
+	header := []string{"Age Group", "Cabin", "Role", "Last Name", "First Name"}
 	if err := cw.Write(header); err != nil {
 		return err
 	}
 
 	for _, g := range r.Cabins {
 		for _, c := range g.Counselors {
-			if err := cw.Write([]string{g.AgeGroupName, g.CabinName, "Counselor", c.Name}); err != nil {
+			last, first := splitForCSV(c.FirstName, c.LastName, c.Name)
+			if err := cw.Write([]string{g.AgeGroupName, g.CabinName, "Counselor", last, first}); err != nil {
 				return err
 			}
 		}
 		for _, c := range g.Campers {
-			if err := cw.Write([]string{g.AgeGroupName, g.CabinName, "Camper", c.Name}); err != nil {
+			last, first := splitForCSV(c.FirstName, c.LastName, c.Name)
+			if err := cw.Write([]string{g.AgeGroupName, g.CabinName, "Camper", last, first}); err != nil {
 				return err
 			}
 		}
@@ -44,12 +48,14 @@ func WriteCabinCSV(w io.Writer, r *CabinReport, opts CSVOptions) error {
 				return err
 			}
 			for _, c := range r.Unassigned.Counselors {
-				if err := cw.Write([]string{"", "", "Unassigned Counselor", c.Name}); err != nil {
+				last, first := splitForCSV(c.FirstName, c.LastName, c.Name)
+				if err := cw.Write([]string{"", "", "Unassigned Counselor", last, first}); err != nil {
 					return err
 				}
 			}
 			for _, c := range r.Unassigned.Campers {
-				if err := cw.Write([]string{"", "", "Unassigned Camper", c.Name}); err != nil {
+				last, first := splitForCSV(c.FirstName, c.LastName, c.Name)
+				if err := cw.Write([]string{"", "", "Unassigned Camper", last, first}); err != nil {
 					return err
 				}
 			}
@@ -71,7 +77,7 @@ func WriteActivityCSV(w io.Writer, r *ActivityReport, opts CSVOptions) error {
 	// defer guards early-error returns; explicit Flush+Error below covers success path.
 	defer cw.Flush()
 
-	header := []string{"Time Slot", "Activity", "Counselor"}
+	header := []string{"Time Slot", "Activity", "Last Name", "First Name"}
 	if err := cw.Write(header); err != nil {
 		return err
 	}
@@ -79,7 +85,8 @@ func WriteActivityCSV(w io.Writer, r *ActivityReport, opts CSVOptions) error {
 	for _, ts := range r.TimeSlots {
 		for _, act := range ts.Activities {
 			for _, c := range act.Counselors {
-				if err := cw.Write([]string{ts.Name, act.Name, c.Name}); err != nil {
+				last, first := splitForCSV(c.FirstName, c.LastName, c.Name)
+				if err := cw.Write([]string{ts.Name, act.Name, last, first}); err != nil {
 					return err
 				}
 			}
@@ -91,14 +98,15 @@ func WriteActivityCSV(w io.Writer, r *ActivityReport, opts CSVOptions) error {
 			return err
 		}
 		for _, u := range r.Unassigned {
+			last, first := splitForCSV(u.FirstName, u.LastName, u.Name)
 			if len(u.MissingTimeSlots) == 0 {
-				if err := cw.Write([]string{"", "unassigned", u.Name}); err != nil {
+				if err := cw.Write([]string{"", "unassigned", last, first}); err != nil {
 					return err
 				}
 				continue
 			}
 			for _, ts := range u.MissingTimeSlots {
-				if err := cw.Write([]string{ts, "unassigned", u.Name}); err != nil {
+				if err := cw.Write([]string{ts, "unassigned", last, first}); err != nil {
 					return err
 				}
 			}
@@ -120,11 +128,11 @@ func WriteActivityCSV(w io.Writer, r *ActivityReport, opts CSVOptions) error {
 		if err := cw.Write([]string{}); err != nil {
 			return err
 		}
-		if err := cw.Write([]string{"Empty Activities", "", ""}); err != nil {
+		if err := cw.Write([]string{"Empty Activities", "", "", ""}); err != nil {
 			return err
 		}
 		for _, e := range empties {
-			if err := cw.Write([]string{e.slot, e.activity, ""}); err != nil {
+			if err := cw.Write([]string{e.slot, e.activity, "", ""}); err != nil {
 				return err
 			}
 		}

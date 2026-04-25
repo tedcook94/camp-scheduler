@@ -31,9 +31,21 @@
 	let loading = $state(true);
 	let loadError = $state(false);
 
-	let sortKey = $state<"name" | "gender">("name");
+	let sortKey = $state<"last_name" | "gender">("last_name");
 	let sortDirection = $state<SortDirection>("asc");
-	let sortedCampers = $derived(sortItems(campers, sortKey, sortDirection));
+	let sortedCampers = $derived.by(() => {
+		const items = [...campers];
+		const dir = sortDirection === "asc" ? 1 : -1;
+		if (sortKey === "last_name") {
+			items.sort((a, b) => {
+				const byLast = a.last_name.localeCompare(b.last_name, undefined, { sensitivity: "base" });
+				if (byLast !== 0) return byLast * dir;
+				return a.first_name.localeCompare(b.first_name, undefined, { sensitivity: "base" }) * dir;
+			});
+			return items;
+		}
+		return sortItems(items, sortKey, sortDirection);
+	});
 
 	function toggleSort(key: typeof sortKey) {
 		if (sortKey === key) {
@@ -47,17 +59,19 @@
 	// Create/edit dialog
 	let dialogOpen = $state(false);
 	let editingCamper = $state<Camper | null>(null);
-	let formName = $state("");
+	let formFirstName = $state("");
+	let formLastName = $state("");
 	let formGender = $state<Gender | "">("");
 	let submitting = $state(false);
-	let nameError = $state("");
+	let firstNameError = $state("");
+	let lastNameError = $state("");
 	let genderError = $state("");
 
 	let dialogTitle = $derived(editingCamper ? "Edit Camper" : "Add Camper");
 	let dialogDescription = $derived(
 		editingCamper
 			? "Update the camper's details."
-			: "Enter a name for the new camper."
+			: "Enter the camper's first and last name."
 	);
 
 	// Delete confirmation
@@ -79,31 +93,41 @@
 
 	function openCreate() {
 		editingCamper = null;
-		formName = "";
+		formFirstName = "";
+		formLastName = "";
 		formGender = "";
-		nameError = "";
+		firstNameError = "";
+		lastNameError = "";
 		genderError = "";
 		dialogOpen = true;
 	}
 
 	function openEdit(camper: Camper) {
 		editingCamper = camper;
-		formName = camper.name;
+		formFirstName = camper.first_name;
+		formLastName = camper.last_name;
 		formGender = camper.gender;
-		nameError = "";
+		firstNameError = "";
+		lastNameError = "";
 		genderError = "";
 		dialogOpen = true;
 	}
 
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
-		nameError = "";
+		firstNameError = "";
+		lastNameError = "";
 		genderError = "";
 
-		const name = formName.trim();
+		const first_name = formFirstName.trim();
+		const last_name = formLastName.trim();
 		let valid = true;
-		if (!name) {
-			nameError = "Name is required.";
+		if (!first_name) {
+			firstNameError = "First name is required.";
+			valid = false;
+		}
+		if (!last_name) {
+			lastNameError = "Last name is required.";
 			valid = false;
 		}
 		if (formGender !== "male" && formGender !== "female") {
@@ -116,11 +140,11 @@
 
 		try {
 			if (editingCamper) {
-				const updated = await camperApi.update(editingCamper.id, { name, gender: formGender as Gender });
+				const updated = await camperApi.update(editingCamper.id, { first_name, last_name, gender: formGender as Gender });
 				campers = campers.map((c) => (c.id === updated.id ? updated : c));
 				toast.success("Camper updated");
 			} else {
-				const created = await camperApi.create({ name, gender: formGender as Gender });
+				const created = await camperApi.create({ first_name, last_name, gender: formGender as Gender });
 				campers = [...campers, created];
 				toast.success("Camper created");
 			}
@@ -188,7 +212,7 @@
 		<Table.Table>
 			<Table.TableHeader>
 				<Table.TableRow>
-					<SortableTableHead label="Name" active={sortKey === "name"} direction={sortDirection} onclick={() => toggleSort("name")} />
+					<SortableTableHead label="Name" active={sortKey === "last_name"} direction={sortDirection} onclick={() => toggleSort("last_name")} />
 					<SortableTableHead label="Gender" active={sortKey === "gender"} direction={sortDirection} onclick={() => toggleSort("gender")} />
 					<Table.TableHead class="w-24">
 						<span class="sr-only">Actions</span>
@@ -256,17 +280,31 @@
 		</Dialog.DialogHeader>
 		<form onsubmit={handleSubmit} class="grid gap-4">
 			<div class="grid gap-2">
-				<Label for="camper-name">Name</Label>
+				<Label for="camper-first-name">First name</Label>
 				<Input
-					id="camper-name"
+					id="camper-first-name"
 					type="text"
-					placeholder="Camper name"
-					bind:value={formName}
+					placeholder="First name"
+					bind:value={formFirstName}
 					disabled={submitting}
-					oninput={() => (nameError = "")}
+					oninput={() => (firstNameError = "")}
 				/>
-				{#if nameError}
-					<p class="text-destructive text-sm">{nameError}</p>
+				{#if firstNameError}
+					<p class="text-destructive text-sm">{firstNameError}</p>
+				{/if}
+			</div>
+			<div class="grid gap-2">
+				<Label for="camper-last-name">Last name</Label>
+				<Input
+					id="camper-last-name"
+					type="text"
+					placeholder="Last name"
+					bind:value={formLastName}
+					disabled={submitting}
+					oninput={() => (lastNameError = "")}
+				/>
+				{#if lastNameError}
+					<p class="text-destructive text-sm">{lastNameError}</p>
 				{/if}
 			</div>
 			<div class="grid gap-2">

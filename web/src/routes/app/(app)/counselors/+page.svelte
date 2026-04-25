@@ -32,19 +32,29 @@
 	let loading = $state(true);
 	let loadError = $state(false);
 
-	let sortKey = $state<"name" | "junior_counselor" | "enabled" | "gender">("name");
+	let sortKey = $state<"last_name" | "junior_counselor" | "enabled" | "gender">("last_name");
 	let sortDirection = $state<SortDirection>("asc");
-	let sortedCounselors = $derived(
-		sortItems(
-			counselors,
+	let sortedCounselors = $derived.by(() => {
+		const items = [...counselors];
+		const dir = sortDirection === "asc" ? 1 : -1;
+		if (sortKey === "last_name") {
+			items.sort((a, b) => {
+				const byLast = a.last_name.localeCompare(b.last_name, undefined, { sensitivity: "base" });
+				if (byLast !== 0) return byLast * dir;
+				return a.first_name.localeCompare(b.first_name, undefined, { sensitivity: "base" }) * dir;
+			});
+			return items;
+		}
+		return sortItems(
+			items,
 			sortKey === "junior_counselor"
 				? (c: Counselor) => (c.junior_counselor ? "Junior" : "Senior")
 				: sortKey === "enabled"
 					? (c: Counselor) => (c.enabled ? "Active" : "Inactive")
 					: sortKey,
 			sortDirection
-		)
-	);
+		);
+	});
 
 	function toggleSort(key: typeof sortKey) {
 		if (sortKey === key) {
@@ -58,19 +68,21 @@
 	// Create/edit dialog
 	let dialogOpen = $state(false);
 	let editingCounselor = $state<Counselor | null>(null);
-	let formName = $state("");
+	let formFirstName = $state("");
+	let formLastName = $state("");
 	let formJunior = $state(false);
 	let formEnabled = $state(true);
 	let formGender = $state<Gender | "">("");
 	let submitting = $state(false);
-	let nameError = $state("");
+	let firstNameError = $state("");
+	let lastNameError = $state("");
 	let genderError = $state("");
 
 	let dialogTitle = $derived(editingCounselor ? "Edit Counselor" : "Add Counselor");
 	let dialogDescription = $derived(
 		editingCounselor
 			? "Update the counselor's details."
-			: "Enter a name for the new counselor."
+			: "Enter the counselor's first and last name."
 	);
 
 	// Delete confirmation
@@ -92,35 +104,45 @@
 
 	function openCreate() {
 		editingCounselor = null;
-		formName = "";
+		formFirstName = "";
+		formLastName = "";
 		formJunior = false;
 		formEnabled = true;
 		formGender = "";
-		nameError = "";
+		firstNameError = "";
+		lastNameError = "";
 		genderError = "";
 		dialogOpen = true;
 	}
 
 	function openEdit(counselor: Counselor) {
 		editingCounselor = counselor;
-		formName = counselor.name;
+		formFirstName = counselor.first_name;
+		formLastName = counselor.last_name;
 		formJunior = counselor.junior_counselor;
 		formEnabled = counselor.enabled;
 		formGender = counselor.gender;
-		nameError = "";
+		firstNameError = "";
+		lastNameError = "";
 		genderError = "";
 		dialogOpen = true;
 	}
 
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
-		nameError = "";
+		firstNameError = "";
+		lastNameError = "";
 		genderError = "";
 
-		const name = formName.trim();
+		const first_name = formFirstName.trim();
+		const last_name = formLastName.trim();
 		let valid = true;
-		if (!name) {
-			nameError = "Name is required.";
+		if (!first_name) {
+			firstNameError = "First name is required.";
+			valid = false;
+		}
+		if (!last_name) {
+			lastNameError = "Last name is required.";
 			valid = false;
 		}
 		if (formGender !== "male" && formGender !== "female") {
@@ -134,7 +156,8 @@
 		try {
 			if (editingCounselor) {
 				const updated = await counselorApi.update(editingCounselor.id, {
-					name,
+					first_name,
+					last_name,
 					junior_counselor: formJunior,
 					enabled: formEnabled,
 					gender: formGender as Gender,
@@ -143,7 +166,8 @@
 				toast.success("Counselor updated");
 			} else {
 				const created = await counselorApi.create({
-					name,
+					first_name,
+					last_name,
 					junior_counselor: formJunior,
 					gender: formGender as Gender,
 				});
@@ -214,7 +238,7 @@
 		<Table.Table>
 			<Table.TableHeader>
 				<Table.TableRow>
-					<SortableTableHead label="Name" active={sortKey === "name"} direction={sortDirection} onclick={() => toggleSort("name")} />
+					<SortableTableHead label="Name" active={sortKey === "last_name"} direction={sortDirection} onclick={() => toggleSort("last_name")} />
 					<SortableTableHead label="Type" active={sortKey === "junior_counselor"} direction={sortDirection} onclick={() => toggleSort("junior_counselor")} />
 					<SortableTableHead label="Gender" active={sortKey === "gender"} direction={sortDirection} onclick={() => toggleSort("gender")} />
 					<SortableTableHead label="Status" active={sortKey === "enabled"} direction={sortDirection} onclick={() => toggleSort("enabled")} />
@@ -290,17 +314,31 @@
 		</Dialog.DialogHeader>
 		<form onsubmit={handleSubmit} class="grid gap-4">
 			<div class="grid gap-2">
-				<Label for="counselor-name">Name</Label>
+				<Label for="counselor-first-name">First name</Label>
 				<Input
-					id="counselor-name"
+					id="counselor-first-name"
 					type="text"
-					placeholder="Counselor name"
-					bind:value={formName}
+					placeholder="First name"
+					bind:value={formFirstName}
 					disabled={submitting}
-					oninput={() => (nameError = "")}
+					oninput={() => (firstNameError = "")}
 				/>
-				{#if nameError}
-					<p class="text-destructive text-sm">{nameError}</p>
+				{#if firstNameError}
+					<p class="text-destructive text-sm">{firstNameError}</p>
+				{/if}
+			</div>
+			<div class="grid gap-2">
+				<Label for="counselor-last-name">Last name</Label>
+				<Input
+					id="counselor-last-name"
+					type="text"
+					placeholder="Last name"
+					bind:value={formLastName}
+					disabled={submitting}
+					oninput={() => (lastNameError = "")}
+				/>
+				{#if lastNameError}
+					<p class="text-destructive text-sm">{lastNameError}</p>
 				{/if}
 			</div>
 			<div class="flex items-center gap-2">

@@ -209,6 +209,8 @@ export interface UpdateSessionActivityRequest {
 export interface Counselor {
 	id: string;
 	camp_id: string;
+	first_name: string;
+	last_name: string;
 	name: string;
 	junior_counselor: boolean;
 	enabled: boolean;
@@ -216,13 +218,15 @@ export interface Counselor {
 }
 
 export interface CreateCounselorRequest {
-	name: string;
+	first_name: string;
+	last_name: string;
 	junior_counselor: boolean;
 	gender: Gender;
 }
 
 export interface UpdateCounselorRequest {
-	name: string;
+	first_name: string;
+	last_name: string;
 	junior_counselor: boolean;
 	enabled: boolean;
 	gender: Gender;
@@ -315,17 +319,21 @@ export interface ActivityPreferenceItem {
 export interface Camper {
 	id: string;
 	camp_id: string;
+	first_name: string;
+	last_name: string;
 	name: string;
 	gender: Gender;
 }
 
 export interface CreateCamperRequest {
-	name: string;
+	first_name: string;
+	last_name: string;
 	gender: Gender;
 }
 
 export interface UpdateCamperRequest {
-	name: string;
+	first_name: string;
+	last_name: string;
 	gender: Gender;
 }
 
@@ -341,6 +349,8 @@ export interface SessionCounselor {
 	camp_id: string;
 	session_id: string;
 	counselor_id: string;
+	counselor_first_name: string;
+	counselor_last_name: string;
 	counselor_name: string;
 	junior_counselor: boolean;
 	counselor_enabled: boolean;
@@ -387,6 +397,8 @@ export interface Enrollment {
 	camp_id: string;
 	camper_id: string;
 	session_age_group_id: string;
+	camper_first_name: string;
+	camper_last_name: string;
 	camper_name: string;
 	session_id: string;
 	age_group_id: string;
@@ -420,8 +432,12 @@ export interface ScoreBreakdown {
 export interface AssignmentDetail {
 	id: string;
 	counselor_id?: string;
+	counselor_first_name?: string;
+	counselor_last_name?: string;
 	counselor_name?: string;
 	camper_id?: string;
+	camper_first_name?: string;
+	camper_last_name?: string;
 	camper_name?: string;
 	cabin_id?: string;
 	cabin_name?: string;
@@ -435,8 +451,12 @@ export interface AssignmentDetail {
 export interface ExplanationDetail {
 	id: string;
 	counselor_id?: string;
+	counselor_first_name?: string;
+	counselor_last_name?: string;
 	counselor_name?: string;
 	camper_id?: string;
+	camper_first_name?: string;
+	camper_last_name?: string;
 	camper_name?: string;
 	explanation_type: "reason" | "unmet_preference" | "ineligible_preference";
 	constraint_name: string | null;
@@ -451,6 +471,8 @@ export interface UnassignedTimeSlotRef {
 
 export interface UnassignedCounselor {
 	counselor_id: string;
+	counselor_first_name?: string;
+	counselor_last_name?: string;
 	counselor_name: string;
 	missing_time_slots?: UnassignedTimeSlotRef[];
 }

@@ -11,6 +11,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveCamper = `-- name: ArchiveCamper :execrows
+UPDATE campers
+SET archived = true
+WHERE id = $1 AND camp_id = $2
+`
+
+type ArchiveCamperParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) ArchiveCamper(ctx context.Context, arg ArchiveCamperParams) (int64, error) {
+	result, err := q.db.Exec(ctx, archiveCamper, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createCamper = `-- name: CreateCamper :one
 INSERT INTO campers (camp_id, first_name, last_name, gender)
 VALUES ($1, $2, $3, $4)
@@ -231,6 +250,25 @@ func (q *Queries) ListCampers(ctx context.Context, campID pgtype.UUID) ([]ListCa
 		return nil, err
 	}
 	return items, nil
+}
+
+const unarchiveCamper = `-- name: UnarchiveCamper :execrows
+UPDATE campers
+SET archived = false
+WHERE id = $1 AND camp_id = $2
+`
+
+type UnarchiveCamperParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) UnarchiveCamper(ctx context.Context, arg UnarchiveCamperParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unarchiveCamper, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateCamper = `-- name: UpdateCamper :one

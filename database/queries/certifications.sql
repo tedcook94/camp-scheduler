@@ -35,3 +35,13 @@ RETURNING id, camp_id, certification_name, archived;
 -- name: DeleteCertification :execrows
 DELETE FROM certifications
 WHERE id = $1 AND camp_id = $2;
+
+-- name: ArchiveCertification :execrows
+UPDATE certifications
+SET archived = true
+WHERE id = $1 AND camp_id = $2;
+
+-- name: UnarchiveCertification :execrows
+UPDATE certifications
+SET archived = false
+WHERE id = $1 AND camp_id = $2;

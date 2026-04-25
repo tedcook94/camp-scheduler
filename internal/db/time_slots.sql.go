@@ -11,6 +11,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveTimeSlot = `-- name: ArchiveTimeSlot :execrows
+UPDATE time_slots
+SET archived = true
+WHERE id = $1 AND camp_id = $2
+`
+
+type ArchiveTimeSlotParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) ArchiveTimeSlot(ctx context.Context, arg ArchiveTimeSlotParams) (int64, error) {
+	result, err := q.db.Exec(ctx, archiveTimeSlot, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createTimeSlot = `-- name: CreateTimeSlot :one
 INSERT INTO time_slots (camp_id, time_slot_name)
 VALUES ($1, $2)
@@ -169,6 +188,25 @@ func (q *Queries) ListTimeSlots(ctx context.Context, campID pgtype.UUID) ([]Time
 		return nil, err
 	}
 	return items, nil
+}
+
+const unarchiveTimeSlot = `-- name: UnarchiveTimeSlot :execrows
+UPDATE time_slots
+SET archived = false
+WHERE id = $1 AND camp_id = $2
+`
+
+type UnarchiveTimeSlotParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) UnarchiveTimeSlot(ctx context.Context, arg UnarchiveTimeSlotParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unarchiveTimeSlot, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateTimeSlot = `-- name: UpdateTimeSlot :one

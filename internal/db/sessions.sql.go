@@ -11,6 +11,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveSession = `-- name: ArchiveSession :execrows
+UPDATE sessions
+SET archived = true
+WHERE id = $1 AND camp_id = $2
+`
+
+type ArchiveSessionParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) ArchiveSession(ctx context.Context, arg ArchiveSessionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, archiveSession, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createSession = `-- name: CreateSession :one
 INSERT INTO sessions (camp_id, season_id, session_name, previous_session)
 VALUES ($1, $2, $3, $4)
@@ -205,6 +224,25 @@ func (q *Queries) ListSessions(ctx context.Context, campID pgtype.UUID) ([]Sessi
 		return nil, err
 	}
 	return items, nil
+}
+
+const unarchiveSession = `-- name: UnarchiveSession :execrows
+UPDATE sessions
+SET archived = false
+WHERE id = $1 AND camp_id = $2
+`
+
+type UnarchiveSessionParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) UnarchiveSession(ctx context.Context, arg UnarchiveSessionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unarchiveSession, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateSession = `-- name: UpdateSession :one

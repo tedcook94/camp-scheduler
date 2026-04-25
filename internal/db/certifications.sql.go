@@ -11,6 +11,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveCertification = `-- name: ArchiveCertification :execrows
+UPDATE certifications
+SET archived = true
+WHERE id = $1 AND camp_id = $2
+`
+
+type ArchiveCertificationParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) ArchiveCertification(ctx context.Context, arg ArchiveCertificationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, archiveCertification, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createCertification = `-- name: CreateCertification :one
 INSERT INTO certifications (camp_id, certification_name)
 VALUES ($1, $2)
@@ -169,6 +188,25 @@ func (q *Queries) ListCertifications(ctx context.Context, campID pgtype.UUID) ([
 		return nil, err
 	}
 	return items, nil
+}
+
+const unarchiveCertification = `-- name: UnarchiveCertification :execrows
+UPDATE certifications
+SET archived = false
+WHERE id = $1 AND camp_id = $2
+`
+
+type UnarchiveCertificationParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) UnarchiveCertification(ctx context.Context, arg UnarchiveCertificationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unarchiveCertification, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateCertification = `-- name: UpdateCertification :one

@@ -11,6 +11,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveAgeGroup = `-- name: ArchiveAgeGroup :execrows
+UPDATE age_groups
+SET archived = true
+WHERE id = $1 AND camp_id = $2
+`
+
+type ArchiveAgeGroupParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) ArchiveAgeGroup(ctx context.Context, arg ArchiveAgeGroupParams) (int64, error) {
+	result, err := q.db.Exec(ctx, archiveAgeGroup, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createAgeGroup = `-- name: CreateAgeGroup :one
 INSERT INTO age_groups (camp_id, age_group_name)
 VALUES ($1, $2)
@@ -169,6 +188,25 @@ func (q *Queries) ListArchivedAgeGroups(ctx context.Context, campID pgtype.UUID)
 		return nil, err
 	}
 	return items, nil
+}
+
+const unarchiveAgeGroup = `-- name: UnarchiveAgeGroup :execrows
+UPDATE age_groups
+SET archived = false
+WHERE id = $1 AND camp_id = $2
+`
+
+type UnarchiveAgeGroupParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) UnarchiveAgeGroup(ctx context.Context, arg UnarchiveAgeGroupParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unarchiveAgeGroup, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateAgeGroup = `-- name: UpdateAgeGroup :one

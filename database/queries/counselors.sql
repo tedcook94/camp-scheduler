@@ -38,3 +38,13 @@ RETURNING id, camp_id, first_name, last_name, junior_counselor, archived, gender
 -- name: DeleteCounselor :execrows
 DELETE FROM counselors
 WHERE id = $1 AND camp_id = $2;
+
+-- name: ArchiveCounselor :execrows
+UPDATE counselors
+SET archived = true
+WHERE id = $1 AND camp_id = $2;
+
+-- name: UnarchiveCounselor :execrows
+UPDATE counselors
+SET archived = false
+WHERE id = $1 AND camp_id = $2;

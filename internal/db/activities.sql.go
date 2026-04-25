@@ -11,6 +11,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveActivity = `-- name: ArchiveActivity :execrows
+UPDATE activities
+SET archived = true
+WHERE id = $1 AND camp_id = $2
+`
+
+type ArchiveActivityParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) ArchiveActivity(ctx context.Context, arg ArchiveActivityParams) (int64, error) {
+	result, err := q.db.Exec(ctx, archiveActivity, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createActivity = `-- name: CreateActivity :one
 INSERT INTO activities (camp_id, activity_name)
 VALUES ($1, $2)
@@ -169,6 +188,25 @@ func (q *Queries) ListArchivedActivities(ctx context.Context, campID pgtype.UUID
 		return nil, err
 	}
 	return items, nil
+}
+
+const unarchiveActivity = `-- name: UnarchiveActivity :execrows
+UPDATE activities
+SET archived = false
+WHERE id = $1 AND camp_id = $2
+`
+
+type UnarchiveActivityParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) UnarchiveActivity(ctx context.Context, arg UnarchiveActivityParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unarchiveActivity, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateActivity = `-- name: UpdateActivity :one

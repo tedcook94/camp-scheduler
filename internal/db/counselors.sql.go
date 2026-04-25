@@ -11,6 +11,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveCounselor = `-- name: ArchiveCounselor :execrows
+UPDATE counselors
+SET archived = true
+WHERE id = $1 AND camp_id = $2
+`
+
+type ArchiveCounselorParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) ArchiveCounselor(ctx context.Context, arg ArchiveCounselorParams) (int64, error) {
+	result, err := q.db.Exec(ctx, archiveCounselor, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createCounselor = `-- name: CreateCounselor :one
 INSERT INTO counselors (camp_id, first_name, last_name, junior_counselor, gender)
 VALUES ($1, $2, $3, $4, $5)
@@ -243,6 +262,25 @@ func (q *Queries) ListCounselors(ctx context.Context, campID pgtype.UUID) ([]Lis
 		return nil, err
 	}
 	return items, nil
+}
+
+const unarchiveCounselor = `-- name: UnarchiveCounselor :execrows
+UPDATE counselors
+SET archived = false
+WHERE id = $1 AND camp_id = $2
+`
+
+type UnarchiveCounselorParams struct {
+	ID     pgtype.UUID
+	CampID pgtype.UUID
+}
+
+func (q *Queries) UnarchiveCounselor(ctx context.Context, arg UnarchiveCounselorParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unarchiveCounselor, arg.ID, arg.CampID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateCounselor = `-- name: UpdateCounselor :one

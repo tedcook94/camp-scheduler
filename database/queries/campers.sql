@@ -37,3 +37,13 @@ RETURNING id, camp_id, first_name, last_name, gender, archived;
 -- name: DeleteCamper :execrows
 DELETE FROM campers
 WHERE id = $1 AND camp_id = $2;
+
+-- name: ArchiveCamper :execrows
+UPDATE campers
+SET archived = true
+WHERE id = $1 AND camp_id = $2;
+
+-- name: UnarchiveCamper :execrows
+UPDATE campers
+SET archived = false
+WHERE id = $1 AND camp_id = $2;

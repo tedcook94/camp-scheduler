@@ -542,3 +542,66 @@ export interface TriggerRunRequest {
 		activity_preference?: number;
 	};
 }
+
+export interface CounselorCabinOverride {
+	id: string;
+	camp_id: string;
+	session_id: string;
+	counselor_id: string;
+	session_age_group_cabin_id: string;
+	cabin_id: string;
+	counselor_first_name: string;
+	counselor_last_name: string;
+	counselor_name: string;
+	cabin_name: string;
+	age_group_name: string;
+}
+
+export interface CamperCabinOverride {
+	id: string;
+	camp_id: string;
+	session_id: string;
+	camper_id: string;
+	session_age_group_cabin_id: string;
+	cabin_id: string;
+	camper_first_name: string;
+	camper_last_name: string;
+	camper_name: string;
+	cabin_name: string;
+	age_group_name: string;
+}
+
+export interface CounselorActivityOverride {
+	id: string;
+	camp_id: string;
+	session_id: string;
+	counselor_id: string;
+	session_activity_id: string;
+	session_time_slot_id: string;
+	counselor_first_name: string;
+	counselor_last_name: string;
+	counselor_name: string;
+	activity_name: string;
+	time_slot_name: string;
+}
+
+export interface SessionOverrides {
+	counselor_cabin: CounselorCabinOverride[];
+	camper_cabin: CamperCabinOverride[];
+	counselor_activity: CounselorActivityOverride[];
+}
+
+export interface CreateCounselorCabinOverrideRequest {
+	counselor_id: string;
+	session_age_group_cabin_id: string;
+}
+
+export interface CreateCamperCabinOverrideRequest {
+	camper_id: string;
+	session_age_group_cabin_id: string;
+}
+
+export interface CreateCounselorActivityOverrideRequest {
+	counselor_id: string;
+	session_activity_id: string;
+}

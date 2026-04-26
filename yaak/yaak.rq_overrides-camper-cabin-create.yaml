@@ -1,0 +1,19 @@
+type: http_request
+model: http_request
+id: rq_overrides-camper-cabin-create
+createdAt: "2026-04-25T00:00:00.000000"
+updatedAt: "2026-04-25T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_overrides
+name: Camper-Cabin Create
+description: ""
+url: "${[ base_url ]}/sessions/${[ test-session-id ]}/overrides/camper-cabin"
+urlParameters: []
+method: POST
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"camper_id": "${[ test-camper-id ]}", "session_age_group_cabin_id": "${[ test-session-age-group-cabin-id ]}"}'
+bodyType: application/json
+sortPriority: 3.0

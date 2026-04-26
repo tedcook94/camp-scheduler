@@ -23,6 +23,7 @@ import (
 	"camp-scheduler/internal/db"
 	"camp-scheduler/internal/enrollment"
 	"camp-scheduler/internal/history"
+	"camp-scheduler/internal/override"
 	"camp-scheduler/internal/preferences"
 	"camp-scheduler/internal/report"
 	"camp-scheduler/internal/season"
@@ -198,6 +199,10 @@ func (s *Server) routes() {
 	assignmentService := assignment.NewService(queries, s.pool, marker)
 	assignmentController := assignment.NewController(assignmentService)
 	assignmentController.RegisterRoutes(protected)
+
+	overrideService := override.NewService(queries, s.pool, marker)
+	overrideController := override.NewController(overrideService)
+	overrideController.RegisterRoutes(protected)
 
 	reportService := report.NewService(queries)
 	reportController := report.NewController(reportService)

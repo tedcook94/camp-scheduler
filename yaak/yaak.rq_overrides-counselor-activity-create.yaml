@@ -1,0 +1,19 @@
+type: http_request
+model: http_request
+id: rq_overrides-counselor-activity-create
+createdAt: "2026-04-25T00:00:00.000000"
+updatedAt: "2026-04-25T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_overrides
+name: Counselor-Activity Create
+description: ""
+url: "${[ base_url ]}/sessions/${[ test-session-id ]}/overrides/counselor-activity"
+urlParameters: []
+method: POST
+headers: []
+authentication: {}
+authenticationType: null
+body:
+  text: '{"counselor_id": "${[ test-counselor-id ]}", "session_activity_id": "${[ test-session-activity-id ]}"}'
+bodyType: application/json
+sortPriority: 5.0

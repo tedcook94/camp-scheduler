@@ -171,8 +171,6 @@
 	};
 	let errorDialogShortages = $state<CamperShortage[]>([]);
 
-	let overridesExpanded = $state(false);
-
 	function handleOverrideMutation() {
 		// An override change marks runs stale on the server. Re-fetch the
 		// run list so the UI reflects the new is_stale state.
@@ -841,27 +839,6 @@
 		<div class="text-muted-foreground py-8 text-center text-sm">Loading runs...</div>
 	{:else}
 		<div class="grid gap-4">
-			<div class="border-border overflow-hidden rounded-lg border">
-				<button
-					type="button"
-					class="bg-muted hover:bg-muted/80 flex w-full items-center gap-2 px-4 py-3 text-left"
-					onclick={() => (overridesExpanded = !overridesExpanded)}
-				>
-					<ChevronDownIcon
-						class="size-4 transition-transform {overridesExpanded ? '' : '-rotate-90'}"
-					/>
-					<PinIcon class="size-4" />
-					<h3 class="font-medium">Overrides</h3>
-					<span class="text-muted-foreground text-sm">
-						— pin counselors and campers before running the solver
-					</span>
-				</button>
-				{#if overridesExpanded && selectedSessionId}
-					<div class="bg-background px-4 py-3">
-						<OverridesPanel sessionId={selectedSessionId} onMutate={handleOverrideMutation} />
-					</div>
-				{/if}
-			</div>
 			{#each CARDS as card (card.runType)}
 				{@const Icon = card.icon}
 				{@const run = runsByType.get(card.runType) ?? null}
@@ -975,6 +952,15 @@
 				</div>
 			{/each}
 		</div>
+		{#if selectedSessionId}
+			<section class="mt-6 grid gap-3">
+				<div class="flex items-center gap-2">
+					<PinIcon class="size-4" />
+					<h2 class="text-lg font-semibold tracking-tight">Overrides</h2>
+				</div>
+				<OverridesPanel sessionId={selectedSessionId} onMutate={handleOverrideMutation} />
+			</section>
+		{/if}
 	{/if}
 </div>
 

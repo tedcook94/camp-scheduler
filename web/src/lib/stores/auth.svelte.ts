@@ -1,11 +1,20 @@
-import type { TokenResponse } from "$lib/api/types";
+import { authClient } from "$lib/auth-client";
 
-const ACCESS_TOKEN_KEY = "access_token";
-const REFRESH_TOKEN_KEY = "refresh_token";
-const ADMIN_ACCESS_TOKEN_KEY = "admin_access_token";
-const ADMIN_REFRESH_TOKEN_KEY = "admin_refresh_token";
+interface JwtPayload {
+	sub?: string;
+	username?: string;
+	email?: string;
+	role?: string;
+	camp_id?: string;
+	org_role?: string;
+	impersonated_by?: string;
+	first_name?: string;
+	last_name?: string;
+	exp?: number;
+	[key: string]: unknown;
+}
 
-function parseJwtPayload(token: string): Record<string, unknown> | null {
+function parseJwtPayload(token: string): JwtPayload | null {
 	try {
 		const parts = token.split(".");
 		if (parts.length !== 3) return null;
@@ -21,109 +30,178 @@ function parseJwtPayload(token: string): Record<string, unknown> | null {
 function isTokenExpired(token: string): boolean {
 	const payload = parseJwtPayload(token);
 	if (!payload || typeof payload.exp !== "number") return true;
-	return Date.now() >= payload.exp * 1000;
+	// Treat as expired 30s before actual exp to avoid clock skew / in-flight races
+	return Date.now() >= (payload.exp - 30) * 1000;
+}
+
+interface OrgSummary {
+	id: string;
+	name: string;
+	slug: string;
 }
 
 function createAuthStore() {
-	let accessToken = $state<string | null>(null);
-	let refreshToken = $state<string | null>(null);
-	let username = $state<string | null>(null);
-	let role = $state<string | null>(null);
-	let campId = $state<string | null>(null);
-	let impersonatedBy = $state<string | null>(null);
+	let token = $state<string | null>(null);
+	let claims = $state<JwtPayload | null>(null);
+	let sessionLoaded = $state(false);
+	let hasSession = $state(false);
+	let organizations = $state<OrgSummary[]>([]);
 
-	function loadFromStorage() {
-		if (typeof window === "undefined") return;
-		const storedAccess = localStorage.getItem(ACCESS_TOKEN_KEY);
-		const storedRefresh = localStorage.getItem(REFRESH_TOKEN_KEY);
+	let tokenPromise: Promise<string | null> | null = null;
 
-		if (storedAccess && storedRefresh) {
-			setTokens({ access_token: storedAccess, refresh_token: storedRefresh });
+	function applyToken(next: string | null) {
+		token = next;
+		claims = next ? parseJwtPayload(next) : null;
+	}
+
+	async function refreshToken(): Promise<string | null> {
+		if (tokenPromise) return tokenPromise;
+		tokenPromise = (async () => {
+			try {
+				// BetterAuth jwt plugin: GET /api/auth/token returns { token: string }
+				const res = await fetch("/api/auth/token", {
+					credentials: "include",
+				});
+				if (!res.ok) {
+					applyToken(null);
+					hasSession = false;
+					return null;
+				}
+				const data = (await res.json()) as { token?: string };
+				if (data.token) {
+					applyToken(data.token);
+					hasSession = true;
+					return data.token;
+				}
+				applyToken(null);
+				return null;
+			} catch {
+				applyToken(null);
+				return null;
+			} finally {
+				tokenPromise = null;
+			}
+		})();
+		return tokenPromise;
+	}
+
+	async function ensureToken(): Promise<string | null> {
+		if (token && !isTokenExpired(token)) return token;
+		return refreshToken();
+	}
+
+	async function loadOrganizations() {
+		try {
+			const result = await authClient.organization.list();
+			const list = (result?.data ?? []) as OrgSummary[];
+			organizations = list.map((o) => ({ id: o.id, name: o.name, slug: o.slug }));
+		} catch {
+			organizations = [];
 		}
 	}
 
-	function setTokens(tokens: TokenResponse) {
-		accessToken = tokens.access_token;
-		refreshToken = tokens.refresh_token;
-
-		const payload = parseJwtPayload(tokens.access_token);
-		username = (payload?.username as string) ?? null;
-		role = (payload?.role as string) ?? null;
-		campId = (payload?.camp_id as string) ?? null;
-		impersonatedBy = (payload?.impersonated_by as string) ?? null;
-
-		localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
-		localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
-	}
-
-	function clear() {
-		accessToken = null;
-		refreshToken = null;
-		username = null;
-		role = null;
-		campId = null;
-		impersonatedBy = null;
-		localStorage.removeItem(ACCESS_TOKEN_KEY);
-		localStorage.removeItem(REFRESH_TOKEN_KEY);
-		localStorage.removeItem(ADMIN_ACCESS_TOKEN_KEY);
-		localStorage.removeItem(ADMIN_REFRESH_TOKEN_KEY);
-	}
-
-	function startImpersonation(tokens: TokenResponse) {
-		if (accessToken) {
-			localStorage.setItem(ADMIN_ACCESS_TOKEN_KEY, accessToken);
-		}
-		if (refreshToken) {
-			localStorage.setItem(ADMIN_REFRESH_TOKEN_KEY, refreshToken);
-		}
-		setTokens(tokens);
-	}
-
-	function stopImpersonation() {
-		const adminAccess = localStorage.getItem(ADMIN_ACCESS_TOKEN_KEY);
-		const adminRefresh = localStorage.getItem(ADMIN_REFRESH_TOKEN_KEY);
-
-		localStorage.removeItem(ADMIN_ACCESS_TOKEN_KEY);
-		localStorage.removeItem(ADMIN_REFRESH_TOKEN_KEY);
-
-		if (adminAccess && adminRefresh) {
-			setTokens({ access_token: adminAccess, refresh_token: adminRefresh });
-		} else {
-			clear();
+	async function init() {
+		if (sessionLoaded) return;
+		try {
+			const session = await authClient.getSession();
+			if (session?.data?.session) {
+				hasSession = true;
+				await refreshToken();
+				await loadOrganizations();
+			} else {
+				hasSession = false;
+				applyToken(null);
+			}
+		} catch {
+			hasSession = false;
+			applyToken(null);
+		} finally {
+			sessionLoaded = true;
 		}
 	}
 
-	loadFromStorage();
+	async function onSignedIn() {
+		hasSession = true;
+		sessionLoaded = true;
+		await refreshToken();
+		await loadOrganizations();
+	}
+
+	async function signOut() {
+		try {
+			await authClient.signOut();
+		} catch {
+			// ignore — clear local state regardless
+		}
+		applyToken(null);
+		hasSession = false;
+		organizations = [];
+	}
+
+	async function setActiveOrganization(organizationId: string) {
+		await authClient.organization.setActive({ organizationId });
+		// Force a fresh JWT so camp_id reflects the new active org
+		applyToken(null);
+		await refreshToken();
+	}
+
+	async function stopImpersonating() {
+		try {
+			await authClient.admin.stopImpersonating();
+		} catch {
+			// ignore — refresh state regardless
+		}
+		applyToken(null);
+		await refreshToken();
+		await loadOrganizations();
+	}
+
+	if (typeof window !== "undefined") {
+		void init();
+	}
 
 	return {
 		get accessToken() {
-			return accessToken;
-		},
-		get refreshToken() {
-			return refreshToken;
+			return token;
 		},
 		get username() {
-			return username;
+			return (claims?.username as string) ?? null;
+		},
+		get email() {
+			return (claims?.email as string) ?? null;
 		},
 		get role() {
-			return role;
+			return (claims?.role as string) ?? null;
 		},
 		get campId() {
-			return campId;
+			return (claims?.camp_id as string) ?? null;
+		},
+		get orgRole() {
+			return (claims?.org_role as string) ?? null;
 		},
 		get isAuthenticated() {
-			return accessToken !== null && refreshToken !== null;
+			return hasSession;
+		},
+		get isInitialized() {
+			return sessionLoaded;
 		},
 		get isAccessExpired() {
-			return accessToken !== null && isTokenExpired(accessToken);
+			return token !== null && isTokenExpired(token);
 		},
 		get isImpersonating() {
-			return impersonatedBy !== null && impersonatedBy !== "";
+			const v = claims?.impersonated_by;
+			return typeof v === "string" && v.length > 0;
 		},
-		setTokens,
-		clear,
-		startImpersonation,
-		stopImpersonation,
+		get organizations() {
+			return organizations;
+		},
+		ensureToken,
+		refreshToken,
+		onSignedIn,
+		signOut,
+		setActiveOrganization,
+		stopImpersonating,
+		loadOrganizations,
 	};
 }
 

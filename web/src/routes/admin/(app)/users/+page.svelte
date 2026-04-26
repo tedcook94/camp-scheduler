@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
-	import { campApi, userApi } from "$lib/api";
-	import { ApiClientError } from "$lib/api/client";
+	import { campApi } from "$lib/api";
+	import { authClient } from "$lib/auth-client";
 	import { auth } from "$lib/stores/auth.svelte";
-	import type { Camp, User, CreateUserRequest, UpdateUserRequest } from "$lib/api/types";
+	import type { Camp } from "$lib/api/types";
 	import { toast } from "svelte-sonner";
 	import { Button } from "$lib/components/ui/button";
 	import { Input } from "$lib/components/ui/input";
@@ -16,14 +16,24 @@
 	import * as AlertDialog from "$lib/components/ui/alert-dialog";
 	import * as Select from "$lib/components/ui/select";
 	import PlusIcon from "@lucide/svelte/icons/plus";
-	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import TrashIcon from "@lucide/svelte/icons/trash";
 	import KeyIcon from "@lucide/svelte/icons/key-round";
 	import UserCheckIcon from "@lucide/svelte/icons/user-check";
 	import SortableTableHead from "$lib/components/sortable-table-head.svelte";
 	import { sortItems, type SortDirection, type SortAccessor } from "$lib/utils";
 
-	let users = $state<User[]>([]);
+	interface AdminUser {
+		id: string;
+		username?: string | null;
+		email: string;
+		firstName?: string | null;
+		lastName?: string | null;
+		role?: string | null;
+		// Org membership info merged client-side.
+		campIds: string[];
+	}
+
+	let users = $state<AdminUser[]>([]);
 	let camps = $state<Camp[]>([]);
 	let loading = $state(true);
 
@@ -31,14 +41,24 @@
 	let sortKey = $state<UserSortKey>("name");
 	let sortDirection = $state<SortDirection>("asc");
 
-	function userSortAccessor(key: UserSortKey): SortAccessor<User> {
+	function userSortAccessor(key: UserSortKey): SortAccessor<AdminUser> {
 		switch (key) {
 			case "name":
-				return (u: User) => `${u.first_name} ${u.last_name}`;
+				return (u: AdminUser) => `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim();
+			case "username":
+				return (u: AdminUser) => u.username ?? "";
+			case "email":
+				return (u: AdminUser) => u.email;
+			case "role":
+				return (u: AdminUser) => u.role ?? "";
 			case "camp":
-				return (u: User) => campNameById(u.camp_id);
-			default:
-				return key;
+				return (u: AdminUser) => u.campIds.map(campNameById).join(", ");
+			default: {
+				// Compile-time exhaustiveness check: adding a new UserSortKey
+				// without handling it here will surface as a TypeScript error.
+				const _exhaustive: never = key;
+				throw new Error(`unhandled sort key: ${_exhaustive as string}`);
+			}
 		}
 	}
 
@@ -53,55 +73,93 @@
 		}
 	}
 
-	// User form dialog
 	let dialogOpen = $state(false);
-	let dialogMode = $state<"create" | "edit">("create");
-	let editingUser = $state<User | null>(null);
 	let saving = $state(false);
 	let formError = $state("");
 
-	// User form fields
+	type AdminFormRole = "admin" | "super_admin";
+	// BetterAuth's admin client typings don't see roles defined via our custom
+	// access-control config (super_admin), so we describe the wire role union
+	// ourselves and cast once at the createUser call site below.
+	type BetterAuthAdminRole = "user" | "super_admin";
+
 	let formUsername = $state("");
 	let formEmail = $state("");
 	let formFirstName = $state("");
 	let formLastName = $state("");
 	let formPassword = $state("");
-	let formRole = $state<string>("admin");
+	let formRole = $state<AdminFormRole>("admin");
 	let formCampId = $state<string>("");
 
-	// Password dialog
 	let passwordDialogOpen = $state(false);
-	let passwordUser = $state<User | null>(null);
+	let passwordUser = $state<AdminUser | null>(null);
 	let passwordValue = $state("");
 	let passwordError = $state("");
 	let passwordSaving = $state(false);
 
-	// Delete dialog
 	let deleteDialogOpen = $state(false);
-	let deletingUser = $state<User | null>(null);
+	let deletingUser = $state<AdminUser | null>(null);
 	let deleting = $state(false);
+
+	function campNameById(id: string | null | undefined): string {
+		if (!id) return "\u2014";
+		const camp = camps.find((c) => c.id === id);
+		return camp?.name ?? "Unknown";
+	}
 
 	async function loadData() {
 		loading = true;
 		try {
-			[users, camps] = await Promise.all([userApi.list(), campApi.list()]);
+			const [usersRes, campsList] = await Promise.all([
+				authClient.admin.listUsers({ query: { limit: 500 } }),
+				campApi.list(),
+			]);
+			camps = campsList;
+
+			if (usersRes.error) {
+				toast.error(usersRes.error.message ?? "Failed to load users");
+				return;
+			}
+			const rawUsers = (usersRes.data?.users ?? []) as unknown as Array<Record<string, unknown>>;
+
+			// For each camp/org, fetch memberships and build a userId -> [campId] map.
+			const userToCamps = new Map<string, string[]>();
+			await Promise.all(
+				campsList.map(async (camp) => {
+					try {
+						const res = await authClient.organization.listMembers({
+							query: { organizationId: camp.id, limit: 500 },
+						});
+						const members = (res.data?.members ?? []) as Array<{ userId: string }>;
+						for (const m of members) {
+							const list = userToCamps.get(m.userId) ?? [];
+							list.push(camp.id);
+							userToCamps.set(m.userId, list);
+						}
+					} catch {
+						// Skip camps whose member list can't be loaded.
+					}
+				}),
+			);
+
+			users = rawUsers.map((u) => ({
+				id: String(u.id),
+				username: (u.username as string) ?? null,
+				email: String(u.email ?? ""),
+				firstName: (u.firstName as string) ?? null,
+				lastName: (u.lastName as string) ?? null,
+				role: (u.role as string) ?? null,
+				campIds: userToCamps.get(String(u.id)) ?? [],
+			}));
 		} catch (err) {
-			const message = err instanceof ApiClientError ? err.message : "Failed to load data";
+			const message = err instanceof Error ? err.message : "Failed to load data";
 			toast.error(message);
 		} finally {
 			loading = false;
 		}
 	}
 
-	function campNameById(id: string | null): string {
-		if (!id) return "\u2014";
-		const camp = camps.find((c) => c.id === id);
-		return camp?.name ?? "Unknown";
-	}
-
 	function openCreate() {
-		dialogMode = "create";
-		editingUser = null;
 		formUsername = "";
 		formEmail = "";
 		formFirstName = "";
@@ -113,28 +171,14 @@
 		dialogOpen = true;
 	}
 
-	function openEdit(user: User) {
-		dialogMode = "edit";
-		editingUser = user;
-		formUsername = user.username;
-		formEmail = user.email;
-		formFirstName = user.first_name;
-		formLastName = user.last_name;
-		formPassword = "";
-		formRole = user.role;
-		formCampId = user.camp_id ?? "";
-		formError = "";
-		dialogOpen = true;
-	}
-
-	function openPassword(user: User) {
+	function openPassword(user: AdminUser) {
 		passwordUser = user;
 		passwordValue = "";
 		passwordError = "";
 		passwordDialogOpen = true;
 	}
 
-	function openDelete(user: User) {
+	function openDelete(user: AdminUser) {
 		deletingUser = user;
 		deleteDialogOpen = true;
 	}
@@ -151,41 +195,38 @@
 		saving = true;
 
 		try {
-			const campId = formRole === "super_admin" ? null : formCampId;
+			const fullName = `${formFirstName.trim()} ${formLastName.trim()}`.trim();
+			const baRole: BetterAuthAdminRole = formRole === "super_admin" ? "super_admin" : "user";
 
-			if (dialogMode === "create") {
-				const req: CreateUserRequest = {
+			const created = await authClient.admin.createUser({
+				email: formEmail.trim(),
+				password: formPassword,
+				name: fullName,
+				// Cast bridges the gap between our typed wire union and the
+				// admin client's narrower default-roles typing.
+				role: baRole as "user",
+				data: {
 					username: formUsername.trim(),
-					email: formEmail.trim(),
-					password: formPassword,
-					first_name: formFirstName.trim(),
-					last_name: formLastName.trim(),
-					role: formRole as "admin" | "super_admin",
-					camp_id: campId,
-				};
-				await userApi.create(req);
-				toast.success("User created.");
-			} else if (editingUser) {
-				const req: UpdateUserRequest = {
-					username: formUsername.trim(),
-					email: formEmail.trim(),
-					first_name: formFirstName.trim(),
-					last_name: formLastName.trim(),
-					role: formRole as "admin" | "super_admin",
-					camp_id: campId,
-				};
-				await userApi.update(editingUser.id, req);
-				toast.success("User updated.");
+					displayUsername: formUsername.trim(),
+					firstName: formFirstName.trim(),
+					lastName: formLastName.trim(),
+				},
+			});
+
+			if (created.error) {
+				formError = created.error.message ?? "Failed to create user";
+				return;
 			}
 
+			if (formRole === "admin" && formCampId) {
+				toast.info("User created. Camp assignment must be done from the user's account for now.");
+			} else {
+				toast.success("User created.");
+			}
 			dialogOpen = false;
 			await loadData();
 		} catch (err) {
-			if (err instanceof ApiClientError) {
-				formError = err.message;
-			} else {
-				formError = "An unexpected error occurred.";
-			}
+			formError = err instanceof Error ? err.message : "An unexpected error occurred.";
 		} finally {
 			saving = false;
 		}
@@ -198,16 +239,19 @@
 		passwordSaving = true;
 
 		try {
-			await userApi.updatePassword(passwordUser.id, { password: passwordValue });
+			const res = await authClient.admin.setUserPassword({
+				userId: passwordUser.id,
+				newPassword: passwordValue,
+			});
+			if (res.error) {
+				passwordError = res.error.message ?? "Failed to update password";
+				return;
+			}
 			toast.success("Password updated.");
 			passwordDialogOpen = false;
 			passwordUser = null;
 		} catch (err) {
-			if (err instanceof ApiClientError) {
-				passwordError = err.message;
-			} else {
-				passwordError = "An unexpected error occurred.";
-			}
+			passwordError = err instanceof Error ? err.message : "An unexpected error occurred.";
 		} finally {
 			passwordSaving = false;
 		}
@@ -218,13 +262,18 @@
 		deleting = true;
 
 		try {
-			await userApi.delete(deletingUser.id);
+			const res = await authClient.admin.removeUser({ userId: deletingUser.id });
+			if (res.error) {
+				toast.error(res.error.message ?? "Failed to delete user");
+				deleteDialogOpen = false;
+				return;
+			}
 			toast.success("User deleted.");
 			deleteDialogOpen = false;
 			deletingUser = null;
 			await loadData();
 		} catch (err) {
-			const message = err instanceof ApiClientError ? err.message : "Failed to delete user";
+			const message = err instanceof Error ? err.message : "Failed to delete user";
 			toast.error(message);
 			deleteDialogOpen = false;
 		} finally {
@@ -232,13 +281,18 @@
 		}
 	}
 
-	async function handleImpersonate(user: User) {
+	async function handleImpersonate(user: AdminUser) {
 		try {
-			const tokens = await userApi.impersonate(user.id);
-			auth.startImpersonation(tokens);
+			const res = await authClient.admin.impersonateUser({ userId: user.id });
+			if (res.error) {
+				toast.error(res.error.message ?? "Failed to impersonate user");
+				return;
+			}
+			// New impersonation cookie is set; reload session + JWT.
+			await auth.onSignedIn();
 			goto("/app/dashboard");
 		} catch (err) {
-			const message = err instanceof ApiClientError ? err.message : "Failed to impersonate user";
+			const message = err instanceof Error ? err.message : "Failed to impersonate user";
 			toast.error(message);
 		}
 	}
@@ -274,7 +328,7 @@
 					<SortableTableHead label="Username" active={sortKey === "username"} direction={sortDirection} onclick={() => toggleSort("username")} />
 					<SortableTableHead label="Email" active={sortKey === "email"} direction={sortDirection} onclick={() => toggleSort("email")} />
 					<SortableTableHead label="Role" active={sortKey === "role"} direction={sortDirection} onclick={() => toggleSort("role")} />
-					<SortableTableHead label="Camp" active={sortKey === "camp"} direction={sortDirection} onclick={() => toggleSort("camp")} />
+					<SortableTableHead label="Camps" active={sortKey === "camp"} direction={sortDirection} onclick={() => toggleSort("camp")} />
 					<Table.TableHead class="w-32">
 						<span class="sr-only">Actions</span>
 					</Table.TableHead>
@@ -284,34 +338,31 @@
 				{#each sortedUsers as user (user.id)}
 					<Table.TableRow>
 						<Table.TableCell class="font-medium">
-							{user.first_name} {user.last_name}
+							{user.firstName ?? ""} {user.lastName ?? ""}
 						</Table.TableCell>
-						<Table.TableCell class="text-muted-foreground">{user.username}</Table.TableCell>
+						<Table.TableCell class="text-muted-foreground">{user.username ?? "\u2014"}</Table.TableCell>
 						<Table.TableCell class="text-muted-foreground">{user.email}</Table.TableCell>
 						<Table.TableCell>
 							{#if user.role === "super_admin"}
 								<Badge variant="default">Super Admin</Badge>
 							{:else}
-								<Badge variant="secondary">Admin</Badge>
+								<Badge variant="secondary">User</Badge>
 							{/if}
 						</Table.TableCell>
 						<Table.TableCell class="text-muted-foreground">
-							{campNameById(user.camp_id)}
+							{user.campIds.length === 0 ? "\u2014" : user.campIds.map(campNameById).join(", ")}
 						</Table.TableCell>
 						<Table.TableCell>
 							<div class="flex items-center justify-end gap-1">
 								{#if user.role !== "super_admin"}
-									<Button variant="ghost" size="icon-sm" onclick={() => handleImpersonate(user)} title="Impersonate" aria-label="Impersonate {user.username}">
+									<Button variant="ghost" size="icon-sm" onclick={() => handleImpersonate(user)} title="Impersonate" aria-label="Impersonate {user.username ?? user.email}">
 										<UserCheckIcon class="size-4" />
 									</Button>
 								{/if}
-								<Button variant="ghost" size="icon-sm" onclick={() => openPassword(user)} title="Change password" aria-label="Change password for {user.username}">
+								<Button variant="ghost" size="icon-sm" onclick={() => openPassword(user)} title="Change password" aria-label="Change password for {user.username ?? user.email}">
 									<KeyIcon class="size-4" />
 								</Button>
-								<Button variant="ghost" size="icon-sm" onclick={() => openEdit(user)} title="Edit" aria-label="Edit {user.username}">
-									<PencilIcon class="size-4" />
-								</Button>
-								<Button variant="ghost" size="icon-sm" onclick={() => openDelete(user)} title="Delete" aria-label="Delete {user.username}">
+								<Button variant="ghost" size="icon-sm" onclick={() => openDelete(user)} title="Delete" aria-label="Delete {user.username ?? user.email}">
 									<TrashIcon class="size-4" />
 								</Button>
 							</div>
@@ -323,18 +374,12 @@
 	{/if}
 </div>
 
-<!-- Create / Edit User Dialog -->
+<!-- Create User Dialog -->
 <Dialog.Dialog bind:open={dialogOpen}>
 	<Dialog.DialogContent class="max-w-md" onInteractOutside={(e) => e.preventDefault()}>
 		<Dialog.DialogHeader>
-			<Dialog.DialogTitle>
-				{dialogMode === "create" ? "Create User" : "Edit User"}
-			</Dialog.DialogTitle>
-			<Dialog.DialogDescription>
-				{dialogMode === "create"
-					? "Add a new user account."
-					: "Update user details."}
-			</Dialog.DialogDescription>
+			<Dialog.DialogTitle>Create User</Dialog.DialogTitle>
+			<Dialog.DialogDescription>Add a new user account.</Dialog.DialogDescription>
 		</Dialog.DialogHeader>
 		<form onsubmit={handleSave} class="grid gap-4">
 			{#if formError}
@@ -345,23 +390,11 @@
 			<div class="grid grid-cols-2 gap-4">
 				<div class="grid gap-2">
 					<Label for="user-first-name">First Name</Label>
-					<Input
-						id="user-first-name"
-						bind:value={formFirstName}
-						placeholder="First name"
-						required
-						disabled={saving}
-					/>
+					<Input id="user-first-name" bind:value={formFirstName} placeholder="First name" required disabled={saving} />
 				</div>
 				<div class="grid gap-2">
 					<Label for="user-last-name">Last Name</Label>
-					<Input
-						id="user-last-name"
-						bind:value={formLastName}
-						placeholder="Last name"
-						required
-						disabled={saving}
-					/>
+					<Input id="user-last-name" bind:value={formLastName} placeholder="Last name" required disabled={saving} />
 				</div>
 			</div>
 			<div class="grid gap-2">
@@ -371,36 +404,20 @@
 					bind:value={formUsername}
 					placeholder="Username"
 					required
-					minlength={8}
-					pattern="[a-zA-Z0-9._\\-]+"
-					title="Letters, numbers, dots, hyphens, and underscores only"
+					minlength={3}
+					pattern="[a-zA-Z0-9._]+"
+					title="Letters, numbers, dots, and underscores only"
 					disabled={saving}
 				/>
 			</div>
 			<div class="grid gap-2">
 				<Label for="user-email">Email</Label>
-				<Input
-					id="user-email"
-					type="email"
-					bind:value={formEmail}
-					placeholder="Email address"
-					required
-					disabled={saving}
-				/>
+				<Input id="user-email" type="email" bind:value={formEmail} placeholder="Email address" required disabled={saving} />
 			</div>
-		{#if dialogMode === "create"}
 			<div class="grid gap-2">
 				<Label for="user-password">Password</Label>
-				<PasswordInput
-					id="user-password"
-					bind:value={formPassword}
-					placeholder="Minimum 8 characters"
-					required
-					minlength={8}
-					disabled={saving}
-				/>
+				<PasswordInput id="user-password" bind:value={formPassword} placeholder="Minimum 8 characters" required minlength={8} disabled={saving} />
 			</div>
-		{/if}
 			<div class="grid gap-2">
 				<Label for="user-role">Role</Label>
 				<Select.Select type="single" bind:value={formRole}>
@@ -429,11 +446,9 @@
 				</div>
 			{/if}
 			<Dialog.DialogFooter>
-				<Button type="button" variant="outline" onclick={() => (dialogOpen = false)} disabled={saving}>
-					Cancel
-				</Button>
+				<Button type="button" variant="outline" onclick={() => (dialogOpen = false)} disabled={saving}>Cancel</Button>
 				<Button type="submit" disabled={saving}>
-					{saving ? "Saving..." : dialogMode === "create" ? "Create" : "Save"}
+					{saving ? "Saving..." : "Create"}
 				</Button>
 			</Dialog.DialogFooter>
 		</form>
@@ -446,7 +461,7 @@
 		<Dialog.DialogHeader>
 			<Dialog.DialogTitle>Change Password</Dialog.DialogTitle>
 			<Dialog.DialogDescription>
-				Set a new password for <strong>{passwordUser?.username}</strong>.
+				Set a new password for <strong>{passwordUser?.username ?? passwordUser?.email}</strong>.
 			</Dialog.DialogDescription>
 		</Dialog.DialogHeader>
 		<form onsubmit={handlePasswordChange} class="grid gap-4">
@@ -455,21 +470,12 @@
 					{passwordError}
 				</div>
 			{/if}
-		<div class="grid gap-2">
-			<Label for="new-password">New Password</Label>
-			<PasswordInput
-				id="new-password"
-				bind:value={passwordValue}
-				placeholder="Minimum 8 characters"
-				required
-				minlength={8}
-				disabled={passwordSaving}
-			/>
-		</div>
+			<div class="grid gap-2">
+				<Label for="new-password">New Password</Label>
+				<PasswordInput id="new-password" bind:value={passwordValue} placeholder="Minimum 8 characters" required minlength={8} disabled={passwordSaving} />
+			</div>
 			<Dialog.DialogFooter>
-				<Button type="button" variant="outline" onclick={() => (passwordDialogOpen = false)} disabled={passwordSaving}>
-					Cancel
-				</Button>
+				<Button type="button" variant="outline" onclick={() => (passwordDialogOpen = false)} disabled={passwordSaving}>Cancel</Button>
 				<Button type="submit" disabled={passwordSaving}>
 					{passwordSaving ? "Saving..." : "Update Password"}
 				</Button>
@@ -484,15 +490,12 @@
 		<AlertDialog.AlertDialogHeader>
 			<AlertDialog.AlertDialogTitle>Delete User</AlertDialog.AlertDialogTitle>
 			<AlertDialog.AlertDialogDescription>
-				Are you sure you want to delete <strong>{deletingUser?.username}</strong>? This action cannot be undone.
+				Are you sure you want to delete <strong>{deletingUser?.username ?? deletingUser?.email}</strong>? This action cannot be undone.
 			</AlertDialog.AlertDialogDescription>
 		</AlertDialog.AlertDialogHeader>
 		<AlertDialog.AlertDialogFooter>
 			<AlertDialog.AlertDialogCancel disabled={deleting}>Cancel</AlertDialog.AlertDialogCancel>
-			<AlertDialog.AlertDialogAction
-				onclick={handleDelete}
-				disabled={deleting}
-			>
+			<AlertDialog.AlertDialogAction onclick={handleDelete} disabled={deleting}>
 				{deleting ? "Deleting..." : "Delete"}
 			</AlertDialog.AlertDialogAction>
 		</AlertDialog.AlertDialogFooter>

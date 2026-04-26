@@ -2,15 +2,14 @@
 	import { goto } from "$app/navigation";
 	import { browser } from "$app/environment";
 	import { auth } from "$lib/stores/auth.svelte";
-	import { authApi } from "$lib/api";
-	import { ApiClientError } from "$lib/api/client";
+	import { authClient } from "$lib/auth-client";
 	import { Button } from "$lib/components/ui/button";
 	import { Input } from "$lib/components/ui/input";
 	import { Label } from "$lib/components/ui/label";
 	import PasswordInput from "$lib/components/password-input.svelte";
 	import * as Card from "$lib/components/ui/card";
 
-	let username = $state("");
+	let identifier = $state("");
 	let password = $state("");
 	let error = $state("");
 	let loading = $state(false);
@@ -23,9 +22,11 @@
 		}
 	}
 
-	if (browser && auth.isAuthenticated) {
-		redirectForRole(auth.role);
-	}
+	$effect(() => {
+		if (browser && auth.isInitialized && auth.isAuthenticated) {
+			redirectForRole(auth.role);
+		}
+	});
 
 	async function handleLogin(e: SubmitEvent) {
 		e.preventDefault();
@@ -33,15 +34,19 @@
 		loading = true;
 
 		try {
-			const tokens = await authApi.login(username, password);
-			auth.setTokens(tokens);
+			// Identifier is dispatched to the matching BetterAuth endpoint: an "@" picks
+			// email/password sign-in, anything else hits the username plugin.
+			const result = identifier.includes("@")
+				? await authClient.signIn.email({ email: identifier, password })
+				: await authClient.signIn.username({ username: identifier, password });
+			if (result.error) {
+				error = result.error.message ?? "Invalid credentials";
+				return;
+			}
+			await auth.onSignedIn();
 			redirectForRole(auth.role);
 		} catch (err) {
-			if (err instanceof ApiClientError) {
-				error = err.message;
-			} else {
-				error = "An unexpected error occurred.";
-			}
+			error = err instanceof Error ? err.message : "An unexpected error occurred.";
 		} finally {
 			loading = false;
 		}
@@ -62,12 +67,12 @@
 					</div>
 				{/if}
 				<div class="grid gap-2">
-					<Label for="username">Username</Label>
+					<Label for="identifier">Username or email</Label>
 					<Input
-						id="username"
+						id="identifier"
 						type="text"
-						placeholder="Enter your username"
-						bind:value={username}
+						placeholder="Enter your username or email"
+						bind:value={identifier}
 						required
 						disabled={loading}
 					/>

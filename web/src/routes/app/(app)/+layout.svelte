@@ -47,14 +47,16 @@
 	setContext("campDisabled", () => campDisabled);
 	setContext("camp", () => camp);
 
-	if (browser && !auth.isAuthenticated) {
-		auth.clear();
-		goto("/login", { replaceState: true });
-	}
-
-	if (browser && auth.isAuthenticated && auth.role === "super_admin" && !auth.isImpersonating) {
-		goto("/admin/camps", { replaceState: true });
-	}
+	$effect(() => {
+		if (!browser || !auth.isInitialized) return;
+		if (!auth.isAuthenticated) {
+			goto("/login", { replaceState: true });
+			return;
+		}
+		if (auth.role === "super_admin" && !auth.isImpersonating) {
+			goto("/admin/camps", { replaceState: true });
+		}
+	});
 
 	onMount(async () => {
 		try {
@@ -67,14 +69,27 @@
 		}
 	});
 
-	function handleLogout() {
+	async function handleLogout() {
 		if (auth.isImpersonating) {
-			auth.stopImpersonation();
+			await auth.stopImpersonating();
 			goto("/admin/users");
 			return;
 		}
-		auth.clear();
+		await auth.signOut();
 		goto("/login");
+	}
+
+	async function handleSwitchCamp(orgId: string) {
+		if (orgId === auth.campId) return;
+		await auth.setActiveOrganization(orgId);
+		// Refetch camp data for the newly active org.
+		try {
+			camp = await campApi.get();
+			campDisabled = !camp.enabled;
+		} catch {
+			camp = null;
+			campDisabled = false;
+		}
 	}
 
 	function isParentActive(item: NavItem): boolean {
@@ -230,7 +245,26 @@
 							</Button>
 						{/snippet}
 					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="start" class="w-40">
+					<DropdownMenu.Content align="start" class="w-56">
+						{#if auth.organizations.length > 1}
+							<DropdownMenu.Sub>
+								<DropdownMenu.SubTrigger>
+									<TentTreeIcon class="mr-2 size-4" />
+									Switch camp
+								</DropdownMenu.SubTrigger>
+								<DropdownMenu.SubContent class="w-56">
+									{#each auth.organizations as org (org.id)}
+										<DropdownMenu.Item
+											onclick={() => handleSwitchCamp(org.id)}
+											class={org.id === auth.campId ? "font-semibold" : ""}
+										>
+											{org.name}
+										</DropdownMenu.Item>
+									{/each}
+								</DropdownMenu.SubContent>
+							</DropdownMenu.Sub>
+							<DropdownMenu.Separator />
+						{/if}
 						<DropdownMenu.Item onclick={handleLogout}>
 							<LogOutIcon class="mr-2 size-4" />
 							Sign out

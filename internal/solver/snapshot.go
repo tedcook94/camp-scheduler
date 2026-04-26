@@ -67,6 +67,12 @@ func BuildSnapshot(ctx context.Context, queries *db.Queries, campID, sessionID s
 		return SessionSnapshot{}, err
 	}
 
+	cabinSet := make(map[string]bool, len(cabins))
+	for _, c := range cabins {
+		cabinSet[c.ID] = true
+	}
+	overrides = filterOverridesByCabin(overrides, cabinSet)
+
 	// Prune all counselor-keyed maps to only counselors on the session roster.
 	// This means a counselor removed from the roster (or with stale prefs from
 	// a prior roster membership) is invisible to the solver and explainer.
@@ -87,6 +93,23 @@ func BuildSnapshot(ctx context.Context, queries *db.Queries, campID, sessionID s
 		UnmetCocounselorPreferences: unmetCo,
 		Overrides:                   overrides,
 	}, nil
+}
+
+// filterOverridesByCabin drops overrides whose target cabin is no longer
+// present in the snapshot (e.g. cabin or its age-group archived after the
+// override was created). The trigger-time validation step is responsible for
+// surfacing this; here we just keep the solver consistent.
+func filterOverridesByCabin(overrides map[string]string, cabins map[string]bool) map[string]string {
+	if len(overrides) == 0 {
+		return overrides
+	}
+	out := make(map[string]string, len(overrides))
+	for k, v := range overrides {
+		if cabins[v] {
+			out[k] = v
+		}
+	}
+	return out
 }
 
 // loadCounselorCabinOverrides loads admin-pinned counselor->cabin assignments

@@ -266,4 +266,54 @@ func TestOrderCounselors(t *testing.T) {
 			t.Errorf("expected counselor with history first, got %q", ordered[0].ID)
 		}
 	})
+
+	t.Run("override forces counselor into pinned cabin", func(t *testing.T) {
+		snapshot := SessionSnapshot{
+			Cabins: []Cabin{
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 10},
+				{ID: "c2", Name: "Oak", AgeGroupID: "ag2", RequiredCounselors: 1, Capacity: 10},
+			},
+			Counselors: []Counselor{
+				{ID: "sr1", Name: "Counselor 1", IsJunior: false},
+				{ID: "sr2", Name: "Counselor 2", IsJunior: false},
+			},
+			Overrides: map[string]string{"sr1": "c2"},
+		}
+
+		solutions := Solve(snapshot, DefaultSolverConfig())
+		if len(solutions) == 0 {
+			t.Fatal("expected at least one solution")
+		}
+
+		for _, sol := range solutions {
+			if !slices.Contains(sol.Assignment.CabinCounselors["c2"], "sr1") {
+				t.Errorf("override violated: sr1 not in c2; assignment=%v", sol.Assignment.CabinCounselors)
+			}
+			if slices.Contains(sol.Assignment.CabinCounselors["c1"], "sr1") {
+				t.Errorf("override violated: sr1 placed in c1")
+			}
+		}
+	})
+
+	t.Run("override prevents skipping pinned counselor", func(t *testing.T) {
+		snapshot := SessionSnapshot{
+			Cabins: []Cabin{
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", RequiredCounselors: 1, Capacity: 10},
+			},
+			Counselors: []Counselor{
+				{ID: "sr1", Name: "Counselor 1", IsJunior: false},
+			},
+			Overrides: map[string]string{"sr1": "c1"},
+		}
+
+		solutions := Solve(snapshot, DefaultSolverConfig())
+		if len(solutions) == 0 {
+			t.Fatal("expected pinned solution")
+		}
+		for _, sol := range solutions {
+			if !slices.Contains(sol.Assignment.CabinCounselors["c1"], "sr1") {
+				t.Errorf("pinned counselor was skipped; assignment=%v", sol.Assignment.CabinCounselors)
+			}
+		}
+	})
 }

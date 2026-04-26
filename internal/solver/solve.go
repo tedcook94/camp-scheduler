@@ -59,6 +59,31 @@ func (s *searchState) search(counselors []Counselor, index int) {
 	remaining := counselors[index:]
 	counselor := remaining[0]
 
+	// Forced placement: if this counselor is pinned by an admin override,
+	// only the pinned cabin is considered (and skipping is not allowed).
+	// The override target was filtered against current cabins/roster at
+	// snapshot load time, but constraint changes after save time (cabin
+	// gender flipped, counselor gender edited, capacity reduced) are not
+	// re-checked. Defensive guards below silently abandon the search if a
+	// stale pin is now infeasible; the caller will then see no solutions
+	// rather than a clear stale-override error. Adding trigger-time
+	// constraint revalidation is tracked as a follow-up.
+	if pinnedCabinID, pinned := s.snapshot.Overrides[counselor.ID]; pinned {
+		cabin := s.snapshot.Cabins[s.cabinIndexByID[pinnedCabinID]]
+		if cabin.Gender != counselor.Gender {
+			return
+		}
+		if len(s.assignment[pinnedCabinID]) >= cabin.Capacity {
+			return
+		}
+		s.assignment[pinnedCabinID] = append(s.assignment[pinnedCabinID], counselor.ID)
+		if s.feasible(remaining[1:]) {
+			s.search(counselors, index+1)
+		}
+		s.assignment[pinnedCabinID] = s.assignment[pinnedCabinID][:len(s.assignment[pinnedCabinID])-1]
+		return
+	}
+
 	for _, cabinID := range s.cabinIDs {
 		cabin := s.snapshot.Cabins[s.cabinIndexByID[cabinID]]
 		if cabin.Gender != counselor.Gender {
@@ -219,6 +244,12 @@ func orderCounselors(snapshot SessionSnapshot) []Counselor {
 	priorities := make([]counselorPriority, len(snapshot.Counselors))
 	for i, c := range snapshot.Counselors {
 		constraints := 0
+
+		// Pinned counselors have exactly one valid cabin -- order them
+		// first so the search establishes those constraints up front.
+		if _, pinned := snapshot.Overrides[c.ID]; pinned {
+			constraints += 1000
+		}
 
 		// Seniors are more constrained: they must fill the senior requirement.
 		if !c.IsJunior {

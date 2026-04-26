@@ -378,6 +378,7 @@ func (svc *Service) CreateCabin(ctx context.Context, campID, sessionID string, r
 		CabinID:            cabinUUID,
 		GroupSize:          req.GroupSize,
 		RequiredCounselors: req.RequiredCounselors,
+		Gender:             req.Gender,
 	})
 	if err != nil {
 		return SessionCabinResponse{}, fmt.Errorf("error creating session cabin: %w", err)
@@ -433,6 +434,7 @@ func (svc *Service) UpdateCabin(ctx context.Context, campID, sessionID, id strin
 		CabinID:            cabinUUID,
 		GroupSize:          req.GroupSize,
 		RequiredCounselors: req.RequiredCounselors,
+		Gender:             req.Gender,
 	})
 	if err != nil {
 		return SessionCabinResponse{}, fmt.Errorf("error updating session cabin %s: %w", id, err)
@@ -515,5 +517,6 @@ func toSessionCabinResponse(r db.SessionAgeGroupCabin, sessionID string) Session
 		CabinID:            api.UUIDToString(r.CabinID),
 		GroupSize:          r.GroupSize,
 		RequiredCounselors: r.RequiredCounselors,
+		Gender:             r.Gender,
 	}
 }

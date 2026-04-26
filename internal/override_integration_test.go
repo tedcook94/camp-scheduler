@@ -20,6 +20,7 @@ func TestAssignmentOverrides(t *testing.T) {
 	t.Run("counselor_cabin_override_rejects_gender_mismatch", testCounselorCabinOverrideGenderMismatch)
 	t.Run("override_mutation_marks_run_stale", testOverrideMutationMarksRunStale)
 	t.Run("trigger_rejects_stale_override", testTriggerRejectsStaleOverride)
+	t.Run("session_cabin_gender_overrides_default", testSessionCabinGenderOverridesDefault)
 }
 
 // overrideCabinFixture sets up a session with two female cabins and several
@@ -78,11 +79,11 @@ func setupOverrideCabinFixture(t *testing.T) (*httptest.Server, overrideCabinFix
 
 	pineSAGC := mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
 		"session_age_group_id": sagJuniorsID, "cabin_id": str(pine, "id"),
-		"group_size": 6, "required_counselors": 1,
+		"group_size": 6, "required_counselors": 1, "gender": "female",
 	}, token)
 	oakSAGC := mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
 		"session_age_group_id": sagJuniorsID, "cabin_id": str(oak, "id"),
-		"group_size": 6, "required_counselors": 1,
+		"group_size": 6, "required_counselors": 1, "gender": "female",
 	}, token)
 
 	counselorIDs := map[string]string{}
@@ -406,4 +407,67 @@ func testTriggerRejectsStaleOverride(t *testing.T) {
 
 	doRawRequest(t, http.MethodPost, apiURL(ts, "/sessions/"+f.sessionID+"/assignment-runs"),
 		map[string]any{"run_type": "cabin"}, http.StatusUnprocessableEntity, f.token)
+}
+
+// testSessionCabinGenderOverridesDefault verifies that a session cabin's
+// gender takes precedence over the global cabin's gender for both override
+// validation and solver placement. The global cabin is created as female,
+// then the session cabin is created with gender=male. A male counselor pin
+// should succeed and the run should complete.
+func testSessionCabinGenderOverridesDefault(t *testing.T) {
+	ts, pool := mustSetupServer(t)
+
+	var campID string
+	if err := pool.QueryRow(context.Background(),
+		`INSERT INTO camps (camp_name, camp_location) VALUES ($1, $2) RETURNING id`,
+		"Camp Gender", "Test").Scan(&campID); err != nil {
+		t.Fatalf("inserting camp: %v", err)
+	}
+	token := mustLogin(t, ts, pool, campID)
+
+	juniors := mustPost(t, apiURL(ts, "/age-groups"), map[string]any{"name": "Juniors"}, token)
+	juniorsAGID := str(juniors, "id")
+
+	// Global cabin defaults to female.
+	pine := mustPost(t, apiURL(ts, "/cabins"), map[string]any{
+		"name": "Pine", "default_age_group_id": juniorsAGID,
+		"default_group_size": 8, "default_required_counselors": 1, "gender": "female",
+	}, token)
+
+	season := mustPost(t, apiURL(ts, "/seasons"), map[string]any{
+		"name": "S", "start_date": "2025-06-01", "end_date": "2025-08-31",
+	}, token)
+	session := mustPost(t, apiURL(ts, "/sessions"), map[string]any{
+		"name": "S1", "season_id": str(season, "id"),
+	}, token)
+	sessionID := str(session, "id")
+
+	sag := mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/age-groups"), map[string]any{
+		"age_group_id": juniorsAGID,
+	}, token)
+
+	// Per-session, override Pine to be a male cabin.
+	pineSAGC := mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
+		"session_age_group_id": str(sag, "id"), "cabin_id": str(pine, "id"),
+		"group_size": 6, "required_counselors": 1, "gender": "male",
+	}, token)
+
+	// Need a senior male counselor.
+	mike := mustPost(t, apiURL(ts, "/counselors"), map[string]any{
+		"first_name": "Mike", "last_name": "Test",
+		"junior_counselor": false, "gender": "male",
+	}, token)
+
+	// Pin succeeds against per-session male gender.
+	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/overrides/counselor-cabin"), map[string]any{
+		"counselor_id":               str(mike, "id"),
+		"session_age_group_cabin_id": str(pineSAGC, "id"),
+	}, token)
+
+	// Run completes — solver respects per-session male gender.
+	run := mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/assignment-runs"),
+		map[string]any{"run_type": "cabin"}, token)
+	if str(run, "status") != "completed" {
+		t.Fatalf("expected status completed, got %q", str(run, "status"))
+	}
 }

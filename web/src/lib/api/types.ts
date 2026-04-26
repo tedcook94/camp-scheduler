@@ -384,6 +384,7 @@ export interface SessionCabin {
 	cabin_id: string;
 	group_size: number;
 	required_counselors: number;
+	gender: Gender;
 }
 
 export interface CreateSessionCabinRequest {
@@ -391,12 +392,14 @@ export interface CreateSessionCabinRequest {
 	cabin_id: string;
 	group_size: number;
 	required_counselors: number;
+	gender: Gender;
 }
 
 export interface UpdateSessionCabinRequest {
 	cabin_id: string;
 	group_size: number;
 	required_counselors: number;
+	gender: Gender;
 }
 
 export interface Enrollment {

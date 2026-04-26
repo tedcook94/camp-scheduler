@@ -90,6 +90,7 @@ func setupStalenessFixture(t *testing.T, name string) *stalenessFixture {
 	mustPost(t, apiURL(ts, sessBase+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabinID,
 		"group_size": 8, "required_counselors": 1,
+		"gender":             "female",
 	}, token)
 
 	camper := mustPost(t, apiURL(ts, "/campers"), map[string]any{
@@ -311,6 +312,7 @@ func TestStalenessFlagging(t *testing.T) {
 			mustPost(t, apiURL(ts, "/sessions/"+sid+"/cabins"), map[string]any{
 				"session_age_group_id": sagID, "cabin_id": cabID,
 				"group_size": 8, "required_counselors": 1,
+				"gender":             "female",
 			}, token)
 		}
 
@@ -401,6 +403,7 @@ func TestStalenessFlagging(t *testing.T) {
 			mustPost(t, apiURL(ts, "/sessions/"+sid+"/cabins"), map[string]any{
 				"session_age_group_id": sagID, "cabin_id": cabID,
 				"group_size": 8, "required_counselors": 1,
+				"gender":             "female",
 			}, token)
 		}
 
@@ -554,6 +557,7 @@ func setupCascadeFixture(t *testing.T, name string) (
 		mustPost(t, apiURL(ts, "/sessions/"+sid+"/cabins"), map[string]any{
 			"session_age_group_id": sagID, "cabin_id": cabID,
 			"group_size": 8, "required_counselors": 1,
+			"gender":             "female",
 		}, token)
 	}
 

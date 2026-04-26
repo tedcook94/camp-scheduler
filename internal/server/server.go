@@ -37,10 +37,21 @@ import (
 )
 
 type Server struct {
-	cfg      config.Config
-	pool     *pgxpool.Pool
-	router   *gin.Engine
-	staticFS fs.FS
+	cfg           config.Config
+	pool          *pgxpool.Pool
+	router        *gin.Engine
+	staticFS      fs.FS
+	authenticator auth.Authenticator
+	orgSync       *admin.OrgSyncer
+}
+
+// Deps lets callers (notably integration tests) inject collaborators that
+// would otherwise be constructed from config — most importantly the
+// Authenticator, so tests can mint tokens without standing up the
+// auth-server. A nil field falls back to the production default.
+type Deps struct {
+	Authenticator auth.Authenticator
+	OrgSyncer     *admin.OrgSyncer
 }
 
 func New(cfg config.Config, staticFS fs.FS) (*Server, error) {
@@ -54,17 +65,43 @@ func New(cfg config.Config, staticFS fs.FS) (*Server, error) {
 // NewWithPool creates a server with an existing database connection pool,
 // allowing callers (such as integration tests) to supply their own pool.
 func NewWithPool(cfg config.Config, pool *pgxpool.Pool, staticFS fs.FS) *Server {
+	return NewWithDeps(cfg, pool, staticFS, Deps{})
+}
+
+// NewWithDeps creates a server with explicit dependencies. Any nil field on
+// deps is replaced with the production default derived from cfg.
+func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, staticFS fs.FS, deps Deps) *Server {
 	if cfg.Server.Mode == "local" {
 		gin.SetMode(gin.DebugMode)
 	} else {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
+	authenticator := deps.Authenticator
+	if authenticator == nil {
+		jwks := auth.NewJWKSAuthenticator(auth.JWKSConfig{
+			JWKSURL: cfg.Auth.JWKSURL(),
+			Timeout: cfg.Auth.JWKSTimeout,
+		})
+		jwks.Warmup(context.Background())
+		authenticator = jwks
+	}
+
+	orgSync := deps.OrgSyncer
+	if orgSync == nil && cfg.Auth.ServerURL != "" && cfg.Auth.SharedSecret != "" {
+		orgSync = admin.NewOrgSyncer(admin.OrgSyncerConfig{
+			BaseURL: cfg.Auth.InternalURL(),
+			Secret:  cfg.Auth.SharedSecret,
+		})
+	}
+
 	s := &Server{
-		cfg:      cfg,
-		pool:     pool,
-		router:   gin.New(),
-		staticFS: staticFS,
+		cfg:           cfg,
+		pool:          pool,
+		router:        gin.New(),
+		staticFS:      staticFS,
+		authenticator: authenticator,
+		orgSync:       orgSync,
 	}
 
 	s.router.Use(gin.Recovery())
@@ -105,17 +142,8 @@ func (s *Server) routes() {
 
 	v1 := s.router.Group("/api/v1")
 
-	authenticator := auth.NewJWTAuthenticator(s.pool, queries, auth.JWTConfig{
-		SigningKey:      []byte(s.cfg.JWT.Secret),
-		AccessTokenTTL:  s.cfg.JWT.AccessTokenTTL,
-		RefreshTokenTTL: s.cfg.JWT.RefreshTokenTTL,
-	})
-
-	authController := auth.NewController(authenticator)
-	authController.RegisterRoutes(v1)
-
 	protected := v1.Group("")
-	protected.Use(auth.Middleware(authenticator), auth.RequireCampScope(), auth.RequireCampEnabled(queries))
+	protected.Use(auth.Middleware(s.authenticator), auth.RequireCampScope(), auth.RequireCampEnabled(queries))
 	campService := camp.NewService(queries)
 	campController := camp.NewController(campService)
 	campController.RegisterRoutes(protected)
@@ -209,16 +237,12 @@ func (s *Server) routes() {
 	reportController.RegisterRoutes(protected)
 
 	superAdmin := v1.Group("/admin")
-	superAdmin.Use(auth.Middleware(authenticator))
+	superAdmin.Use(auth.Middleware(s.authenticator))
 	superAdmin.Use(auth.RequireSuperAdmin())
 
-	adminService := admin.NewService(queries)
+	adminService := admin.NewService(queries, s.orgSync)
 	adminController := admin.NewController(adminService)
 	adminController.RegisterRoutes(superAdmin)
-
-	userService := admin.NewUserService(queries, s.pool)
-	userController := admin.NewUserController(userService, authenticator)
-	userController.RegisterRoutes(superAdmin)
 
 	if s.staticFS != nil {
 		s.serveSPA()

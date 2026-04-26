@@ -21,6 +21,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if cfg.Auth.ServerURL == "" || cfg.Auth.SharedSecret == "" {
+		slog.Error("AUTH_SERVER_URL and AUTH_SHARED_SECRET are required")
+		os.Exit(1)
+	}
+
 	initLogger(cfg)
 
 	var adminFS fs.FS

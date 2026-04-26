@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"regexp"
+	"strings"
 
 	"camp-scheduler/internal/api"
 	"camp-scheduler/internal/camp"
@@ -14,10 +17,13 @@ var ErrNotFound = errors.New("camp not found")
 
 type Service struct {
 	queries *db.Queries
+	orgSync *OrgSyncer
 }
 
-func NewService(queries *db.Queries) *Service {
-	return &Service{queries: queries}
+// NewService constructs the camp admin service. If orgSync is non-nil,
+// camp create/delete will mirror to the auth-server's organization table.
+func NewService(queries *db.Queries, orgSync *OrgSyncer) *Service {
+	return &Service{queries: queries, orgSync: orgSync}
 }
 
 func (svc *Service) List(ctx context.Context) ([]camp.CampResponse, error) {
@@ -56,7 +62,18 @@ func (svc *Service) Create(ctx context.Context, req CreateCampRequest) (camp.Cam
 		return camp.CampResponse{}, fmt.Errorf("error creating camp: %w", err)
 	}
 
-	return camp.ToCampResponse(c), nil
+	resp := camp.ToCampResponse(c)
+	if svc.orgSync != nil {
+		if err := svc.orgSync.CreateOrg(ctx, resp.ID, req.Name, slugify(req.Name)); err != nil {
+			// Org sync failure is logged but not fatal: a reconciliation job
+			// can re-sync, and the camp row is the source of truth.
+			slog.
+				With("camp_id", resp.ID).
+				With("error", err).
+				Error("error syncing camp to auth-server organization")
+		}
+	}
+	return resp, nil
 }
 
 func (svc *Service) Update(ctx context.Context, id string, req UpdateCampRequest) (camp.CampResponse, error) {
@@ -92,5 +109,20 @@ func (svc *Service) Delete(ctx context.Context, id string) error {
 		return ErrNotFound
 	}
 
+	if svc.orgSync != nil {
+		if err := svc.orgSync.DeleteOrg(ctx, id); err != nil {
+			slog.
+				With("camp_id", id).
+				With("error", err).
+				Error("error deleting camp organization in auth-server")
+		}
+	}
 	return nil
+}
+
+var slugRegex = regexp.MustCompile(`[^a-z0-9]+`)
+
+func slugify(name string) string {
+	s := slugRegex.ReplaceAllString(strings.ToLower(name), "-")
+	return strings.Trim(s, "-")
 }

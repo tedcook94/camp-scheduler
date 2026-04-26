@@ -96,6 +96,29 @@ func (s *camperSearchState) search(campers []Camper, index int) {
 	}
 
 	camper := campers[index]
+
+	// Forced placement: if this camper is pinned by an admin override,
+	// only the pinned cabin is considered. Override target was filtered
+	// against current cabins/enrollment at snapshot load, but the search
+	// here intentionally bypasses the age-group/gender eligibility checks
+	// applied to non-pinned campers. Save-time validation rejected the
+	// override against then-current values; constraint changes afterward
+	// (camper age group reassigned, cabin gender flipped, group_size
+	// reduced) are not re-checked, so a stale pin will quietly produce an
+	// infeasible assignment that hard-constraint checks reject. Adding
+	// trigger-time constraint revalidation is tracked as a follow-up.
+	if pinnedCabinID, pinned := s.snapshot.Overrides[camper.ID]; pinned {
+		if s.cabinCount[pinnedCabinID] >= s.capacityOf(pinnedCabinID) {
+			return
+		}
+		s.assignment[pinnedCabinID] = append(s.assignment[pinnedCabinID], camper.ID)
+		s.cabinCount[pinnedCabinID]++
+		s.search(campers, index+1)
+		s.assignment[pinnedCabinID] = s.assignment[pinnedCabinID][:len(s.assignment[pinnedCabinID])-1]
+		s.cabinCount[pinnedCabinID]--
+		return
+	}
+
 	eligibleCabins := s.cabinsByAgeGroup[camper.AgeGroupID]
 
 	// Filter out cabins whose gender doesn't match the camper's.
@@ -175,6 +198,17 @@ func (s *camperSearchState) cloneAssignment() CamperAssignment {
 	return CamperAssignment{CabinCampers: clone}
 }
 
+// capacityOf returns the configured capacity for the given cabin from the
+// snapshot, or 0 if the cabin is not present.
+func (s *camperSearchState) capacityOf(cabinID string) int {
+	for _, cabin := range s.snapshot.Cabins {
+		if cabin.ID == cabinID {
+			return cabin.Capacity
+		}
+	}
+	return 0
+}
+
 func fillRemaining(base CamperAssignment, campers []Camper, snapshot CamperCabinSnapshot, cabinsByAgeGroup map[string][]CamperCabin) CamperAssignment {
 	result := make(map[string][]string, len(base.CabinCampers))
 	counts := make(map[string]int)
@@ -191,7 +225,35 @@ func fillRemaining(base CamperAssignment, campers []Camper, snapshot CamperCabin
 		counts[cabinID] = len(cp)
 	}
 
-	for _, camper := range campers {
+	// Place pinned (override) campers first so capacity reserved for them is
+	// not consumed by greedy balancing of unpinned campers. Order is otherwise
+	// preserved to keep solver output deterministic.
+	ordered := make([]Camper, 0, len(campers))
+	for _, c := range campers {
+		if _, pinned := snapshot.Overrides[c.ID]; pinned {
+			ordered = append(ordered, c)
+		}
+	}
+	for _, c := range campers {
+		if _, pinned := snapshot.Overrides[c.ID]; !pinned {
+			ordered = append(ordered, c)
+		}
+	}
+
+	for _, camper := range ordered {
+		// Forced placement: pinned campers go into their override cabin
+		// regardless of the balancing heuristic. Capacity is still respected:
+		// if the cabin is already full, the camper is dropped from the
+		// solution (trigger-time validation should have rejected the
+		// override before reaching the solver if this can happen).
+		if pinnedCabinID, pinned := snapshot.Overrides[camper.ID]; pinned {
+			if counts[pinnedCabinID] < capacities[pinnedCabinID] {
+				result[pinnedCabinID] = append(result[pinnedCabinID], camper.ID)
+				counts[pinnedCabinID]++
+			}
+			continue
+		}
+
 		cabins := cabinsByAgeGroup[camper.AgeGroupID]
 		if len(cabins) == 0 {
 			continue

@@ -61,6 +61,18 @@ JOIN seasons se ON se.id = s.season_id AND se.camp_id = e.camp_id
 WHERE e.camper_id = $1 AND e.camp_id = $2
 ORDER BY se.start_date DESC, s.session_name ASC;
 
+-- name: GetCamperEnrollmentInSession :one
+SELECT
+    e.id,
+    e.camp_id,
+    e.camper_id,
+    e.session_id,
+    e.session_age_group_id,
+    sag.age_group_id
+FROM camper_session_enrollments e
+JOIN session_age_groups sag ON sag.id = e.session_age_group_id AND sag.camp_id = e.camp_id
+WHERE e.camp_id = $1 AND e.session_id = $2 AND e.camper_id = $3;
+
 -- name: ListEnrollmentsBySessionAgeGroup :many
 SELECT
     e.id,

@@ -336,6 +336,7 @@ type SessionAgeGroupCabin struct {
 	CabinID            pgtype.UUID
 	GroupSize          int32
 	RequiredCounselors int32
+	Gender             string
 }
 
 type SessionCounselor struct {

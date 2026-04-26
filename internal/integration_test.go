@@ -862,6 +862,7 @@ func testSimpleCamp(t *testing.T) {
 			"cabin_id":             cfg.cabinID,
 			"group_size":           4,
 			"required_counselors":  reqCounselors,
+			"gender":             "female",
 		}, token)
 	}
 
@@ -1166,6 +1167,7 @@ func testComplexCamp(t *testing.T) {
 			"cabin_id":             cab.id,
 			"group_size":           4,
 			"required_counselors":  reqCounselors,
+			"gender":             "female",
 		}, token)
 	}
 
@@ -1414,10 +1416,12 @@ func testBasicCamperAssignment(t *testing.T) {
 	mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabinAID,
 		"group_size": 4, "required_counselors": 1,
+		"gender":             "female",
 	}, token)
 	mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabinBID,
 		"group_size": 4, "required_counselors": 1,
+		"gender":             "female",
 	}, token)
 
 	// Create campers.
@@ -1550,10 +1554,12 @@ func testCamperFriendPreferences(t *testing.T) {
 	mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabin1ID,
 		"group_size": 3, "required_counselors": 1,
+		"gender":             "female",
 	}, token)
 	mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabin2ID,
 		"group_size": 3, "required_counselors": 1,
+		"gender":             "female",
 	}, token)
 
 	// Create 4 campers: Amy, Beth, Carol, Dana.
@@ -1810,6 +1816,7 @@ func testGetSolutionRunOwnership(t *testing.T) {
 		mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
 			"session_age_group_id": sagID, "cabin_id": cabinID,
 			"group_size": 4, "required_counselors": 1,
+			"gender":             "female",
 		}, token)
 
 		for _, n := range []string{"Alice", "Bob"} {
@@ -1919,6 +1926,7 @@ func testSelectSolutionCamperRun(t *testing.T) {
 	mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabinID,
 		"group_size": 4, "required_counselors": 1,
+		"gender":             "female",
 	}, token)
 
 	// Create and enroll 2 campers.
@@ -2002,6 +2010,7 @@ func testSelectSolutionReplacesPriorRunSelection(t *testing.T) {
 	mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabinID,
 		"group_size": 4, "required_counselors": 1,
+		"gender":             "female",
 	}, token)
 
 	for _, name := range []string{"Alice", "Bob"} {
@@ -2177,12 +2186,14 @@ func testRepeatedUnmetPreferenceBoost(t *testing.T) {
 			"cabin_id":             pineID,
 			"group_size":           4,
 			"required_counselors":  1,
+			"gender":             "female",
 		}, token)
 		mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
 			"session_age_group_id": str(sagOld, "id"),
 			"cabin_id":             oakID,
 			"group_size":           4,
 			"required_counselors":  1,
+			"gender":             "female",
 		}, token)
 	}
 
@@ -3173,6 +3184,7 @@ func testGetRunById(t *testing.T) {
 	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabinID,
 		"group_size": 8, "required_counselors": 1,
+		"gender":             "female",
 	}, token)
 
 	for _, name := range []string{"Alice", "Bob"} {
@@ -3267,6 +3279,7 @@ func testGetRunByIdCrossCampIsolation(t *testing.T) {
 	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabinID,
 		"group_size": 8, "required_counselors": 1,
+		"gender":             "female",
 	}, tokenA)
 
 	for _, name := range []string{"Alice", "Bob"} {
@@ -3377,6 +3390,7 @@ func testPreconditionNoEnabledCounselors(t *testing.T) {
 	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabinID,
 		"group_size": 8, "required_counselors": 1,
+		"gender":             "female",
 	}, token)
 
 	resp := doRequest(t, http.MethodPost,
@@ -3430,6 +3444,7 @@ func testPreconditionNoSeniorCounselors(t *testing.T) {
 	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabinID,
 		"group_size": 8, "required_counselors": 1,
+		"gender":             "female",
 	}, token)
 
 	mustPost(t, apiURL(ts, "/counselors"), map[string]any{
@@ -3495,6 +3510,7 @@ func testCabinRunWithoutEnrolledCampers(t *testing.T) {
 	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabinID,
 		"group_size": 8, "required_counselors": 1,
+		"gender":             "female",
 	}, token)
 
 	createSeniorCounselors(t, ts, token, "female", 1)
@@ -3552,6 +3568,7 @@ func testCabinRunFailsOnRequiredExceedingCapacity(t *testing.T) {
 	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabinID,
 		"group_size": 2, "required_counselors": 4,
+		"gender":             "female",
 	}, token)
 
 	createSeniorCounselors(t, ts, token, "female", 4)
@@ -3635,6 +3652,7 @@ func testCabinRunCombinedScoreAdditivity(t *testing.T) {
 		mustPost(t, apiURL(ts, sessBase+"/cabins"), map[string]any{
 			"session_age_group_id": c.sagID, "cabin_id": c.cabinID,
 			"group_size": 5, "required_counselors": 1,
+			"gender":             "female",
 		}, token)
 	}
 
@@ -3830,6 +3848,7 @@ func testPreconditionCounselorGenderShortfall(t *testing.T) {
 	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabinID,
 		"group_size": 8, "required_counselors": 1,
+		"gender":             "female",
 	}, token)
 
 	mustPost(t, apiURL(ts, "/counselors"), map[string]any{
@@ -3890,6 +3909,7 @@ func testPreconditionCamperGenderCapacity(t *testing.T) {
 	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/cabins"), map[string]any{
 		"session_age_group_id": sagID, "cabin_id": cabinID,
 		"group_size": 2, "required_counselors": 1,
+		"gender":             "female",
 	}, token)
 
 	for _, name := range []string{"Amy", "Beth", "Carol"} {
@@ -3995,12 +4015,14 @@ func TestCopySession(t *testing.T) {
 		"cabin_id":             pineID,
 		"group_size":           8,
 		"required_counselors":  1,
+		"gender":             "female",
 	}, token)
 	mustPost(t, apiURL(ts, sourceBase+"/cabins"), map[string]any{
 		"session_age_group_id": str(sagS, "id"),
 		"cabin_id":             oakID,
 		"group_size":           10,
 		"required_counselors":  2,
+		"gender":             "female",
 	}, token)
 
 	stsM := mustPost(t, apiURL(ts, sourceBase+"/time-slots"), map[string]any{
@@ -4429,6 +4451,7 @@ func TestArchivedReferencesRejected(t *testing.T) {
 		doRawRequest(t, http.MethodPost, apiURL(ts, sessionBase+"/cabins"), map[string]any{
 			"session_age_group_id": sagID, "cabin_id": archivedCabinID,
 			"group_size": 4, "required_counselors": 1,
+			"gender":             "female",
 		}, http.StatusBadRequest, token)
 	})
 
@@ -4436,6 +4459,7 @@ func TestArchivedReferencesRejected(t *testing.T) {
 		sc := mustPost(t, apiURL(ts, sessionBase+"/cabins"), map[string]any{
 			"session_age_group_id": sagID, "cabin_id": activeCabinID,
 			"group_size": 4, "required_counselors": 1,
+			"gender":             "female",
 		}, token)
 		scID := str(sc, "id")
 		doRawRequest(t, http.MethodPut, apiURL(ts, sessionBase+"/cabins/"+scID), map[string]any{
@@ -4560,15 +4584,18 @@ func TestCopySessionSkipsArchivedReferences(t *testing.T) {
 	mustPost(t, apiURL(ts, sourceBase+"/cabins"), map[string]any{
 		"session_age_group_id": keepSAGID, "cabin_id": keepCabinID,
 		"group_size": 4, "required_counselors": 1,
+		"gender":             "female",
 	}, token)
 	mustPost(t, apiURL(ts, sourceBase+"/cabins"), map[string]any{
 		"session_age_group_id": keepSAGID, "cabin_id": dropCabinID,
 		"group_size": 4, "required_counselors": 1,
+		"gender":             "female",
 	}, token)
 	// Cabin attached under drop-SAG: should disappear because parent SAG drops.
 	mustPost(t, apiURL(ts, sourceBase+"/cabins"), map[string]any{
 		"session_age_group_id": dropSAGID, "cabin_id": keepCabinID,
 		"group_size": 4, "required_counselors": 1,
+		"gender":             "female",
 	}, token)
 
 	keepSTS := mustPost(t, apiURL(ts, sourceBase+"/time-slots"), map[string]any{
@@ -4715,10 +4742,12 @@ func TestReports(t *testing.T) {
 	mustPost(t, apiURL(ts, cabinBase+"/cabins"), map[string]any{
 		"session_age_group_id": cabinSagID, "cabin_id": cabin1ID,
 		"group_size": 4, "required_counselors": 1,
+		"gender":             "female",
 	}, token)
 	mustPost(t, apiURL(ts, cabinBase+"/cabins"), map[string]any{
 		"session_age_group_id": cabinSagID, "cabin_id": cabin2ID,
 		"group_size": 4, "required_counselors": 1,
+		"gender":             "female",
 	}, token)
 
 	// Campers.

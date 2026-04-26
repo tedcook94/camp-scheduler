@@ -28,11 +28,13 @@
 		AgeGroup,
 		Cabin,
 		Counselor,
+		Gender,
 	} from "$lib/api/types";
 	import { toast } from "svelte-sonner";
 	import { Button } from "$lib/components/ui/button";
 	import { Input } from "$lib/components/ui/input";
 	import { Label } from "$lib/components/ui/label";
+	import { Badge } from "$lib/components/ui/badge";
 	import * as Table from "$lib/components/ui/table";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog";
@@ -253,20 +255,24 @@
 	let addCabinAgeGroupId = $state("");
 	let addCabinGroupSize = $state("");
 	let addCabinCounselors = $state("");
+	let addCabinGender = $state<Gender | "">("");
 	let addingCabin = $state(false);
 	let addCabinError = $state("");
 	let addCabinAgeGroupError = $state("");
 	let addCabinGroupSizeError = $state("");
 	let addCabinCounselorsError = $state("");
+	let addCabinGenderError = $state("");
 
 	// Edit cabin dialog
 	let editCabinOpen = $state(false);
 	let editCabinTarget = $state<SessionCabin | null>(null);
 	let editCabinGroupSize = $state("");
 	let editCabinCounselors = $state("");
+	let editCabinGender = $state<Gender | "">("");
 	let editingCabin = $state(false);
 	let editCabinGroupSizeError = $state("");
 	let editCabinCounselorsError = $state("");
+	let editCabinGenderError = $state("");
 
 	// Remove cabin confirmation
 	let removeCabinOpen = $state(false);
@@ -827,10 +833,12 @@
 		addCabinAgeGroupId = "";
 		addCabinGroupSize = "";
 		addCabinCounselors = "";
+		addCabinGender = "";
 		addCabinError = "";
 		addCabinAgeGroupError = "";
 		addCabinGroupSizeError = "";
 		addCabinCounselorsError = "";
+		addCabinGenderError = "";
 		addCabinOpen = true;
 	}
 
@@ -846,8 +854,10 @@
 			addCabinAgeGroupError = "";
 			addCabinGroupSize = String(cabin.default_group_size);
 			addCabinCounselors = String(cabin.default_required_counselors);
+			addCabinGender = cabin.gender;
 			addCabinGroupSizeError = "";
 			addCabinCounselorsError = "";
+			addCabinGenderError = "";
 		}
 	}
 
@@ -857,6 +867,7 @@
 		addCabinAgeGroupError = "";
 		addCabinGroupSizeError = "";
 		addCabinCounselorsError = "";
+		addCabinGenderError = "";
 
 		let valid = true;
 		if (!addCabinId) {
@@ -865,6 +876,10 @@
 		}
 		if (!addCabinAgeGroupId) {
 			addCabinAgeGroupError = "Age group is required.";
+			valid = false;
+		}
+		if (addCabinGender !== "male" && addCabinGender !== "female") {
+			addCabinGenderError = "Gender is required.";
 			valid = false;
 		}
 		const sizeResult = parsePositiveInt(addCabinGroupSize);
@@ -878,6 +893,7 @@
 			valid = false;
 		}
 		if (!valid || !sizeResult.ok || !counselorsResult.ok) return;
+		const gender: Gender = addCabinGender === "male" ? "male" : "female";
 
 		addingCabin = true;
 		// Track a session_age_group we create so we can roll it back on cabin failure
@@ -897,6 +913,7 @@
 				cabin_id: addCabinId,
 				group_size: sizeResult.value,
 				required_counselors: counselorsResult.value,
+				gender: gender,
 			});
 			sessionCabins = [...sessionCabins, created];
 			expandedAgeGroups = new Set([...expandedAgeGroups, sag.id]);
@@ -926,8 +943,10 @@
 		editCabinTarget = sc;
 		editCabinGroupSize = String(sc.group_size);
 		editCabinCounselors = String(sc.required_counselors);
+		editCabinGender = sc.gender;
 		editCabinGroupSizeError = "";
 		editCabinCounselorsError = "";
+		editCabinGenderError = "";
 		editCabinOpen = true;
 	}
 
@@ -936,6 +955,7 @@
 		if (!editCabinTarget) return;
 		editCabinGroupSizeError = "";
 		editCabinCounselorsError = "";
+		editCabinGenderError = "";
 
 		const sizeResult = parsePositiveInt(editCabinGroupSize);
 		if (!sizeResult.ok) {
@@ -945,7 +965,11 @@
 		if (!counselorsResult.ok) {
 			editCabinCounselorsError = counselorsResult.error;
 		}
-		if (!sizeResult.ok || !counselorsResult.ok) return;
+		if (editCabinGender !== "male" && editCabinGender !== "female") {
+			editCabinGenderError = "Gender is required.";
+		}
+		if (!sizeResult.ok || !counselorsResult.ok || editCabinGenderError) return;
+		const gender: Gender = editCabinGender === "male" ? "male" : "female";
 
 		editingCabin = true;
 		const target = editCabinTarget;
@@ -954,6 +978,7 @@
 				cabin_id: target.cabin_id,
 				group_size: sizeResult.value,
 				required_counselors: counselorsResult.value,
+				gender: gender,
 			});
 			sessionCabins = sessionCabins.map((sc) => (sc.id === target.id ? updated : sc));
 			toast.success("Cabin updated");
@@ -1182,6 +1207,7 @@
 										<Table.TableHeader>
 											<Table.TableRow>
 												<Table.TableHead>Cabin</Table.TableHead>
+												<Table.TableHead class="w-24">Gender</Table.TableHead>
 												<Table.TableHead class="w-32">Group Size</Table.TableHead>
 												<Table.TableHead class="w-40">Required Counselors</Table.TableHead>
 												<Table.TableHead class="w-16">
@@ -1194,6 +1220,11 @@
 												<Table.TableRow>
 													<Table.TableCell>
 														{cabinLabel(sc.cabin_id)}
+													</Table.TableCell>
+													<Table.TableCell>
+														<Badge variant={sc.gender === "female" ? "secondary" : "outline"}>
+															{sc.gender === "female" ? "Female" : "Male"}
+														</Badge>
 													</Table.TableCell>
 													<Table.TableCell>
 														{sc.group_size}
@@ -1901,6 +1932,33 @@
 				{/if}
 			</div>
 			<div class="grid gap-2">
+				<Label for="cabin-gender-select">Gender</Label>
+				<Select.Select
+					type="single"
+					value={addCabinGender}
+					disabled={addingCabin}
+					onValueChange={(v) => {
+						addCabinGender = v === "male" || v === "female" ? v : "";
+						addCabinGenderError = "";
+					}}
+				>
+					<Select.SelectTrigger id="cabin-gender-select" class="w-full">
+						{#if addCabinGender}
+							{addCabinGender === "female" ? "Female" : "Male"}
+						{:else}
+							<span class="text-muted-foreground">Select gender</span>
+						{/if}
+					</Select.SelectTrigger>
+					<Select.SelectContent>
+						<Select.SelectItem value="female">Female</Select.SelectItem>
+						<Select.SelectItem value="male">Male</Select.SelectItem>
+					</Select.SelectContent>
+				</Select.Select>
+				{#if addCabinGenderError}
+					<p class="text-destructive text-sm">{addCabinGenderError}</p>
+				{/if}
+			</div>
+			<div class="grid gap-2">
 				<Label for="cabin-group-size">Group Size</Label>
 				<Input
 					id="cabin-group-size"
@@ -1961,6 +2019,33 @@
 			</Dialog.DialogDescription>
 		</Dialog.DialogHeader>
 		<form onsubmit={handleEditCabin} class="grid gap-4">
+			<div class="grid gap-2">
+				<Label for="edit-cabin-gender-select">Gender</Label>
+				<Select.Select
+					type="single"
+					value={editCabinGender}
+					disabled={editingCabin}
+					onValueChange={(v) => {
+						editCabinGender = v === "male" || v === "female" ? v : "";
+						editCabinGenderError = "";
+					}}
+				>
+					<Select.SelectTrigger id="edit-cabin-gender-select" class="w-full">
+						{#if editCabinGender}
+							{editCabinGender === "female" ? "Female" : "Male"}
+						{:else}
+							<span class="text-muted-foreground">Select gender</span>
+						{/if}
+					</Select.SelectTrigger>
+					<Select.SelectContent>
+						<Select.SelectItem value="female">Female</Select.SelectItem>
+						<Select.SelectItem value="male">Male</Select.SelectItem>
+					</Select.SelectContent>
+				</Select.Select>
+				{#if editCabinGenderError}
+					<p class="text-destructive text-sm">{editCabinGenderError}</p>
+				{/if}
+			</div>
 			<div class="grid gap-2">
 				<Label for="edit-cabin-group-size">Group Size</Label>
 				<Input

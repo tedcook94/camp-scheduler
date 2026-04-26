@@ -525,6 +525,7 @@ func (svc *Service) Copy(ctx context.Context, campID, sourceID string, req CopyS
 			CabinID:            sc.CabinID,
 			GroupSize:          sc.GroupSize,
 			RequiredCounselors: sc.RequiredCounselors,
+			Gender:             sc.Gender,
 		}); err != nil {
 			return SessionResponse{}, fmt.Errorf("error copying session cabin: %w", err)
 		}

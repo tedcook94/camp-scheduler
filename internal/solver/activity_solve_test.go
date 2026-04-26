@@ -107,3 +107,98 @@ func TestSolveActivityUnassignedCounselors(t *testing.T) {
 		}
 	})
 }
+
+func TestSolveActivityOverride(t *testing.T) {
+	t.Run("override pins counselor to specific slot in its time slot", func(t *testing.T) {
+		// Two activities in the morning, one in the afternoon. Counselor c1
+		// is pinned to slot-arts-am. They must end up there even though
+		// slot-canoe-am has higher remaining capacity / preference.
+		snapshot := ActivitySnapshot{
+			Slots: []ActivitySlot{
+				{ID: "slot-arts-am", ActivityID: "act-arts", ActivityName: "Arts",
+					TimeSlotID: "ts-am", TimeSlotName: "Morning",
+					RequiredCounselors: 1, Capacity: 5},
+				{ID: "slot-canoe-am", ActivityID: "act-canoe", ActivityName: "Canoeing",
+					TimeSlotID: "ts-am", TimeSlotName: "Morning",
+					RequiredCounselors: 1, Capacity: 5},
+				{ID: "slot-arts-pm", ActivityID: "act-arts", ActivityName: "Arts",
+					TimeSlotID: "ts-pm", TimeSlotName: "Afternoon",
+					RequiredCounselors: 1, Capacity: 5},
+			},
+			Counselors: []ActivityCounselor{
+				{ID: "c1", Name: "Alice", Certifications: map[string]bool{}},
+				{ID: "c2", Name: "Bob", Certifications: map[string]bool{}},
+			},
+			ActivityPreferences: map[string][]RankedPreference{
+				"c1": {{TargetID: "act-canoe", Rank: 1}},
+			},
+			Overrides: map[string]map[string]string{
+				"c1": {"ts-am": "slot-arts-am"},
+			},
+		}
+
+		solutions := SolveActivity(snapshot, DefaultActivitySolverConfig())
+		if len(solutions) == 0 {
+			t.Fatal("expected at least one solution")
+		}
+		for _, sol := range solutions {
+			if !slices.Contains(sol.Assignment.SlotCounselors["slot-arts-am"], "c1") {
+				t.Errorf("c1 not pinned to slot-arts-am: %v", sol.Assignment.SlotCounselors)
+			}
+			if slices.Contains(sol.Assignment.SlotCounselors["slot-canoe-am"], "c1") {
+				t.Errorf("c1 placed in slot-canoe-am despite override to slot-arts-am")
+			}
+		}
+	})
+
+	t.Run("override pins counselor across multiple time slots", func(t *testing.T) {
+		// Counselor c1 is pinned to slot-arts-am AND slot-canoe-pm. Both
+		// pins must be honored simultaneously even though they belong to
+		// the same counselor in different time slots.
+		snapshot := ActivitySnapshot{
+			Slots: []ActivitySlot{
+				{ID: "slot-arts-am", ActivityID: "act-arts", ActivityName: "Arts",
+					TimeSlotID: "ts-am", TimeSlotName: "Morning",
+					RequiredCounselors: 1, Capacity: 5},
+				{ID: "slot-canoe-am", ActivityID: "act-canoe", ActivityName: "Canoeing",
+					TimeSlotID: "ts-am", TimeSlotName: "Morning",
+					RequiredCounselors: 1, Capacity: 5},
+				{ID: "slot-arts-pm", ActivityID: "act-arts", ActivityName: "Arts",
+					TimeSlotID: "ts-pm", TimeSlotName: "Afternoon",
+					RequiredCounselors: 1, Capacity: 5},
+				{ID: "slot-canoe-pm", ActivityID: "act-canoe", ActivityName: "Canoeing",
+					TimeSlotID: "ts-pm", TimeSlotName: "Afternoon",
+					RequiredCounselors: 1, Capacity: 5},
+			},
+			Counselors: []ActivityCounselor{
+				{ID: "c1", Name: "Alice", Certifications: map[string]bool{}},
+				{ID: "c2", Name: "Bob", Certifications: map[string]bool{}},
+			},
+			Overrides: map[string]map[string]string{
+				"c1": {
+					"ts-am": "slot-arts-am",
+					"ts-pm": "slot-canoe-pm",
+				},
+			},
+		}
+
+		solutions := SolveActivity(snapshot, DefaultActivitySolverConfig())
+		if len(solutions) == 0 {
+			t.Fatal("expected at least one solution")
+		}
+		for _, sol := range solutions {
+			if !slices.Contains(sol.Assignment.SlotCounselors["slot-arts-am"], "c1") {
+				t.Errorf("c1 not pinned to slot-arts-am: %v", sol.Assignment.SlotCounselors)
+			}
+			if !slices.Contains(sol.Assignment.SlotCounselors["slot-canoe-pm"], "c1") {
+				t.Errorf("c1 not pinned to slot-canoe-pm: %v", sol.Assignment.SlotCounselors)
+			}
+			if slices.Contains(sol.Assignment.SlotCounselors["slot-canoe-am"], "c1") {
+				t.Errorf("c1 placed in slot-canoe-am despite override to slot-arts-am")
+			}
+			if slices.Contains(sol.Assignment.SlotCounselors["slot-arts-pm"], "c1") {
+				t.Errorf("c1 placed in slot-arts-pm despite override to slot-canoe-pm")
+			}
+		}
+	})
+}

@@ -61,6 +61,48 @@ func (q *Queries) DeleteSessionEnrollment(ctx context.Context, arg DeleteSession
 	return result.RowsAffected(), nil
 }
 
+const getCamperEnrollmentInSession = `-- name: GetCamperEnrollmentInSession :one
+SELECT
+    e.id,
+    e.camp_id,
+    e.camper_id,
+    e.session_id,
+    e.session_age_group_id,
+    sag.age_group_id
+FROM camper_session_enrollments e
+JOIN session_age_groups sag ON sag.id = e.session_age_group_id AND sag.camp_id = e.camp_id
+WHERE e.camp_id = $1 AND e.session_id = $2 AND e.camper_id = $3
+`
+
+type GetCamperEnrollmentInSessionParams struct {
+	CampID    pgtype.UUID
+	SessionID pgtype.UUID
+	CamperID  pgtype.UUID
+}
+
+type GetCamperEnrollmentInSessionRow struct {
+	ID                pgtype.UUID
+	CampID            pgtype.UUID
+	CamperID          pgtype.UUID
+	SessionID         pgtype.UUID
+	SessionAgeGroupID pgtype.UUID
+	AgeGroupID        pgtype.UUID
+}
+
+func (q *Queries) GetCamperEnrollmentInSession(ctx context.Context, arg GetCamperEnrollmentInSessionParams) (GetCamperEnrollmentInSessionRow, error) {
+	row := q.db.QueryRow(ctx, getCamperEnrollmentInSession, arg.CampID, arg.SessionID, arg.CamperID)
+	var i GetCamperEnrollmentInSessionRow
+	err := row.Scan(
+		&i.ID,
+		&i.CampID,
+		&i.CamperID,
+		&i.SessionID,
+		&i.SessionAgeGroupID,
+		&i.AgeGroupID,
+	)
+	return i, err
+}
+
 const getSessionEnrollment = `-- name: GetSessionEnrollment :one
 SELECT
     e.id,

@@ -1,5 +1,5 @@
 import { auth } from "$lib/stores/auth.svelte";
-import type { ApiError, TokenResponse } from "./types";
+import type { ApiError } from "./types";
 
 class ApiClientError extends Error {
 	status: number;
@@ -15,80 +15,27 @@ class ApiClientError extends Error {
 
 export { ApiClientError };
 
-let refreshPromise: Promise<boolean> | null = null;
-
-function handleAuthFailure() {
-	if (auth.isImpersonating) {
-		auth.stopImpersonation();
-	} else {
-		auth.clear();
-	}
-}
-
-async function refreshTokens(): Promise<boolean> {
-	if (!auth.refreshToken) return false;
-
-	try {
-		const res = await fetch("/api/v1/auth/refresh", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ refresh_token: auth.refreshToken }),
-		});
-
-		if (!res.ok) {
-			handleAuthFailure();
-			return false;
-		}
-
-		const tokens: TokenResponse = await res.json();
-		auth.setTokens(tokens);
-		return true;
-	} catch {
-		handleAuthFailure();
-		return false;
-	}
-}
-
-async function ensureValidToken(): Promise<boolean> {
-	if (!auth.isAuthenticated) return false;
-
-	if (!auth.isAccessExpired) return true;
-
-	// Deduplicate concurrent refresh attempts
-	if (!refreshPromise) {
-		refreshPromise = refreshTokens().finally(() => {
-			refreshPromise = null;
-		});
-	}
-
-	return refreshPromise;
-}
-
 async function request<T>(
 	path: string,
 	options: RequestInit = {},
 ): Promise<T> {
-	const hasAuth = await ensureValidToken();
+	const token = await auth.ensureToken();
 
 	const headers = new Headers(options.headers);
-
-	if (hasAuth && auth.accessToken) {
-		headers.set("Authorization", `Bearer ${auth.accessToken}`);
-	}
-
+	if (token) headers.set("Authorization", `Bearer ${token}`);
 	if (options.body && !headers.has("Content-Type")) {
 		headers.set("Content-Type", "application/json");
 	}
 
-	const res = await fetch(path, { ...options, headers });
+	let res = await fetch(path, { ...options, headers });
 
-	if (res.status === 401 && hasAuth) {
-		// Token might have expired between check and request — try refresh once
-		const refreshed = await refreshTokens();
-		if (refreshed && auth.accessToken) {
-			headers.set("Authorization", `Bearer ${auth.accessToken}`);
-			const retryRes = await fetch(path, { ...options, headers });
-			return handleResponse<T>(retryRes);
+	if (res.status === 401 && token) {
+		// Token may have expired between mint and call, or session was invalidated.
+		// Try a single forced refresh + retry.
+		const fresh = await auth.refreshToken();
+		if (fresh) {
+			headers.set("Authorization", `Bearer ${fresh}`);
+			res = await fetch(path, { ...options, headers });
 		}
 	}
 
@@ -142,17 +89,15 @@ export const api = {
 		path: string,
 		options?: RequestInit,
 	): Promise<{ blob: Blob; filename: string | null }> => {
-		const hasAuth = await ensureValidToken();
+		const token = await auth.ensureToken();
 		const headers = new Headers(options?.headers);
-		if (hasAuth && auth.accessToken) {
-			headers.set("Authorization", `Bearer ${auth.accessToken}`);
-		}
+		if (token) headers.set("Authorization", `Bearer ${token}`);
 
 		let res = await fetch(path, { ...options, method: "GET", headers });
-		if (res.status === 401 && hasAuth) {
-			const refreshed = await refreshTokens();
-			if (refreshed && auth.accessToken) {
-				headers.set("Authorization", `Bearer ${auth.accessToken}`);
+		if (res.status === 401 && token) {
+			const fresh = await auth.refreshToken();
+			if (fresh) {
+				headers.set("Authorization", `Bearer ${fresh}`);
 				res = await fetch(path, { ...options, method: "GET", headers });
 			}
 		}

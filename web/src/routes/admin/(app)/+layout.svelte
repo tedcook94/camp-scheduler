@@ -16,16 +16,19 @@
 
 	let { children } = $props();
 
-	if (browser && !auth.isAuthenticated) {
-		goto("/login", { replaceState: true });
-	}
+	$effect(() => {
+		if (!browser || !auth.isInitialized) return;
+		if (!auth.isAuthenticated) {
+			goto("/login", { replaceState: true });
+			return;
+		}
+		if (auth.role !== "super_admin") {
+			goto("/app/dashboard", { replaceState: true });
+		}
+	});
 
-	if (browser && auth.isAuthenticated && auth.role !== "super_admin") {
-		goto("/app/dashboard", { replaceState: true });
-	}
-
-	function handleLogout() {
-		auth.clear();
+	async function handleLogout() {
+		await auth.signOut();
 		goto("/login");
 	}
 

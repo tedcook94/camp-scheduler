@@ -1,25 +1,8 @@
-export interface TokenResponse {
-	access_token: string;
-	refresh_token: string;
-}
-
 export interface Camp {
 	id: string;
 	name: string;
 	location: string | null;
 	enabled: boolean;
-}
-
-export interface User {
-	id: string;
-	camp_id: string | null;
-	username: string;
-	email: string;
-	first_name: string;
-	last_name: string;
-	role: "admin" | "super_admin";
-	created_at: string;
-	updated_at: string;
 }
 
 export interface CreateCampRequest {
@@ -31,29 +14,6 @@ export interface UpdateCampRequest {
 	name: string;
 	location?: string | null;
 	enabled?: boolean;
-}
-
-export interface CreateUserRequest {
-	camp_id?: string | null;
-	username: string;
-	email: string;
-	password: string;
-	first_name: string;
-	last_name: string;
-	role: "admin" | "super_admin";
-}
-
-export interface UpdateUserRequest {
-	camp_id?: string | null;
-	username: string;
-	email: string;
-	first_name: string;
-	last_name: string;
-	role: "admin" | "super_admin";
-}
-
-export interface UpdatePasswordRequest {
-	password: string;
 }
 
 export interface Certification {

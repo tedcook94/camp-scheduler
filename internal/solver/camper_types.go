@@ -24,6 +24,12 @@ type CamperCabinSnapshot struct {
 	Cabins            []CamperCabin
 	Campers           []Camper
 	FriendPreferences map[string][]RankedPreference
+	// Overrides pin a camper to a specific cabin. Keyed by camper ID; the
+	// value is the cabins.id key used internally by the solver (already
+	// remapped from the persisted session_age_group_cabin_id during snapshot
+	// load). The solver must place these campers in their pinned cabin and
+	// must not place them anywhere else.
+	Overrides map[string]string
 }
 
 type CamperAssignment struct {

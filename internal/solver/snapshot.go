@@ -62,6 +62,11 @@ func BuildSnapshot(ctx context.Context, queries *db.Queries, campID, sessionID s
 		return SessionSnapshot{}, err
 	}
 
+	overrides, err := loadCounselorCabinOverrides(ctx, queries, sessionUUID, campUUID, rosterSet)
+	if err != nil {
+		return SessionSnapshot{}, err
+	}
+
 	// Prune all counselor-keyed maps to only counselors on the session roster.
 	// This means a counselor removed from the roster (or with stale prefs from
 	// a prior roster membership) is invisible to the solver and explainer.
@@ -80,7 +85,34 @@ func BuildSnapshot(ctx context.Context, queries *db.Queries, campID, sessionID s
 		CounselorPreviousPlacements: placements,
 		UnmetAgeGroupPreferences:    unmetAG,
 		UnmetCocounselorPreferences: unmetCo,
+		Overrides:                   overrides,
 	}, nil
+}
+
+// loadCounselorCabinOverrides loads admin-pinned counselor->cabin assignments
+// for the session and filters out any whose counselor is no longer on the
+// active roster. Defensive only: the override domain validates roster
+// membership at save time and the solver trigger revalidates.
+func loadCounselorCabinOverrides(ctx context.Context, queries *db.Queries, sessionID, campID pgtype.UUID, roster map[string]bool) (map[string]string, error) {
+	rows, err := queries.ListCounselorCabinOverridesForSolver(ctx, db.ListCounselorCabinOverridesForSolverParams{
+		SessionID: sessionID,
+		CampID:    campID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error listing counselor cabin overrides: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	overrides := make(map[string]string, len(rows))
+	for _, r := range rows {
+		counselorID := api.UUIDToString(r.CounselorID)
+		if !roster[counselorID] {
+			continue
+		}
+		overrides[counselorID] = api.UUIDToString(r.SessionAgeGroupCabinID)
+	}
+	return overrides, nil
 }
 
 func loadCabins(ctx context.Context, queries *db.Queries, sessionID, campID pgtype.UUID) ([]Cabin, error) {

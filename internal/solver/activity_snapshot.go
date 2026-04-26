@@ -55,6 +55,11 @@ func BuildActivitySnapshot(ctx context.Context, queries *db.Queries, campID, ses
 		return ActivitySnapshot{}, err
 	}
 
+	overrides, err := loadCounselorActivityOverrides(ctx, queries, sessionUUID, campUUID, rosterSet)
+	if err != nil {
+		return ActivitySnapshot{}, err
+	}
+
 	// Prune counselor-keyed maps so the solver and explainer only consider
 	// counselors on the session roster.
 	prefs = filterMapByRoster(prefs, rosterSet)
@@ -67,7 +72,33 @@ func BuildActivitySnapshot(ctx context.Context, queries *db.Queries, campID, ses
 		ActivityPreferences:      prefs,
 		UnmetActivityPreferences: unmetPrefs,
 		CertificationNames:       certNames,
+		Overrides:                overrides,
 	}, nil
+}
+
+// loadCounselorActivityOverrides loads admin-pinned counselor->session_activity
+// assignments for the session and filters out any whose counselor is no
+// longer on the active roster.
+func loadCounselorActivityOverrides(ctx context.Context, queries *db.Queries, sessionID, campID pgtype.UUID, roster map[string]bool) (map[string]string, error) {
+	rows, err := queries.ListCounselorActivityOverridesForSolver(ctx, db.ListCounselorActivityOverridesForSolverParams{
+		SessionID: sessionID,
+		CampID:    campID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error listing counselor activity overrides: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	overrides := make(map[string]string, len(rows))
+	for _, r := range rows {
+		counselorID := api.UUIDToString(r.CounselorID)
+		if !roster[counselorID] {
+			continue
+		}
+		overrides[counselorID] = api.UUIDToString(r.SessionActivityID)
+	}
+	return overrides, nil
 }
 
 func loadActivitySlots(ctx context.Context, queries *db.Queries, sessionID, campID pgtype.UUID) ([]ActivitySlot, map[string]string, error) {

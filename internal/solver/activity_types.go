@@ -27,6 +27,11 @@ type ActivitySnapshot struct {
 	ActivityPreferences      map[string][]RankedPreference
 	UnmetActivityPreferences map[string]map[string]bool
 	CertificationNames       map[string]string
+	// Overrides pin a counselor to a specific session_activity (keyed by
+	// counselor ID, value is session_activity ID). The activity's session
+	// time slot is fixed by the pin, so the counselor cannot be placed in
+	// any other activity in that time slot.
+	Overrides map[string]string
 }
 
 type ActivityAssignment struct {

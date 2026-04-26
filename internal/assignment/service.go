@@ -97,6 +97,12 @@ func (svc *Service) TriggerCabinRun(ctx context.Context, campID, sessionID strin
 		return RunDetailResponse{}, NewPreconditionError(msg)
 	}
 
+	if msg, err := svc.validateCabinOverrides(ctx, campID, sessionID, snapshot); err != nil {
+		return RunDetailResponse{}, err
+	} else if msg != "" {
+		return RunDetailResponse{}, NewPreconditionError(msg)
+	}
+
 	if shortages := solver.CamperShortages(reduceCamperCapacityForCounselors(snapshot)); len(shortages) > 0 {
 		return RunDetailResponse{}, &CamperUnassignedError{Shortages: shortages}
 	}
@@ -225,6 +231,103 @@ func reduceCamperCapacityForCounselors(snapshot solver.CabinSnapshot) solver.Cam
 	return reduced
 }
 
+// validateCabinOverrides revalidates persisted cabin overrides against the
+// snapshot. The snapshot defensively drops overrides whose counselor/camper
+// is no longer on the roster/enrollment or whose target cabin has been
+// archived; here we surface those drops as a precondition error so the
+// admin is told to clean them up before solving.
+//
+// LIMITATION: this only catches overrides whose targets disappeared. It
+// does not re-run the full save-time validation against current snapshot
+// values, so an override whose target still exists but is now infeasible
+// (e.g. cabin gender flipped, group_size reduced below pinned headcount,
+// camper age group reassigned to a group whose cabins lack capacity) will
+// pass this check and silently produce solver infeasibility, surfacing as
+// a generic ErrNoSolutions rather than a clear stale-override error.
+// Trigger-time constraint revalidation is tracked as a follow-up.
+func (svc *Service) validateCabinOverrides(ctx context.Context, campID, sessionID string, snapshot solver.CabinSnapshot) (string, error) {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return "", err
+	}
+	sessionUUID, err := api.ParseUUID(sessionID)
+	if err != nil {
+		return "", err
+	}
+
+	counselorRows, err := svc.queries.ListCounselorCabinOverridesForSolver(ctx, db.ListCounselorCabinOverridesForSolverParams{
+		SessionID: sessionUUID,
+		CampID:    campUUID,
+	})
+	if err != nil {
+		return "", fmt.Errorf("error listing counselor cabin overrides: %w", err)
+	}
+	if dropped := len(counselorRows) - len(snapshot.Counselor.Overrides); dropped > 0 {
+		return staleOverrideMessage(dropped, "counselor cabin override", "a counselor or cabin"), nil
+	}
+
+	camperRows, err := svc.queries.ListCamperCabinOverridesForSolver(ctx, db.ListCamperCabinOverridesForSolverParams{
+		SessionID: sessionUUID,
+		CampID:    campUUID,
+	})
+	if err != nil {
+		return "", fmt.Errorf("error listing camper cabin overrides: %w", err)
+	}
+	if dropped := len(camperRows) - len(snapshot.Camper.Overrides); dropped > 0 {
+		return staleOverrideMessage(dropped, "camper cabin override", "a camper or cabin"), nil
+	}
+
+	return "", nil
+}
+
+// staleOverrideMessage returns a precondition error message describing how
+// many persisted overrides of a given kind reference an entity that is no
+// longer valid. The message is grammatically correct for the count.
+func staleOverrideMessage(count int, label, target string) string {
+	if count == 1 {
+		return fmt.Sprintf("1 %s references %s that is no longer valid; remove or update it before triggering a run", label, target)
+	}
+	return fmt.Sprintf("%d %ss reference %s that is no longer valid; remove or update them before triggering a run", count, label, target)
+}
+
+// validateActivityOverrides revalidates persisted activity overrides against
+// the snapshot, surfacing any that were dropped because the counselor is no
+// longer on the roster or the session_activity has been archived.
+//
+// Same LIMITATION as validateCabinOverrides: an activity override whose
+// target slot still exists but is now infeasible (e.g. activity required a
+// new certification the pinned counselor lacks, capacity reduced below
+// pinned counselor count) will pass this check and surface as
+// ErrNoSolutions. Trigger-time constraint revalidation is tracked as a
+// follow-up.
+func (svc *Service) validateActivityOverrides(ctx context.Context, campID, sessionID string, snapshot solver.ActivitySnapshot) (string, error) {
+	campUUID, err := api.ParseUUID(campID)
+	if err != nil {
+		return "", err
+	}
+	sessionUUID, err := api.ParseUUID(sessionID)
+	if err != nil {
+		return "", err
+	}
+
+	rows, err := svc.queries.ListCounselorActivityOverridesForSolver(ctx, db.ListCounselorActivityOverridesForSolverParams{
+		SessionID: sessionUUID,
+		CampID:    campUUID,
+	})
+	if err != nil {
+		return "", fmt.Errorf("error listing counselor activity overrides: %w", err)
+	}
+	loaded := 0
+	for _, byTimeSlot := range snapshot.Overrides {
+		loaded += len(byTimeSlot)
+	}
+	if dropped := len(rows) - loaded; dropped > 0 {
+		return staleOverrideMessage(dropped, "counselor activity override", "a counselor or activity slot"), nil
+	}
+
+	return "", nil
+}
+
 func (svc *Service) ListRuns(ctx context.Context, campID, sessionID string) ([]RunResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {
@@ -260,6 +363,12 @@ func (svc *Service) TriggerActivityRun(ctx context.Context, campID, sessionID st
 	}
 
 	if msg := validateActivity(snapshot); msg != "" {
+		return RunDetailResponse{}, NewPreconditionError(msg)
+	}
+
+	if msg, err := svc.validateActivityOverrides(ctx, campID, sessionID, snapshot); err != nil {
+		return RunDetailResponse{}, err
+	} else if msg != "" {
 		return RunDetailResponse{}, NewPreconditionError(msg)
 	}
 

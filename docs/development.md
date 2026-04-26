@@ -8,30 +8,31 @@
 ## Getting Started
 
 ```sh
-mise install       # Install pinned tool versions (Go, sqlc, migrate, air, pnpm)
-mise run dev       # Start Postgres + Go server + Vite frontend with hot-reload
+mise install        # Install pinned tool versions (Go, sqlc, migrate, air, node, pnpm)
+mise run auth:install  # Install auth-server dependencies (first time only)
+mise run dev        # Start Postgres + auth-server + Go server + Vite frontend with hot-reload
 ```
 
 `mise run dev` starts the full local development environment:
 
-1. Starts PostgreSQL 18 with pg_cron in Docker (auto-creates the
-   `camp_scheduler` user + dev/test databases on first run via
-   `local-setup.sql`)
-2. Runs all pending migrations on both dev and test databases
-3. Starts the Go server via air — watches for file changes and rebuilds
-   automatically
-4. Starts the Vite dev server for the frontend — hot-module replacement on
-   port 5173
+1. Starts PostgreSQL 18 in Docker (auto-creates the `camp_scheduler` user +
+   dev/test databases on first run via `local-setup.sql`)
+2. Runs all pending Go-side migrations on both dev and test databases
+3. Runs BetterAuth schema migrations against the dev database
+4. Starts the BetterAuth auth-server on port 9101 (TypeScript service in `auth/`)
+5. Starts the Go server via air on port 9100 — watches for file changes and rebuilds
+6. Starts the Vite dev server for the frontend on port 5173 — proxies `/api/auth/*`
+   to the auth-server and `/api/*` to the Go server
 
 The frontend is accessible at `http://localhost:5173` during development
-and at `http://localhost:9100` in production builds. The Vite dev server
-proxies API requests to the Go server on port 9100.
+and at `http://localhost:9100` in production builds.
 
-To run just one side independently:
+To run a single component:
 
 ```sh
 mise run server    # Go server only (assumes Postgres is running)
-mise run web       # Vite frontend only (assumes Go server is running)
+mise run auth:dev  # Auth-server only (assumes Postgres is running)
+mise run web       # Vite frontend only
 ```
 
 All environment variables are provided by mise (defined in `mise.toml`), so the
@@ -57,8 +58,11 @@ Override any value locally with `mise.local.toml` (gitignored).
 
 | Task                | Description                                          |
 | ------------------- | ---------------------------------------------------- |
-| `mise run dev`      | Start Postgres, Go server, and Vite frontend         |
-| `mise run server`   | Run server standalone (assumes Postgres is running)  |
+| `mise run dev`      | Start Postgres, auth-server, Go server, and Vite frontend |
+| `mise run server`   | Run Go server standalone (assumes Postgres is running) |
+| `mise run auth:install` | Install auth-server dependencies                |
+| `mise run auth:dev`     | Run auth-server with hot-reload (port 9101)     |
+| `mise run auth:migrate` | Apply BetterAuth schema migrations              |
 | `mise run build`    | Build frontend + server binary to `bin/server`       |
 | `mise run test`     | Run unit tests                                       |
 | `mise run test:integration` | Run integration tests (auto-starts Postgres) |
@@ -79,10 +83,25 @@ Override any value locally with `mise.local.toml` (gitignored).
 
 `docker-compose.yml` defines the Postgres service:
 
-- **postgres** — PostgreSQL 18 with pg_cron (built from
-  `database/postgres/Dockerfile`). Uses a named volume for data persistence. On
-  first start, runs `database/local-setup/local-setup.sql` to create the app
-  user and databases.
+- **postgres** — PostgreSQL 18 (built from `database/postgres/Dockerfile`).
+  Uses a named volume for data persistence. On first start, runs
+  `database/local-setup/local-setup.sql` to create the app user and databases.
+
+### Auth server
+
+The BetterAuth auth-server (`auth/`) is a TypeScript service that:
+
+- Mints short-lived (15m) Ed25519-signed JWTs the Go server validates via JWKS
+- Owns the BetterAuth-managed tables (`user`, `session`, `account`,
+  `verification`, `organization`, `member`, `invitation`, `jwks`) in the same
+  Postgres database used by the Go server
+- Exposes BetterAuth's standard `/api/auth/*` endpoints (sign-in, sessions,
+  admin user CRUD, organization member management, JWT issuance via the `jwt`
+  plugin)
+- Exposes a small `/internal/*` API (protected by `AUTH_SHARED_SECRET`) that the
+  Go server calls to keep the `organization` table in sync with `camps`
+
+See `auth/README.md` for endpoint details.
 
 ### air (hot-reload)
 
@@ -107,7 +126,11 @@ variables:
 | `DATABASE_NAME`       | `camp_scheduler`  | Database name              |
 | `DATABASE_SSL_MODE`   | `disable`         | Postgres SSL mode          |
 | `DATABASE_TIMEOUT`    | `10s`             | Connection timeout         |
-| `JWT_SECRET`          | (dev value)       | Signing key for JWT tokens |
+| `AUTH_PORT`           | `9101`            | Auth-server listen port    |
+| `AUTH_BASE_URL`       | `http://localhost:9101` | Public URL the auth-server is reachable at |
+| `AUTH_SERVER_URL`     | `http://localhost:9101` | URL the Go server uses to reach the auth-server (JWKS + `/internal/*`) |
+| `AUTH_SHARED_SECRET`  | (dev value)       | Shared bearer token for Go ↔ auth-server `/internal/*` calls |
+| `BETTER_AUTH_SECRET`  | (dev value)       | BetterAuth signing secret for cookies/CSRF (min 32 chars) |
 
 `DATABASE_URL` and `DATABASE_URL_TEST` are automatically constructed from the
 above variables via mise templates.
@@ -150,7 +173,11 @@ What it creates:
   activity) varying between sessions
 - 4 counselor session history entries (from Session 1)
 - 36 campers with friend preferences, enrolled in both sessions
-- 1 camp admin user (username: `demo`, password: `demo123`)
+
+> **Note:** The auth-server now owns user accounts. To create an admin user
+> for the demo camp, run `mise run seed:super-admin` (or sign up via the
+> auth-server) and use the BetterAuth admin UI to assign the user to the
+> demo camp's organization.
 
 **Intentional constraint failure:** Session 2's activity schedule is deliberately
 unsolvable. Its Morning 2 time slot has both Swimming and Canoeing, which each

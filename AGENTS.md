@@ -10,13 +10,19 @@ a constraint satisfaction solver. See `README.md` for a high-level overview and
 ## Tech Stack
 
 - Go 1.26, Gin, sqlc, PostgreSQL 18, golang-migrate
+- Auth: BetterAuth (TypeScript service in `auth/`, Hono) — mints Ed25519 JWTs
+  the Go server validates via JWKS
 - Local dev: mise (tooling + tasks), air (hot-reload), Docker Compose
 
 ## Architecture
 
 - Layered domain-driven: Controller → Service → sqlc queries → PostgreSQL
 - Constraint solver reads state via sqlc, produces ranked solutions with explanations
-- Project structure: `cmd/server/` (entrypoint), `internal/` (app code), `database/` (migrations, sqlc queries)
+- Auth: a separate Node/TypeScript service (`auth/`) is the source of truth
+  for users, sessions, organizations (= camps). It mints short-lived JWTs;
+  the Go server is JWT-only and never holds user credentials.
+- Project structure: `cmd/server/` (entrypoint), `internal/` (Go app code),
+  `auth/` (BetterAuth TypeScript service), `database/` (migrations, sqlc queries)
 
 ## Code Style
 

@@ -28,7 +28,7 @@ CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens (expires_at)
 
 DO $$
 BEGIN
-    IF current_database() = 'camp_scheduler' THEN
+    IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'pg_cron') THEN
         CREATE EXTENSION IF NOT EXISTS pg_cron;
         PERFORM cron.schedule(
             'cleanup-expired-refresh-tokens',
@@ -36,6 +36,9 @@ BEGIN
             'DELETE FROM refresh_tokens WHERE expires_at < now()'
         );
     END IF;
+EXCEPTION WHEN OTHERS THEN
+    -- pg_cron not loaded into shared_preload_libraries; skip.
+    NULL;
 END
 $$;
 

@@ -1,12 +1,12 @@
 type: folder
 model: folder
 id: fl_auth
-createdAt: "2026-04-13T00:00:00.000000"
-updatedAt: "2026-04-13T00:00:00.000000"
+createdAt: "2026-04-27T00:00:00.000000"
+updatedAt: "2026-04-27T00:00:00.000000"
 workspaceId: wk_camp-scheduler
 folderId: null
 name: auth
-description: ""
+description: "BetterAuth sign-in + JWT fetch. Run Sign in once per session, then run Fetch JWT whenever the access-token needs refreshing."
 authentication: {}
 authenticationType: null
 headers: []

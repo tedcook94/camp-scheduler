@@ -14,6 +14,7 @@ solutions that respect hard constraints and optimize soft preferences.
 | Database    | PostgreSQL 18                            |
 | Query Layer | sqlc (type-safe SQL code generation)     |
 | Migrations  | golang-migrate                           |
+| Auth        | BetterAuth (TypeScript service, Hono)    |
 | Frontend    | SvelteKit, Svelte 5, Tailwind CSS v4     |
 | Solver      | Custom Go constraint satisfaction engine |
 | Dev Tooling | mise, air (hot-reload), Docker Compose   |
@@ -21,24 +22,27 @@ solutions that respect hard constraints and optimize soft preferences.
 ## Architecture
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Web UI    │────>│  REST API   │────>│ PostgreSQL  │
-│ (SvelteKit) │     │  (Go/Gin)   │     │             │
-└─────────────┘     └──────┬──────┘     └──────┬──────┘
-                           │                    │
-                    ┌──────▼──────┐      ┌──────▼──────┐
-                    │   Solver    │<─────│    sqlc     │
-                    │   (CSP/Go)  │      │  (queries)  │
-                    └──────┬──────┘      └─────────────┘
-                           │
-                    ┌──────▼──────┐
-                    │  Solution   │
-                    │  Ranker +   │
-                    │  Explainer  │
-                    └─────────────┘
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│   Web UI    │───▶│  Go REST API │────▶│ PostgreSQL  │
+│ (SvelteKit) │     │  (Gin :9100) │     │             │
+└──────┬──────┘     └──────┬───────┘     └──────┬──────┘
+       │                   │                    ▲
+       │            JWT validation              │
+       │            (JWKS lookup)               │
+       │                   │                    │
+       ▼                   ▼                    │
+┌──────────────────────────────┐                │
+│  BetterAuth Auth Server      │────────────────┘
+│  (TypeScript / Hono :9101)   │ shares Postgres (own tables)
+│  • sign-in, sessions         │
+│  • JWT minting (Ed25519)     │
+│  • organizations = camps     │
+│  • admin user CRUD           │
+└──────────────────────────────┘
 ```
 
-**Request flow:** Controller → Service → sqlc queries → PostgreSQL
+**Request flow:** Browser ↔ BetterAuth (cookie session + short-lived JWT) →
+Go API validates JWT via JWKS → Service → sqlc queries → PostgreSQL.
 
 **Solver flow:** Reads a snapshot of current state via sqlc, runs constraint
 satisfaction search, produces ranked solutions with per-assignment explanations,
@@ -78,11 +82,15 @@ cmd/server/          → Application entrypoint
 internal/            → All application code
   server/            → HTTP server setup and routing
   config/            → Configuration (env-based via envconfig)
+  auth/              → JWT/JWKS validation + middleware
   solver/            → Constraint satisfaction solver (3 solver types)
   db/                → sqlc-generated database code
   api/               → Shared API helpers
   assignment/        → Assignment run orchestration
   <domain>/          → Domain packages (camp, cabin, counselor, camper, activity, timeslot, sessionconfig, etc.)
+auth/                → BetterAuth auth-server (TypeScript / Hono)
+  src/               → BetterAuth config, JWT plugin, internal admin API
+  scripts/           → Migrate + seed-super-admin scripts
 web/                 → Frontend (SvelteKit SPA)
   src/lib/api/       → API client layer (typed fetch wrapper)
   src/lib/components/→ UI components (shadcn-svelte)

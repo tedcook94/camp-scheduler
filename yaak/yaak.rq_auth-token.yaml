@@ -1,0 +1,19 @@
+type: http_request
+model: http_request
+id: rq_auth-token
+createdAt: 2026-04-27T00:00:00
+updatedAt: 2026-04-27T00:00:00
+workspaceId: wk_camp-scheduler
+folderId: fl_auth
+authentication: {}
+authenticationType: none
+body:
+  text: ''
+bodyType: null
+description: 'Fetch a short-lived JWT (15m) using the BetterAuth session cookie set by Sign in. The access-token environment variable chains off this response.'
+headers: []
+method: GET
+name: Fetch JWT
+sortPriority: 1.0
+url: ${[ auth_base_url ]}/api/auth/token
+urlParameters: []

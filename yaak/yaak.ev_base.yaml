@@ -15,8 +15,12 @@ variables:
   value: http://localhost:9100/api/v1
   id: 6CXWUXwWJ4
 - enabled: true
+  name: auth_base_url
+  value: http://localhost:9101
+  id: aBzKpMwQv7
+- enabled: true
   name: access-token
-  value: ${[ response.body.path(request='rq_auth-login', path='$.access_token') ]}
+  value: "${[ response.body.path(request='rq_auth-token', path='$.token') ]}"
   id: 5eEMJAKVca
 - enabled: true
   name: test-age-group-id
@@ -98,9 +102,5 @@ variables:
   name: test-admin-camp-id
   value: ''
   id: aKm7XqPwN3
-- enabled: true
-  name: test-admin-user-id
-  value: ''
-  id: xR4mWkP9vB
 color: null
 sortPriority: 0.0

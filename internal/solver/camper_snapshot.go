@@ -44,12 +44,46 @@ func BuildCamperCabinSnapshot(ctx context.Context, queries *db.Queries, campID, 
 		return CamperCabinSnapshot{}, err
 	}
 
+	camperSet := make(map[string]bool, len(campers))
+	for _, c := range campers {
+		camperSet[c.ID] = true
+	}
+	overrides, err := loadCamperCabinOverrides(ctx, queries, sessionUUID, campUUID, camperSet)
+	if err != nil {
+		return CamperCabinSnapshot{}, err
+	}
+
 	return CamperCabinSnapshot{
 		SessionID:         sessionID,
 		Cabins:            cabins,
 		Campers:           campers,
 		FriendPreferences: friendPrefs,
+		Overrides:         overrides,
 	}, nil
+}
+
+// loadCamperCabinOverrides loads admin-pinned camper->cabin assignments for
+// the session and filters out any whose camper is no longer enrolled.
+func loadCamperCabinOverrides(ctx context.Context, queries *db.Queries, sessionID, campID pgtype.UUID, enrolled map[string]bool) (map[string]string, error) {
+	rows, err := queries.ListCamperCabinOverridesForSolver(ctx, db.ListCamperCabinOverridesForSolverParams{
+		SessionID: sessionID,
+		CampID:    campID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error listing camper cabin overrides: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	overrides := make(map[string]string, len(rows))
+	for _, r := range rows {
+		camperID := api.UUIDToString(r.CamperID)
+		if !enrolled[camperID] {
+			continue
+		}
+		overrides[camperID] = api.UUIDToString(r.SessionAgeGroupCabinID)
+	}
+	return overrides, nil
 }
 
 func loadCamperCabins(ctx context.Context, queries *db.Queries, sessionID, campID pgtype.UUID) ([]CamperCabin, error) {

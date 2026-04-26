@@ -59,6 +59,11 @@ func BuildActivitySnapshot(ctx context.Context, queries *db.Queries, campID, ses
 	if err != nil {
 		return ActivitySnapshot{}, err
 	}
+	slotSet := make(map[string]bool, len(slots))
+	for _, s := range slots {
+		slotSet[s.ID] = true
+	}
+	overrides = filterOverridesByCabin(overrides, slotSet)
 
 	// Prune counselor-keyed maps so the solver and explainer only consider
 	// counselors on the session roster.

@@ -1,0 +1,19 @@
+type: http_request
+model: http_request
+id: rq_auth-signin
+createdAt: 2026-04-27T00:00:00
+updatedAt: 2026-04-27T00:00:00
+workspaceId: wk_camp-scheduler
+folderId: fl_auth
+authentication: {}
+authenticationType: none
+body:
+  text: '{"username": "admin", "password": "password"}'
+bodyType: application/json
+description: 'Sign in directly against the auth-server so the session cookie is scoped to localhost:9101 (not the Vite proxy on :5173).'
+headers: []
+method: POST
+name: Sign in
+sortPriority: 0.0
+url: ${[ auth_base_url ]}/api/auth/sign-in/username
+urlParameters: []

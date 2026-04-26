@@ -160,6 +160,17 @@ viable configurations and understand trade-offs.
 - [x] Archive (soft delete) objects
 - [x] Overrides (locking assignments before solver runs)
 - [ ] Migrate auth to BetterAuth (camps as orgs, enable MFA)
+  - [x] Stand up TypeScript auth-server (`auth/`) using BetterAuth + plugins (`username`, `organization`, `admin`, `jwt`)
+  - [x] Configure auth-server to share Postgres with Go server; run BetterAuth schema migrations
+  - [x] Mint Ed25519 JWTs (15m expiry) carrying `camp_id` from `session.activeOrganizationId`, plus `role`, `org_role`, `impersonated_by`
+  - [x] Replace Go HS256 authenticator with JWKS validator; remove `/auth/login`, `/auth/refresh`, `/admin/users/*` routes and legacy `users` / `refresh_tokens` tables (migration 41)
+  - [x] Wire camp create/delete to call auth-server `/internal/organizations` so `camps.id == organization.id`
+  - [x] Replace frontend auth store + API client with BetterAuth Svelte client (cookie session + `/api/auth/token` for short-lived JWTs); add "Switch camp" picker for users with >1 org
+  - [x] Replace admin user CRUD UI with BetterAuth `admin` plugin endpoints; impersonation uses `admin.impersonateUser` / `admin.stopImpersonating`
+  - [ ] Add Go super-admin endpoint to add/remove camp memberships (proxy to auth-server `/internal/members`)
+  - [ ] Rewrite `seed:demo` to create users + memberships via BetterAuth APIs
+  - [ ] Enable MFA (BetterAuth `two-factor` plugin)
+  - [ ] Production deploy: auth-server as separate Docker service
 - [ ] Data import (CSV/spreadsheet)
 - [ ] Rebrand to Leiri
 - [ ] Reimplement solver in Prolog?

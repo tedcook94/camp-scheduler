@@ -5,24 +5,31 @@ import "context"
 type Role string
 
 const (
-	RoleAdmin      Role = "admin"
+	RoleUser       Role = "user"
 	RoleSuperAdmin Role = "super_admin"
 )
 
+// Claims is the request-scoped view of an authenticated caller. Fields are
+// derived from the JWT issued by the auth-server (BetterAuth + jwt plugin).
+//
+// CampID corresponds to the active organization (BetterAuth org id == camps.id).
+// OrgRole is the caller's role within that organization (owner/admin/member).
+// Role is the global role on the user (user/super_admin).
 type Claims struct {
 	UserID         string
 	CampID         string
 	Username       string
+	Email          string
 	Role           Role
-	TokenVersion   int32
+	OrgRole        string
 	ImpersonatedBy string
+	FirstName      string
+	LastName       string
 }
 
-// Authenticator abstracts authentication so the implementation (local JWT,
-// external provider, etc.) can be swapped without changing application code.
+// Authenticator validates a bearer access token and returns the associated
+// claims. The Go server is a token consumer only: token issuance, login,
+// refresh, and impersonation all happen in the auth-server.
 type Authenticator interface {
-	Login(ctx context.Context, username, password string) (accessToken, refreshToken string, err error)
-	Refresh(ctx context.Context, refreshToken string) (accessToken, newRefreshToken string, err error)
 	ValidateToken(ctx context.Context, tokenString string) (*Claims, error)
-	ImpersonateUser(ctx context.Context, targetUserID string, impersonatorUserID string) (accessToken, refreshToken string, err error)
 }

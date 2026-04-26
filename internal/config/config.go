@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -12,7 +13,7 @@ import (
 type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
-	JWT      JWTConfig
+	Auth     AuthConfig
 }
 
 type ServerConfig struct {
@@ -21,10 +22,28 @@ type ServerConfig struct {
 	LogLevel string `envconfig:"LOG_LEVEL" default:"info"`
 }
 
-type JWTConfig struct {
-	Secret          string        `envconfig:"JWT_SECRET" required:"true"`
-	AccessTokenTTL  time.Duration `envconfig:"JWT_ACCESS_TTL" default:"15m"`
-	RefreshTokenTTL time.Duration `envconfig:"JWT_REFRESH_TTL" default:"168h"`
+// AuthConfig configures how the Go server talks to the BetterAuth-based
+// auth-server. ServerURL is the base URL (used both to fetch JWKS and to
+// call the internal admin API for organization sync). SharedSecret is the
+// bearer secret accepted by the auth-server's `/internal/*` routes.
+//
+// These fields are validated at server construction (`server.New`) rather
+// than at config load, so test/CLI callers that don't need an authenticated
+// server (integration tests, seed scripts) can still load config.
+type AuthConfig struct {
+	ServerURL    string        `envconfig:"AUTH_SERVER_URL"`
+	SharedSecret string        `envconfig:"AUTH_SHARED_SECRET"`
+	JWKSTimeout  time.Duration `envconfig:"AUTH_JWKS_TIMEOUT" default:"5s"`
+}
+
+// JWKSURL is the JWKS endpoint exposed by the auth-server.
+func (c AuthConfig) JWKSURL() string {
+	return strings.TrimRight(c.ServerURL, "/") + "/api/auth/jwks"
+}
+
+// InternalURL is the base of the auth-server's internal admin API.
+func (c AuthConfig) InternalURL() string {
+	return strings.TrimRight(c.ServerURL, "/") + "/internal"
 }
 
 type DatabaseConfig struct {

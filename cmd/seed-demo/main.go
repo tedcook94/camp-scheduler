@@ -12,15 +12,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"golang.org/x/crypto/bcrypt"
 )
 
 const (
 	demoCampIDStr = "00000000-0000-0000-0000-000000000000"
-	demoUserIDStr = "00000000-0000-0000-0000-000000000001"
 	demoCampName  = "Demo Camp"
-	demoUsername  = "demo"
-	demoPassword  = "demo123"
 )
 
 func pgUUID(s string) pgtype.UUID {
@@ -87,7 +83,7 @@ func main() {
 	}
 
 	fmt.Println("Demo camp seeded successfully!")
-	fmt.Printf("Admin login: username=%s password=%s\n", demoUsername, demoPassword)
+	fmt.Println("To create the demo admin user, run `pnpm seed:super-admin` in the auth/ directory.")
 }
 
 func deleteExisting(ctx context.Context, tx pgx.Tx, campID pgtype.UUID) error {
@@ -143,10 +139,6 @@ func deleteExisting(ctx context.Context, tx pgx.Tx, campID pgtype.UUID) error {
 		if _, err := tx.Exec(ctx, fmt.Sprintf("DELETE FROM %s WHERE camp_id = $1", t), campID); err != nil {
 			return fmt.Errorf("error deleting from %s: %w", t, err)
 		}
-	}
-
-	if _, err := tx.Exec(ctx, "DELETE FROM users WHERE camp_id = $1", campID); err != nil {
-		return fmt.Errorf("error deleting users: %w", err)
 	}
 
 	if _, err := tx.Exec(ctx, "DELETE FROM camps WHERE id = $1", campID); err != nil {
@@ -269,10 +261,9 @@ func seedData(ctx context.Context, tx pgx.Tx, q *db.Queries, campID pgtype.UUID)
 		return err
 	}
 
-	if err := createAdminUser(ctx, tx, campID); err != nil {
-		return err
-	}
-
+	// User accounts are managed by the auth-server (BetterAuth). Run
+	// `pnpm seed:super-admin` in `auth/` to create the demo super-admin and
+	// assign membership to the demo camp.
 	return nil
 }
 
@@ -978,19 +969,3 @@ func setFriendPreferences(ctx context.Context, q *db.Queries, campID pgtype.UUID
 	return nil
 }
 
-func createAdminUser(ctx context.Context, tx pgx.Tx, campID pgtype.UUID) error {
-	hash, err := bcrypt.GenerateFromPassword([]byte(demoPassword), bcrypt.DefaultCost)
-	if err != nil {
-		return fmt.Errorf("error hashing password: %w", err)
-	}
-
-	userID := pgUUID(demoUserIDStr)
-	_, err = tx.Exec(ctx,
-		`INSERT INTO users (id, camp_id, username, email, password_hash, first_name, last_name, role)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, 'admin')`,
-		userID, campID, demoUsername, "demo@campdemo.com", string(hash), "Demo", "Admin")
-	if err != nil {
-		return fmt.Errorf("error creating admin user: %w", err)
-	}
-	return nil
-}

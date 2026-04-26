@@ -57,6 +57,8 @@ export {
 
 export { assignmentApi } from "./assignment";
 
+export { overrideApi } from "./override";
+
 export { reportApi } from "./report";
 
 export const authApi = {

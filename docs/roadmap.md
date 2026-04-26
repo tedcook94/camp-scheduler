@@ -158,9 +158,9 @@ viable configurations and understand trade-offs.
 - [x] First and last name for campers and counselors
 - [x] "Dirty" flag for when changes have been made since assignment run
 - [x] Archive (soft delete) objects
-- [ ] Overrides (locking assignments before solver runs)
-- [ ] Data import (CSV/spreadsheet)
+- [x] Overrides (locking assignments before solver runs)
 - [ ] Migrate auth to BetterAuth (camps as orgs, enable MFA)
+- [ ] Data import (CSV/spreadsheet)
 - [ ] Rebrand to Leiri
 - [ ] Reimplement solver in Prolog?
 - [ ] Reimplement frontend in HTMX?

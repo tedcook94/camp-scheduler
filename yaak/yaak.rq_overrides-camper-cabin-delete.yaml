@@ -1,0 +1,22 @@
+type: http_request
+model: http_request
+id: rq_overrides-camper-cabin-delete
+createdAt: "2026-04-25T00:00:00.000000"
+updatedAt: "2026-04-25T00:00:00.000000"
+workspaceId: wk_camp-scheduler
+folderId: fl_overrides
+name: Camper-Cabin Delete
+description: ""
+url: "${[ base_url ]}/sessions/${[ test-session-id ]}/overrides/camper-cabin/:test-override-id"
+urlParameters:
+  - enabled: true
+    name: ":test-override-id"
+    value: "${[ test-override-id ]}"
+    id: null
+method: DELETE
+headers: []
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+sortPriority: 4.0

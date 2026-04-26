@@ -5,7 +5,6 @@ package internal_test
 import (
 	"context"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 )
 
@@ -40,7 +39,7 @@ type overrideCabinFixture struct {
 	enrollmentIDs map[string]string // name -> camper_session_enrollments.id
 }
 
-func setupOverrideCabinFixture(t *testing.T) (*httptest.Server, overrideCabinFixture) {
+func setupOverrideCabinFixture(t *testing.T) (*testServer, overrideCabinFixture) {
 	t.Helper()
 	ts, pool := mustSetupServer(t)
 

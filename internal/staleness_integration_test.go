@@ -5,7 +5,6 @@ package internal_test
 import (
 	"context"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -39,7 +38,7 @@ func findRun(runs []any, id string) map[string]any {
 }
 
 type stalenessFixture struct {
-	ts            *httptest.Server
+	ts            *testServer
 	pool          *pgxpool.Pool
 	campID        string
 	token         string
@@ -514,7 +513,7 @@ func TestStalenessFlagging(t *testing.T) {
 // server, auth token, session IDs, run IDs, and S1's first solution ID — the
 // shape needed by the previous-session cascade tests.
 func setupCascadeFixture(t *testing.T, name string) (
-	ts *httptest.Server,
+	ts *testServer,
 	token, s1ID, s2ID, s1RunID, s2RunID, s1SolID string,
 ) {
 	t.Helper()

@@ -13,17 +13,24 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
+	"camp-scheduler/internal/auth"
+	"camp-scheduler/internal/auth/authtest"
 	"camp-scheduler/internal/config"
 	"camp-scheduler/internal/server"
 	"camp-scheduler/internal/testutil"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"golang.org/x/crypto/bcrypt"
 )
 
-func mustSetupServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
+// testServer wraps the httptest.Server with the test authenticator so
+// individual tests can mint additional tokens (e.g. for cross-camp tests).
+type testServer struct {
+	*httptest.Server
+	auth *authtest.Authenticator
+}
+
+func mustSetupServer(t *testing.T) (*testServer, *pgxpool.Pool) {
 	t.Helper()
 
 	pool := testutil.MustOpenDB(t)
@@ -31,53 +38,53 @@ func mustSetupServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
 
 	cfg := config.Config{
 		Server: config.ServerConfig{Mode: "test"},
-		JWT: config.JWTConfig{
-			Secret:          "test-secret",
-			AccessTokenTTL:  15 * time.Minute,
-			RefreshTokenTTL: 168 * time.Hour,
-		},
+		// Auth fields are intentionally empty: in tests we inject a stub
+		// Authenticator and disable the auth-server org sync.
 	}
-	srv := server.NewWithPool(cfg, pool, nil)
+	a := authtest.New()
+	srv := server.NewWithDeps(cfg, pool, nil, server.Deps{Authenticator: a})
 	ts := httptest.NewServer(srv)
 	t.Cleanup(ts.Close)
-	return ts, pool
+	return &testServer{Server: ts, auth: a}, pool
 }
 
-const testPassword = "password"
-
-// mustLogin creates a test user for the given camp and returns an access token.
-func mustLogin(t *testing.T, ts *httptest.Server, pool *pgxpool.Pool, campID string) string {
+// mustLogin returns an access token for an admin in the given camp. It mints
+// the token directly using the test authenticator — no DB user row is needed
+// because the production auth flow (BetterAuth) lives outside the Go server.
+func mustLogin(t *testing.T, ts *testServer, _ *pgxpool.Pool, campID string) string {
 	t.Helper()
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.DefaultCost)
+	token, err := ts.auth.Issue(auth.Claims{
+		UserID:   "00000000-0000-0000-0000-0000000000aa",
+		CampID:   campID,
+		Username: "admin-" + campID[:8],
+		Email:    "admin-" + campID[:8] + "@test.com",
+		Role:     auth.RoleUser,
+		OrgRole:  "admin",
+	})
 	if err != nil {
-		t.Fatalf("hashing password: %v", err)
+		t.Fatalf("minting admin token: %v", err)
 	}
+	return token
+}
 
-	_, err = pool.Exec(context.Background(),
-		`INSERT INTO users (camp_id, username, email, password_hash, first_name, last_name, role)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
-		 ON CONFLICT (username) DO NOTHING`,
-		campID, "admin-"+campID[:8], "admin-"+campID[:8]+"@test.com",
-		string(hash), "Test", "Admin", "admin",
-	)
+// mustLoginSuperAdmin returns an access token for a super-admin (no camp
+// scope), minted directly by the test authenticator.
+func mustLoginSuperAdmin(t *testing.T, ts *testServer, _ *pgxpool.Pool) string {
+	t.Helper()
+	token, err := ts.auth.Issue(auth.Claims{
+		UserID:   "00000000-0000-0000-0000-0000000000ff",
+		Username: "superadmin",
+		Email:    "superadmin@test.com",
+		Role:     auth.RoleSuperAdmin,
+	})
 	if err != nil {
-		t.Fatalf("inserting test user: %v", err)
-	}
-
-	resp := doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
-		map[string]any{"username": "admin-" + campID[:8], "password": testPassword},
-		http.StatusOK, "")
-
-	token := str(resp, "access_token")
-	if token == "" {
-		t.Fatal("expected access_token in login response")
+		t.Fatalf("minting super-admin token: %v", err)
 	}
 	return token
 }
 
 // apiURL builds a full URL from the test server base and a path suffix.
-func apiURL(ts *httptest.Server, path string) string {
+func apiURL(ts *testServer, path string) string {
 	return ts.URL + "/api/v1" + path
 }
 
@@ -209,7 +216,7 @@ func asMap(v any) map[string]any {
 // createSeniorCounselors creates n senior counselors of the given gender.
 // Useful for camper-focused tests that still need cabins staffed so the
 // combined cabin run can satisfy required_counselors and senior constraints.
-func createSeniorCounselors(t *testing.T, ts *httptest.Server, token, gender string, n int) {
+func createSeniorCounselors(t *testing.T, ts *testServer, token, gender string, n int) {
 	t.Helper()
 	for i := 0; i < n; i++ {
 		mustPost(t, apiURL(ts, "/counselors"), map[string]any{
@@ -263,191 +270,6 @@ func TestAssignmentRunEndpoints(t *testing.T) {
 	t.Run("cabin_run_combined_score_additivity", testCabinRunCombinedScoreAdditivity)
 }
 
-func TestAuth(t *testing.T) {
-	t.Run("login_success", testLoginSuccess)
-	t.Run("login_bad_password", testLoginBadPassword)
-	t.Run("login_nonexistent_user", testLoginNonexistentUser)
-	t.Run("refresh_success", testRefreshSuccess)
-	t.Run("refresh_revokes_old_token", testRefreshRevokesOldToken)
-	t.Run("protected_route_no_token", testProtectedRouteNoToken)
-	t.Run("protected_route_invalid_token", testProtectedRouteInvalidToken)
-	t.Run("cross_camp_isolation", testCrossCampIsolation)
-}
-
-func testLoginSuccess(t *testing.T) {
-	ts, pool := mustSetupServer(t)
-
-	var directCampID string
-	err := pool.QueryRow(context.Background(),
-		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Auth Test").Scan(&directCampID)
-	if err != nil {
-		t.Fatalf("inserting camp: %v", err)
-	}
-
-	hash, err := bcrypt.GenerateFromPassword([]byte("secret123"), bcrypt.DefaultCost)
-	if err != nil {
-		t.Fatalf("hashing password: %v", err)
-	}
-
-	_, err = pool.Exec(context.Background(),
-		`INSERT INTO users (camp_id, username, email, password_hash, first_name, last_name, role)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		directCampID, "testuser", "testuser@test.com", string(hash), "Test", "User", "admin",
-	)
-	if err != nil {
-		t.Fatalf("inserting user: %v", err)
-	}
-
-	resp := doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
-		map[string]any{"username": "testuser", "password": "secret123"},
-		http.StatusOK, "")
-
-	if str(resp, "access_token") == "" {
-		t.Fatal("expected access_token in response")
-	}
-	if str(resp, "refresh_token") == "" {
-		t.Fatal("expected refresh_token in response")
-	}
-}
-
-func testLoginBadPassword(t *testing.T) {
-	ts, pool := mustSetupServer(t)
-
-	var campID string
-	err := pool.QueryRow(context.Background(),
-		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Bad PW").Scan(&campID)
-	if err != nil {
-		t.Fatalf("inserting camp: %v", err)
-	}
-
-	hash, err := bcrypt.GenerateFromPassword([]byte("correct"), bcrypt.DefaultCost)
-	if err != nil {
-		t.Fatalf("hashing password: %v", err)
-	}
-
-	_, err = pool.Exec(context.Background(),
-		`INSERT INTO users (camp_id, username, email, password_hash, first_name, last_name, role)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		campID, "badpwuser", "badpw@test.com", string(hash), "Test", "User", "admin",
-	)
-	if err != nil {
-		t.Fatalf("inserting user: %v", err)
-	}
-
-	doRawRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
-		map[string]any{"username": "badpwuser", "password": "wrong"},
-		http.StatusUnauthorized, "")
-}
-
-func testLoginNonexistentUser(t *testing.T) {
-	ts, _ := mustSetupServer(t)
-
-	doRawRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
-		map[string]any{"username": "ghost", "password": "whatever"},
-		http.StatusUnauthorized, "")
-}
-
-func testRefreshSuccess(t *testing.T) {
-	ts, pool := mustSetupServer(t)
-
-	var campID string
-	err := pool.QueryRow(context.Background(),
-		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Refresh").Scan(&campID)
-	if err != nil {
-		t.Fatalf("inserting camp: %v", err)
-	}
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.DefaultCost)
-	if err != nil {
-		t.Fatalf("hashing password: %v", err)
-	}
-
-	_, err = pool.Exec(context.Background(),
-		`INSERT INTO users (camp_id, username, email, password_hash, first_name, last_name, role)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		campID, "refreshuser", "refresh@test.com", string(hash), "Test", "User", "admin",
-	)
-	if err != nil {
-		t.Fatalf("inserting user: %v", err)
-	}
-
-	loginResp := doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
-		map[string]any{"username": "refreshuser", "password": testPassword},
-		http.StatusOK, "")
-
-	refreshToken := str(loginResp, "refresh_token")
-	if refreshToken == "" {
-		t.Fatal("expected refresh_token in login response")
-	}
-
-	refreshResp := doRequest(t, http.MethodPost, apiURL(ts, "/auth/refresh"),
-		map[string]any{"refresh_token": refreshToken},
-		http.StatusOK, "")
-
-	if str(refreshResp, "access_token") == "" {
-		t.Fatal("expected access_token in refresh response")
-	}
-	if str(refreshResp, "refresh_token") == "" {
-		t.Fatal("expected refresh_token in refresh response")
-	}
-
-	// Verify the refreshed access token works on a protected endpoint.
-	doRawRequest(t, http.MethodGet, apiURL(ts, "/camp"),
-		nil, http.StatusOK, str(refreshResp, "access_token"))
-}
-
-func testRefreshRevokesOldToken(t *testing.T) {
-	ts, pool := mustSetupServer(t)
-
-	var campID string
-	err := pool.QueryRow(context.Background(),
-		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp Revoke").Scan(&campID)
-	if err != nil {
-		t.Fatalf("inserting camp: %v", err)
-	}
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.DefaultCost)
-	if err != nil {
-		t.Fatalf("hashing password: %v", err)
-	}
-
-	_, err = pool.Exec(context.Background(),
-		`INSERT INTO users (camp_id, username, email, password_hash, first_name, last_name, role)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		campID, "revokeuser", "revoke@test.com", string(hash), "Test", "User", "admin",
-	)
-	if err != nil {
-		t.Fatalf("inserting user: %v", err)
-	}
-
-	loginResp := doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
-		map[string]any{"username": "revokeuser", "password": testPassword},
-		http.StatusOK, "")
-
-	refreshToken := str(loginResp, "refresh_token")
-
-	// Use the refresh token once — should succeed.
-	doRequest(t, http.MethodPost, apiURL(ts, "/auth/refresh"),
-		map[string]any{"refresh_token": refreshToken},
-		http.StatusOK, "")
-
-	// Reuse the same refresh token — should fail (already revoked).
-	doRawRequest(t, http.MethodPost, apiURL(ts, "/auth/refresh"),
-		map[string]any{"refresh_token": refreshToken},
-		http.StatusUnauthorized, "")
-}
-
-func testProtectedRouteNoToken(t *testing.T) {
-	ts, _ := mustSetupServer(t)
-
-	doRawRequest(t, http.MethodGet, apiURL(ts, "/camp"), nil, http.StatusUnauthorized, "")
-}
-
-func testProtectedRouteInvalidToken(t *testing.T) {
-	ts, _ := mustSetupServer(t)
-
-	doRawRequest(t, http.MethodGet, apiURL(ts, "/camp"), nil, http.StatusUnauthorized, "garbage-token")
-}
 
 func testActivityScheduling(t *testing.T) {
 	ts, pool := mustSetupServer(t)
@@ -2351,35 +2173,6 @@ func testCrossCampIsolation(t *testing.T) {
 
 // mustLoginSuperAdmin creates a super-admin user (no camp association) and
 // returns an access token.
-func mustLoginSuperAdmin(t *testing.T, ts *httptest.Server, pool *pgxpool.Pool) string {
-	t.Helper()
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.DefaultCost)
-	if err != nil {
-		t.Fatalf("hashing password: %v", err)
-	}
-
-	_, err = pool.Exec(context.Background(),
-		`INSERT INTO users (camp_id, username, email, password_hash, first_name, last_name, role)
-		 VALUES (NULL, $1, $2, $3, $4, $5, $6)
-		 ON CONFLICT (username) DO NOTHING`,
-		"superadmin", "superadmin@test.com",
-		string(hash), "Super", "Admin", "super_admin",
-	)
-	if err != nil {
-		t.Fatalf("inserting super-admin user: %v", err)
-	}
-
-	resp := doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
-		map[string]any{"username": "superadmin", "password": testPassword},
-		http.StatusOK, "")
-
-	token := str(resp, "access_token")
-	if token == "" {
-		t.Fatal("expected access_token in login response")
-	}
-	return token
-}
 
 func TestSuperAdminCampCRUD(t *testing.T) {
 	t.Run("full_lifecycle", testSuperAdminCampLifecycle)
@@ -2483,359 +2276,6 @@ func testSuperAdminRejectedFromCampRoutes(t *testing.T) {
 	doRawRequest(t, http.MethodGet, apiURL(ts, "/cabins"), nil, http.StatusForbidden, superToken)
 }
 
-func TestSuperAdminUserCRUD(t *testing.T) {
-	t.Run("full_lifecycle", testSuperAdminUserLifecycle)
-	t.Run("admin_rejected_from_user_routes", testAdminRejectedFromUserRoutes)
-	t.Run("constraint_violations", testUserConstraintViolations)
-	t.Run("password_change_revokes_tokens", testPasswordChangeRevokesTokens)
-}
-
-func testSuperAdminUserLifecycle(t *testing.T) {
-	ts, pool := mustSetupServer(t)
-	token := mustLoginSuperAdmin(t, ts, pool)
-
-	// Create a camp to associate with admin users.
-	camp := mustPost(t, apiURL(ts, "/admin/camps"),
-		map[string]any{"name": "User Test Camp", "location": "Somewhere"}, token)
-	campID := str(camp, "id")
-
-	// Create an admin user.
-	created := mustPost(t, apiURL(ts, "/admin/users"), map[string]any{
-		"camp_id":    campID,
-		"username":   "testadmin",
-		"email":      "testadmin@example.com",
-		"password":   "securepass123",
-		"first_name": "Test",
-		"last_name":  "Admin",
-		"role":       "admin",
-	}, token)
-
-	userID := str(created, "id")
-	if userID == "" {
-		t.Fatal("expected id in create response")
-	}
-	if str(created, "username") != "testadmin" {
-		t.Fatalf("expected username 'testadmin', got %q", str(created, "username"))
-	}
-	if str(created, "role") != "admin" {
-		t.Fatalf("expected role 'admin', got %q", str(created, "role"))
-	}
-	if str(created, "camp_id") != campID {
-		t.Fatalf("expected camp_id %q, got %q", campID, str(created, "camp_id"))
-	}
-
-	// Create a super_admin user.
-	superUser := mustPost(t, apiURL(ts, "/admin/users"), map[string]any{
-		"username":   "newsuper",
-		"email":      "newsuper@example.com",
-		"password":   "securepass123",
-		"first_name": "New",
-		"last_name":  "Super",
-		"role":       "super_admin",
-	}, token)
-	superUserID := str(superUser, "id")
-	if str(superUser, "camp_id") != "" {
-		t.Fatalf("expected empty camp_id for super_admin, got %q", str(superUser, "camp_id"))
-	}
-
-	// List all users — both created users (and the seeded super-admin) must appear.
-	users := mustGetList(t, apiURL(ts, "/admin/users"), token)
-	if len(users) < 3 {
-		t.Fatalf("expected at least 3 users in list, got %d", len(users))
-	}
-
-	// List users filtered by camp_id.
-	campUsers := mustGetList(t, apiURL(ts, "/admin/users?camp_id="+campID), token)
-	if len(campUsers) != 1 {
-		t.Fatalf("expected 1 user for camp, got %d", len(campUsers))
-	}
-	if str(asMap(campUsers[0]), "id") != userID {
-		t.Fatalf("expected user %s in camp list, got %s", userID, str(asMap(campUsers[0]), "id"))
-	}
-
-	// Get user by ID.
-	got := mustGet(t, apiURL(ts, "/admin/users/"+userID), token)
-	if str(got, "username") != "testadmin" {
-		t.Fatalf("expected username 'testadmin', got %q", str(got, "username"))
-	}
-
-	// Update user.
-	updated := doRequest(t, http.MethodPut, apiURL(ts, "/admin/users/"+userID),
-		map[string]any{
-			"camp_id":    campID,
-			"username":   "updatedadmin",
-			"email":      "updated@example.com",
-			"first_name": "Updated",
-			"last_name":  "Admin",
-			"role":       "admin",
-		}, http.StatusOK, token)
-	if str(updated, "username") != "updatedadmin" {
-		t.Fatalf("expected username 'updatedadmin', got %q", str(updated, "username"))
-	}
-	if str(updated, "email") != "updated@example.com" {
-		t.Fatalf("expected email 'updated@example.com', got %q", str(updated, "email"))
-	}
-
-	// Verify update persisted.
-	gotAfterUpdate := mustGet(t, apiURL(ts, "/admin/users/"+userID), token)
-	if str(gotAfterUpdate, "first_name") != "Updated" {
-		t.Fatalf("expected persisted first_name 'Updated', got %q", str(gotAfterUpdate, "first_name"))
-	}
-
-	// Update password.
-	doRawRequest(t, http.MethodPut, apiURL(ts, "/admin/users/"+userID+"/password"),
-		map[string]any{"password": "newpassword123"}, http.StatusOK, token)
-
-	// Verify new password works by logging in.
-	doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
-		map[string]any{"username": "updatedadmin", "password": "newpassword123"},
-		http.StatusOK, "")
-
-	// Update password for nonexistent user returns 404.
-	doRawRequest(t, http.MethodPut,
-		apiURL(ts, "/admin/users/00000000-0000-0000-0000-000000000000/password"),
-		map[string]any{"password": "newpassword123"}, http.StatusNotFound, token)
-
-	// Get nonexistent user returns 404.
-	doRawRequest(t, http.MethodGet,
-		apiURL(ts, "/admin/users/00000000-0000-0000-0000-000000000000"),
-		nil, http.StatusNotFound, token)
-
-	// Update nonexistent user returns 404.
-	doRawRequest(t, http.MethodPut,
-		apiURL(ts, "/admin/users/00000000-0000-0000-0000-000000000000"),
-		map[string]any{
-			"camp_id":    campID,
-			"username":   "test-user",
-			"email":      "ghost@example.com",
-			"first_name": "Ghost",
-			"last_name":  "User",
-			"role":       "admin",
-		}, http.StatusNotFound, token)
-
-	// Delete nonexistent user returns 404.
-	doRawRequest(t, http.MethodDelete,
-		apiURL(ts, "/admin/users/00000000-0000-0000-0000-000000000000"),
-		nil, http.StatusNotFound, token)
-
-	// Delete user.
-	mustDelete(t, apiURL(ts, "/admin/users/"+userID), token)
-
-	// Verify deletion.
-	doRawRequest(t, http.MethodGet, apiURL(ts, "/admin/users/"+userID),
-		nil, http.StatusNotFound, token)
-
-	// Clean up the other created user.
-	mustDelete(t, apiURL(ts, "/admin/users/"+superUserID), token)
-}
-
-func testAdminRejectedFromUserRoutes(t *testing.T) {
-	ts, pool := mustSetupServer(t)
-
-	var campID string
-	err := pool.QueryRow(context.Background(),
-		`INSERT INTO camps (camp_name) VALUES ($1) RETURNING id`, "Camp User Reject").Scan(&campID)
-	if err != nil {
-		t.Fatalf("inserting camp: %v", err)
-	}
-
-	adminToken := mustLogin(t, ts, pool, campID)
-
-	doRawRequest(t, http.MethodGet, apiURL(ts, "/admin/users"), nil, http.StatusForbidden, adminToken)
-	doRawRequest(t, http.MethodPost, apiURL(ts, "/admin/users"),
-		map[string]any{
-			"camp_id":    campID,
-			"username":   "sneaky",
-			"email":      "sneaky@example.com",
-			"password":   "securepass123",
-			"first_name": "Sneaky",
-			"last_name":  "User",
-			"role":       "admin",
-		}, http.StatusForbidden, adminToken)
-}
-
-func testUserConstraintViolations(t *testing.T) {
-	ts, pool := mustSetupServer(t)
-	token := mustLoginSuperAdmin(t, ts, pool)
-
-	camp := mustPost(t, apiURL(ts, "/admin/camps"),
-		map[string]any{"name": "Constraint Camp", "location": "Here"}, token)
-	campID := str(camp, "id")
-
-	// Create a user to test conflicts against.
-	mustPost(t, apiURL(ts, "/admin/users"), map[string]any{
-		"camp_id":    campID,
-		"username":   "existing",
-		"email":      "existing@example.com",
-		"password":   "securepass123",
-		"first_name": "Existing",
-		"last_name":  "User",
-		"role":       "admin",
-	}, token)
-
-	// Duplicate username → 409.
-	doRawRequest(t, http.MethodPost, apiURL(ts, "/admin/users"),
-		map[string]any{
-			"camp_id":    campID,
-			"username":   "existing",
-			"email":      "different@example.com",
-			"password":   "securepass123",
-			"first_name": "Dup",
-			"last_name":  "User",
-			"role":       "admin",
-		}, http.StatusConflict, token)
-
-	// Duplicate email → 409.
-	doRawRequest(t, http.MethodPost, apiURL(ts, "/admin/users"),
-		map[string]any{
-			"camp_id":    campID,
-			"username":   "different",
-			"email":      "existing@example.com",
-			"password":   "securepass123",
-			"first_name": "Dup",
-			"last_name":  "User",
-			"role":       "admin",
-		}, http.StatusConflict, token)
-
-	// admin role with no camp_id → 400 (check violation).
-	doRawRequest(t, http.MethodPost, apiURL(ts, "/admin/users"),
-		map[string]any{
-			"username":   "nocampuser",
-			"email":      "nocampuser@example.com",
-			"password":   "securepass123",
-			"first_name": "No",
-			"last_name":  "Camp",
-			"role":       "admin",
-		}, http.StatusBadRequest, token)
-
-	// super_admin role with camp_id → 400 (check violation).
-	doRawRequest(t, http.MethodPost, apiURL(ts, "/admin/users"),
-		map[string]any{
-			"camp_id":    campID,
-			"username":   "badsuperadmin",
-			"email":      "badsuperadmin@example.com",
-			"password":   "securepass123",
-			"first_name": "Bad",
-			"last_name":  "Super",
-			"role":       "super_admin",
-		}, http.StatusBadRequest, token)
-
-	// Invalid camp_id (FK violation) → 400.
-	doRawRequest(t, http.MethodPost, apiURL(ts, "/admin/users"),
-		map[string]any{
-			"camp_id":    "00000000-0000-0000-0000-000000000000",
-			"username":   "badcamp",
-			"email":      "badcamp@example.com",
-			"password":   "securepass123",
-			"first_name": "Bad",
-			"last_name":  "Camp",
-			"role":       "admin",
-		}, http.StatusBadRequest, token)
-
-	// Missing required fields → 400.
-	doRawRequest(t, http.MethodPost, apiURL(ts, "/admin/users"),
-		map[string]any{"username": "incomplete"}, http.StatusBadRequest, token)
-
-	// Short password → 400.
-	doRawRequest(t, http.MethodPost, apiURL(ts, "/admin/users"),
-		map[string]any{
-			"camp_id":    campID,
-			"username":   "shortpw",
-			"email":      "shortpw@example.com",
-			"password":   "short",
-			"first_name": "Short",
-			"last_name":  "Pw",
-			"role":       "admin",
-		}, http.StatusBadRequest, token)
-
-	// Short password on update → 400.
-	doRawRequest(t, http.MethodPut,
-		apiURL(ts, "/admin/users/00000000-0000-0000-0000-000000000000/password"),
-		map[string]any{"password": "short"}, http.StatusBadRequest, token)
-}
-
-func testPasswordChangeRevokesTokens(t *testing.T) {
-	ts, pool := mustSetupServer(t)
-	superToken := mustLoginSuperAdmin(t, ts, pool)
-
-	// Create a camp and an admin user via the super-admin API.
-	camp := mustPost(t, apiURL(ts, "/admin/camps"),
-		map[string]any{"name": "Token Revoke Camp", "location": "Somewhere"}, superToken)
-	campID := str(camp, "id")
-
-	created := mustPost(t, apiURL(ts, "/admin/users"), map[string]any{
-		"camp_id":    campID,
-		"username":   "tokenuser",
-		"email":      "tokenuser@example.com",
-		"password":   "oldpassword123",
-		"first_name": "Token",
-		"last_name":  "User",
-		"role":       "admin",
-	}, superToken)
-	userID := str(created, "id")
-
-	// Login twice to simulate two devices with independent tokens.
-	loginResp1 := doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
-		map[string]any{"username": "tokenuser", "password": "oldpassword123"},
-		http.StatusOK, "")
-	accessToken1 := str(loginResp1, "access_token")
-	refreshToken1 := str(loginResp1, "refresh_token")
-	if accessToken1 == "" {
-		t.Fatal("expected access_token in first login response")
-	}
-	if refreshToken1 == "" {
-		t.Fatal("expected refresh_token in first login response")
-	}
-
-	loginResp2 := doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
-		map[string]any{"username": "tokenuser", "password": "oldpassword123"},
-		http.StatusOK, "")
-	accessToken2 := str(loginResp2, "access_token")
-	refreshToken2 := str(loginResp2, "refresh_token")
-	if accessToken2 == "" {
-		t.Fatal("expected access_token in second login response")
-	}
-	if refreshToken2 == "" {
-		t.Fatal("expected refresh_token in second login response")
-	}
-
-	// Verify old access tokens work before password change.
-	doRawRequest(t, http.MethodGet, apiURL(ts, "/camp"),
-		nil, http.StatusOK, accessToken1)
-
-	// Change the admin user's password via the super-admin endpoint.
-	doRawRequest(t, http.MethodPut,
-		apiURL(ts, "/admin/users/"+userID+"/password"),
-		map[string]any{"password": "newpassword123"}, http.StatusOK, superToken)
-
-	// Both access tokens should now be rejected (token version mismatch).
-	doRawRequest(t, http.MethodGet, apiURL(ts, "/camp"),
-		nil, http.StatusUnauthorized, accessToken1)
-
-	doRawRequest(t, http.MethodGet, apiURL(ts, "/camp"),
-		nil, http.StatusUnauthorized, accessToken2)
-
-	// Both refresh tokens should also be revoked.
-	doRawRequest(t, http.MethodPost, apiURL(ts, "/auth/refresh"),
-		map[string]any{"refresh_token": refreshToken1},
-		http.StatusUnauthorized, "")
-
-	doRawRequest(t, http.MethodPost, apiURL(ts, "/auth/refresh"),
-		map[string]any{"refresh_token": refreshToken2},
-		http.StatusUnauthorized, "")
-
-	// Login with the new password should succeed and produce a valid access token.
-	newLogin := doRequest(t, http.MethodPost, apiURL(ts, "/auth/login"),
-		map[string]any{"username": "tokenuser", "password": "newpassword123"},
-		http.StatusOK, "")
-	newAccessToken := str(newLogin, "access_token")
-	if newAccessToken == "" {
-		t.Fatal("expected access_token in new login response")
-	}
-
-	doRawRequest(t, http.MethodGet, apiURL(ts, "/camp"),
-		nil, http.StatusOK, newAccessToken)
-}
 
 // testSessionCrossSeasonPrevious verifies that creating or updating a session
 // with a previous_session_id from a different season is rejected with 400.
@@ -4968,7 +4408,7 @@ func TestReports(t *testing.T) {
 }
 
 // getReport fetches a report and returns (body, content-type, content-disposition).
-func getReport(t *testing.T, ts *httptest.Server, token, sessionID, kind, query string, expectedStatus int) ([]byte, string, string) {
+func getReport(t *testing.T, ts *testServer, token, sessionID, kind, query string, expectedStatus int) ([]byte, string, string) {
 	t.Helper()
 	url := apiURL(ts, "/sessions/"+sessionID+"/reports/"+kind+"?"+query)
 	req, err := http.NewRequest(http.MethodGet, url, nil)

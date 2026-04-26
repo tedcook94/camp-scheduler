@@ -122,6 +122,15 @@ type CamperCabinExplanation struct {
 	Rank            pgtype.Int4
 }
 
+type CamperCabinOverride struct {
+	ID                     pgtype.UUID
+	CampID                 pgtype.UUID
+	SessionID              pgtype.UUID
+	CamperID               pgtype.UUID
+	SessionAgeGroupCabinID pgtype.UUID
+	CreatedAt              pgtype.Timestamptz
+}
+
 type CamperCabinSolution struct {
 	ID              pgtype.UUID
 	CampID          pgtype.UUID
@@ -163,6 +172,15 @@ type Counselor struct {
 	FirstName       string
 	LastName        string
 	Archived        bool
+}
+
+type CounselorActivityOverride struct {
+	ID                pgtype.UUID
+	CampID            pgtype.UUID
+	SessionID         pgtype.UUID
+	CounselorID       pgtype.UUID
+	SessionActivityID pgtype.UUID
+	CreatedAt         pgtype.Timestamptz
 }
 
 type CounselorActivityPreference struct {
@@ -214,6 +232,15 @@ type CounselorCabinExplanation struct {
 	ConstraintName  pgtype.Text
 	Message         string
 	Rank            pgtype.Int4
+}
+
+type CounselorCabinOverride struct {
+	ID                     pgtype.UUID
+	CampID                 pgtype.UUID
+	SessionID              pgtype.UUID
+	CounselorID            pgtype.UUID
+	SessionAgeGroupCabinID pgtype.UUID
+	CreatedAt              pgtype.Timestamptz
 }
 
 type CounselorCabinSolution struct {

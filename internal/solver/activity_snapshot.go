@@ -60,10 +60,12 @@ func BuildActivitySnapshot(ctx context.Context, queries *db.Queries, campID, ses
 		return ActivitySnapshot{}, err
 	}
 	slotSet := make(map[string]bool, len(slots))
+	timeSlotSet := make(map[string]bool, len(slots))
 	for _, s := range slots {
 		slotSet[s.ID] = true
+		timeSlotSet[s.TimeSlotID] = true
 	}
-	overrides = filterOverridesByCabin(overrides, slotSet)
+	overrides = filterActivityOverrides(overrides, slotSet, timeSlotSet)
 
 	// Prune counselor-keyed maps so the solver and explainer only consider
 	// counselors on the session roster.
@@ -83,8 +85,10 @@ func BuildActivitySnapshot(ctx context.Context, queries *db.Queries, campID, ses
 
 // loadCounselorActivityOverrides loads admin-pinned counselor->session_activity
 // assignments for the session and filters out any whose counselor is no
-// longer on the active roster.
-func loadCounselorActivityOverrides(ctx context.Context, queries *db.Queries, sessionID, campID pgtype.UUID, roster map[string]bool) (map[string]string, error) {
+// longer on the active roster. The returned map is keyed by counselor ID
+// and then by session_time_slot ID, since one counselor may be pinned in
+// multiple time slots.
+func loadCounselorActivityOverrides(ctx context.Context, queries *db.Queries, sessionID, campID pgtype.UUID, roster map[string]bool) (map[string]map[string]string, error) {
 	rows, err := queries.ListCounselorActivityOverridesForSolver(ctx, db.ListCounselorActivityOverridesForSolverParams{
 		SessionID: sessionID,
 		CampID:    campID,
@@ -95,15 +99,43 @@ func loadCounselorActivityOverrides(ctx context.Context, queries *db.Queries, se
 	if len(rows) == 0 {
 		return nil, nil
 	}
-	overrides := make(map[string]string, len(rows))
+	overrides := make(map[string]map[string]string, len(rows))
 	for _, r := range rows {
 		counselorID := api.UUIDToString(r.CounselorID)
 		if !roster[counselorID] {
 			continue
 		}
-		overrides[counselorID] = api.UUIDToString(r.SessionActivityID)
+		byTimeSlot := overrides[counselorID]
+		if byTimeSlot == nil {
+			byTimeSlot = make(map[string]string)
+			overrides[counselorID] = byTimeSlot
+		}
+		byTimeSlot[api.UUIDToString(r.SessionTimeSlotID)] = api.UUIDToString(r.SessionActivityID)
 	}
 	return overrides, nil
+}
+
+// filterActivityOverrides drops any override entry whose target session_activity
+// or its time slot is no longer present in the snapshot (e.g. the activity
+// was archived after the override was created).
+func filterActivityOverrides(overrides map[string]map[string]string, slotSet, timeSlotSet map[string]bool) map[string]map[string]string {
+	if len(overrides) == 0 {
+		return overrides
+	}
+	out := make(map[string]map[string]string, len(overrides))
+	for counselorID, byTimeSlot := range overrides {
+		filtered := make(map[string]string, len(byTimeSlot))
+		for tsID, saID := range byTimeSlot {
+			if !timeSlotSet[tsID] || !slotSet[saID] {
+				continue
+			}
+			filtered[tsID] = saID
+		}
+		if len(filtered) > 0 {
+			out[counselorID] = filtered
+		}
+	}
+	return out
 }
 
 func loadActivitySlots(ctx context.Context, queries *db.Queries, sessionID, campID pgtype.UUID) ([]ActivitySlot, map[string]string, error) {

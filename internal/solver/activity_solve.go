@@ -117,6 +117,23 @@ func (s *activitySearchState) searchCounselorSlots(counselors []ActivityCounselo
 	tsID := s.timeSlotOrder[tsIndex]
 	eligible := s.eligibleByTimeSlot[counselorID][tsID]
 
+	// Forced placement: if this counselor has an override pinning them to a
+	// session_activity in this time slot, they must be placed there and
+	// cannot be placed in any other activity in this time slot or skipped.
+	// In other time slots, the search proceeds normally.
+	if pinnedSlotID, pinned := s.snapshot.Overrides[counselorID][tsID]; pinned {
+		pinnedSlot := s.slotsByID[pinnedSlotID]
+		if len(s.assignment[pinnedSlotID]) >= pinnedSlot.Capacity {
+			return
+		}
+		s.assignment[pinnedSlotID] = append(s.assignment[pinnedSlotID], counselorID)
+		s.counselorSlots[counselorID] = append(s.counselorSlots[counselorID], pinnedSlotID)
+		s.searchCounselorSlots(counselors, counselorIndex, counselorID, tsIndex+1)
+		s.assignment[pinnedSlotID] = s.assignment[pinnedSlotID][:len(s.assignment[pinnedSlotID])-1]
+		s.counselorSlots[counselorID] = s.counselorSlots[counselorID][:len(s.counselorSlots[counselorID])-1]
+		return
+	}
+
 	// Order eligible slots so that preferred activities (by rank) are tried
 	// first. Ties break by highest remaining-capacity fraction so the search
 	// naturally lands on balanced, preference-respecting solutions early.

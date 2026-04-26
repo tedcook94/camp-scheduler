@@ -67,11 +67,13 @@ func BuildSnapshot(ctx context.Context, queries *db.Queries, campID, sessionID s
 		return SessionSnapshot{}, err
 	}
 
-	cabinSet := make(map[string]bool, len(cabins))
+	// Resolve override values from session_age_group_cabin_id (the persisted
+	// FK target) to the cabins.id keys the solver uses internally.
+	sagcToCabin := make(map[string]string, len(cabins))
 	for _, c := range cabins {
-		cabinSet[c.ID] = true
+		sagcToCabin[c.SessionAgeGroupCabinID] = c.ID
 	}
-	overrides = filterOverridesByCabin(overrides, cabinSet)
+	overrides = remapOverrideValues(overrides, sagcToCabin)
 
 	// Prune all counselor-keyed maps to only counselors on the session roster.
 	// This means a counselor removed from the roster (or with stale prefs from
@@ -95,10 +97,27 @@ func BuildSnapshot(ctx context.Context, queries *db.Queries, campID, sessionID s
 	}, nil
 }
 
-// filterOverridesByCabin drops overrides whose target cabin is no longer
-// present in the snapshot (e.g. cabin or its age-group archived after the
-// override was created). The trigger-time validation step is responsible for
-// surfacing this; here we just keep the solver consistent.
+// remapOverrideValues replaces each override target value via the provided
+// map, dropping entries whose target is not present in the map. Used to
+// translate persisted session_age_group_cabin IDs to the cabins.id keys
+// used by the cabin solvers, and to drop overrides whose target cabin has
+// been archived.
+func remapOverrideValues(overrides, valueMap map[string]string) map[string]string {
+	if len(overrides) == 0 {
+		return overrides
+	}
+	out := make(map[string]string, len(overrides))
+	for k, v := range overrides {
+		if mapped, ok := valueMap[v]; ok {
+			out[k] = mapped
+		}
+	}
+	return out
+}
+
+// filterOverridesByCabin drops overrides whose target ID is no longer
+// present in the snapshot. Used by solvers that key their cabins by the
+// persisted FK directly (e.g. activity solver keying on session_activity_id).
 func filterOverridesByCabin(overrides map[string]string, cabins map[string]bool) map[string]string {
 	if len(overrides) == 0 {
 		return overrides

@@ -52,11 +52,11 @@ func BuildCamperCabinSnapshot(ctx context.Context, queries *db.Queries, campID, 
 	if err != nil {
 		return CamperCabinSnapshot{}, err
 	}
-	cabinSet := make(map[string]bool, len(cabins))
+	sagcToCabin := make(map[string]string, len(cabins))
 	for _, c := range cabins {
-		cabinSet[c.ID] = true
+		sagcToCabin[c.SessionAgeGroupCabinID] = c.ID
 	}
-	overrides = filterOverridesByCabin(overrides, cabinSet)
+	overrides = remapOverrideValues(overrides, sagcToCabin)
 
 	return CamperCabinSnapshot{
 		SessionID:         sessionID,

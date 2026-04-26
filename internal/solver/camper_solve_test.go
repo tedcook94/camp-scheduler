@@ -1,6 +1,7 @@
 package solver
 
 import (
+	"slices"
 	"testing"
 )
 
@@ -113,6 +114,62 @@ func TestCamperShortages(t *testing.T) {
 			if shortages[i].AgeGroupName != w.ag || shortages[i].Gender != w.gender {
 				t.Errorf("shortage[%d]: got %s/%s, want %s/%s",
 					i, shortages[i].AgeGroupName, shortages[i].Gender, w.ag, w.gender)
+			}
+		}
+	})
+}
+
+func TestSolveCamperCabinOverride(t *testing.T) {
+	t.Run("override forces camper into pinned cabin (no friend pref)", func(t *testing.T) {
+		snapshot := CamperCabinSnapshot{
+			Cabins: []CamperCabin{
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", Capacity: 5, Gender: "female"},
+				{ID: "c2", Name: "Oak", AgeGroupID: "ag1", Capacity: 5, Gender: "female"},
+			},
+			Campers: []Camper{
+				{ID: "k1", Name: "Alice", AgeGroupID: "ag1", Gender: "female"},
+				{ID: "k2", Name: "Beth", AgeGroupID: "ag1", Gender: "female"},
+			},
+			Overrides: map[string]string{"k1": "c2"},
+		}
+
+		solutions := SolveCamperCabin(snapshot, DefaultCamperSolverConfig())
+		if len(solutions) == 0 {
+			t.Fatal("expected at least one solution")
+		}
+		for _, sol := range solutions {
+			if !slices.Contains(sol.Assignment.CabinCampers["c2"], "k1") {
+				t.Errorf("k1 not pinned to c2: %v", sol.Assignment.CabinCampers)
+			}
+			if slices.Contains(sol.Assignment.CabinCampers["c1"], "k1") {
+				t.Errorf("k1 placed in c1 instead of pinned c2")
+			}
+		}
+	})
+
+	t.Run("override forces camper with friend pref into pinned cabin", func(t *testing.T) {
+		snapshot := CamperCabinSnapshot{
+			Cabins: []CamperCabin{
+				{ID: "c1", Name: "Pine", AgeGroupID: "ag1", Capacity: 5, Gender: "female"},
+				{ID: "c2", Name: "Oak", AgeGroupID: "ag1", Capacity: 5, Gender: "female"},
+			},
+			Campers: []Camper{
+				{ID: "k1", Name: "Alice", AgeGroupID: "ag1", Gender: "female"},
+				{ID: "k2", Name: "Beth", AgeGroupID: "ag1", Gender: "female"},
+			},
+			FriendPreferences: map[string][]RankedPreference{
+				"k1": {{TargetID: "k2", Rank: 1}},
+			},
+			Overrides: map[string]string{"k1": "c2"},
+		}
+
+		solutions := SolveCamperCabin(snapshot, DefaultCamperSolverConfig())
+		if len(solutions) == 0 {
+			t.Fatal("expected at least one solution")
+		}
+		for _, sol := range solutions {
+			if !slices.Contains(sol.Assignment.CabinCampers["c2"], "k1") {
+				t.Errorf("k1 not pinned to c2: %v", sol.Assignment.CabinCampers)
 			}
 		}
 	})

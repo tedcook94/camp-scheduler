@@ -72,6 +72,32 @@ export const campApi = {
 	delete: (id: string) => api.delete<void>(`/api/v1/admin/camps/${id}`),
 };
 
+// Super-admin only: manage user-to-camp memberships. The auth-server is the
+// source of truth for users/sessions, but the Go server proxies these calls
+// so that the same super-admin auth flow protects them.
+export const adminUserApi = {
+	update: (
+		userId: string,
+		data: { firstName?: string; lastName?: string; email?: string },
+	) => {
+		// Translate to the snake_case wire shape the Go server expects.
+		const payload: { first_name?: string; last_name?: string; email?: string } = {};
+		if (data.firstName !== undefined) payload.first_name = data.firstName;
+		if (data.lastName !== undefined) payload.last_name = data.lastName;
+		if (data.email !== undefined) payload.email = data.email;
+		return api.put<void>(`/api/v1/admin/users/${userId}`, payload);
+	},
+	setRole: (userId: string, role: string) =>
+		api.post<void>(`/api/v1/admin/users/${userId}/role`, { role }),
+	addCamp: (userId: string, campId: string, role?: string) =>
+		api.post<void>(
+			`/api/v1/admin/users/${userId}/camps/${campId}`,
+			role ? { role } : {},
+		),
+	removeCamp: (userId: string, campId: string) =>
+		api.delete<void>(`/api/v1/admin/users/${userId}/camps/${campId}`),
+};
+
 export const certificationApi = {
 	list: () => api.get<Certification[]>("/api/v1/certifications"),
 	listArchived: () => api.get<Certification[]>("/api/v1/certifications/archived"),

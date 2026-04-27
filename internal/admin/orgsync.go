@@ -60,6 +60,29 @@ func (s *OrgSyncer) DeleteOrg(ctx context.Context, campID string) error {
 	return s.do(ctx, http.MethodDelete, "/organizations/"+campID, nil)
 }
 
+type memberPayload struct {
+	UserID         string `json:"userId"`
+	OrganizationID string `json:"organizationId"`
+	Role           string `json:"role,omitempty"`
+}
+
+// AddMember adds a user to a camp's organization on the auth-server.
+// role defaults to "admin" when empty.
+func (s *OrgSyncer) AddMember(ctx context.Context, userID, campID, role string) error {
+	body, err := json.Marshal(memberPayload{UserID: userID, OrganizationID: campID, Role: role})
+	if err != nil {
+		return fmt.Errorf("error marshaling member payload: %w", err)
+	}
+	return s.do(ctx, http.MethodPost, "/members", body)
+}
+
+// RemoveMember removes a user from a camp's organization on the auth-server.
+func (s *OrgSyncer) RemoveMember(ctx context.Context, userID, campID string) error {
+	path := fmt.Sprintf("/members?userId=%s&organizationId=%s",
+		url.QueryEscape(userID), url.QueryEscape(campID))
+	return s.do(ctx, http.MethodDelete, path, nil)
+}
+
 type CreateUserRequest struct {
 	Email     string `json:"email"`
 	Password  string `json:"password"`

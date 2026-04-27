@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
-	import { campApi } from "$lib/api";
+	import { campApi, adminUserApi } from "$lib/api";
 	import { authClient } from "$lib/auth-client";
 	import { auth } from "$lib/stores/auth.svelte";
 	import type { Camp } from "$lib/api/types";
@@ -19,6 +19,8 @@
 	import TrashIcon from "@lucide/svelte/icons/trash";
 	import KeyIcon from "@lucide/svelte/icons/key-round";
 	import UserCheckIcon from "@lucide/svelte/icons/user-check";
+	import BuildingIcon from "@lucide/svelte/icons/building-2";
+	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import SortableTableHead from "$lib/components/sortable-table-head.svelte";
 	import { sortItems, type SortDirection, type SortAccessor } from "$lib/utils";
 
@@ -100,6 +102,20 @@
 	let deleteDialogOpen = $state(false);
 	let deletingUser = $state<AdminUser | null>(null);
 	let deleting = $state(false);
+
+	let campsDialogOpen = $state(false);
+	let campsUser = $state<AdminUser | null>(null);
+	let campsAddSelection = $state<string>("");
+	let campsBusy = $state(false);
+
+	let editDialogOpen = $state(false);
+	let editingUser = $state<AdminUser | null>(null);
+	let editFirstName = $state("");
+	let editLastName = $state("");
+	let editEmail = $state("");
+	let editRole = $state<string>("admin");
+	let editError = $state("");
+	let editSaving = $state(false);
 
 	function campNameById(id: string | null | undefined): string {
 		if (!id) return "\u2014";
@@ -183,6 +199,95 @@
 		deleteDialogOpen = true;
 	}
 
+	function openCamps(user: AdminUser) {
+		campsUser = user;
+		campsAddSelection = "";
+		campsDialogOpen = true;
+	}
+
+	function openEdit(user: AdminUser) {
+		editingUser = user;
+		editFirstName = user.firstName ?? "";
+		editLastName = user.lastName ?? "";
+		editEmail = user.email;
+		editRole = user.role === "super_admin" ? "super_admin" : "admin";
+		editError = "";
+		editDialogOpen = true;
+	}
+
+	async function handleEditSave(e: SubmitEvent) {
+		e.preventDefault();
+		if (!editingUser) return;
+		editError = "";
+		editSaving = true;
+
+		try {
+			const profilePatch: { firstName?: string; lastName?: string; email?: string } = {};
+			const newFirst = editFirstName.trim();
+			const newLast = editLastName.trim();
+			const newEmail = editEmail.trim();
+			if (newFirst !== (editingUser.firstName ?? "")) profilePatch.firstName = newFirst;
+			if (newLast !== (editingUser.lastName ?? "")) profilePatch.lastName = newLast;
+			if (newEmail !== editingUser.email) profilePatch.email = newEmail;
+
+			const newRole = editRole === "super_admin" ? "super_admin" : "user";
+			const oldRole = editingUser.role === "super_admin" ? "super_admin" : "user";
+
+			if (Object.keys(profilePatch).length > 0) {
+				await adminUserApi.update(editingUser.id, profilePatch);
+			}
+			if (newRole !== oldRole) {
+				await adminUserApi.setRole(editingUser.id, newRole);
+			}
+
+			// If the super-admin edited their own account, force a JWT refresh so the
+			// new claims (role, email) are reflected immediately.
+			if (editingUser.email === auth.email || newEmail === auth.email) {
+				await auth.refreshToken();
+			}
+
+			toast.success("User updated.");
+			editDialogOpen = false;
+			editingUser = null;
+			await loadData();
+		} catch (err) {
+			editError = err instanceof Error ? err.message : "Failed to update user";
+		} finally {
+			editSaving = false;
+		}
+	}
+
+	async function handleAddCamp() {
+		if (!campsUser || !campsAddSelection) return;
+		campsBusy = true;
+		try {
+			await adminUserApi.addCamp(campsUser.id, campsAddSelection);
+			toast.success("Added user to camp.");
+			await loadData();
+			campsUser = users.find((u) => u.id === campsUser?.id) ?? null;
+			campsAddSelection = "";
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Failed to add user to camp");
+		} finally {
+			campsBusy = false;
+		}
+	}
+
+	async function handleRemoveCamp(campId: string) {
+		if (!campsUser) return;
+		campsBusy = true;
+		try {
+			await adminUserApi.removeCamp(campsUser.id, campId);
+			toast.success("Removed user from camp.");
+			await loadData();
+			campsUser = users.find((u) => u.id === campsUser?.id) ?? null;
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Failed to remove user from camp");
+		} finally {
+			campsBusy = false;
+		}
+	}
+
 	async function handleSave(e: SubmitEvent) {
 		e.preventDefault();
 		formError = "";
@@ -219,7 +324,21 @@
 			}
 
 			if (formRole === "admin" && formCampId) {
-				toast.info("User created. Camp assignment must be done from the user's account for now.");
+				const newUserId = created.data?.user?.id;
+				if (newUserId) {
+					try {
+						await adminUserApi.addCamp(newUserId, formCampId);
+						toast.success("User created and added to camp.");
+					} catch (err) {
+						toast.warning(
+							`User created but adding to camp failed: ${
+								err instanceof Error ? err.message : "unknown error"
+							}`,
+						);
+					}
+				} else {
+					toast.warning("User created but no id returned; camp not assigned.");
+				}
 			} else {
 				toast.success("User created.");
 			}
@@ -358,7 +477,13 @@
 									<Button variant="ghost" size="icon-sm" onclick={() => handleImpersonate(user)} title="Impersonate" aria-label="Impersonate {user.username ?? user.email}">
 										<UserCheckIcon class="size-4" />
 									</Button>
+									<Button variant="ghost" size="icon-sm" onclick={() => openCamps(user)} title="Manage camps" aria-label="Manage camps for {user.username ?? user.email}">
+										<BuildingIcon class="size-4" />
+									</Button>
 								{/if}
+								<Button variant="ghost" size="icon-sm" onclick={() => openEdit(user)} title="Edit" aria-label="Edit {user.username ?? user.email}">
+									<PencilIcon class="size-4" />
+								</Button>
 								<Button variant="ghost" size="icon-sm" onclick={() => openPassword(user)} title="Change password" aria-label="Change password for {user.username ?? user.email}">
 									<KeyIcon class="size-4" />
 								</Button>
@@ -501,3 +626,121 @@
 		</AlertDialog.AlertDialogFooter>
 	</AlertDialog.AlertDialogContent>
 </AlertDialog.AlertDialog>
+
+<!-- Manage Camps Dialog -->
+<Dialog.Dialog bind:open={campsDialogOpen}>
+	<Dialog.DialogContent class="max-w-md" onInteractOutside={(e) => e.preventDefault()}>
+		<Dialog.DialogHeader>
+			<Dialog.DialogTitle>Manage Camps</Dialog.DialogTitle>
+			<Dialog.DialogDescription>
+				Add or remove camp memberships for <strong>{campsUser?.username ?? campsUser?.email}</strong>.
+			</Dialog.DialogDescription>
+		</Dialog.DialogHeader>
+		<div class="grid gap-4">
+			<div class="grid gap-2">
+				<Label>Current camps</Label>
+				{#if !campsUser || campsUser.campIds.length === 0}
+					<p class="text-muted-foreground text-sm">Not a member of any camp.</p>
+				{:else}
+					<ul class="grid gap-2">
+						{#each campsUser.campIds as campId (campId)}
+							<li class="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+								<span>{campNameById(campId)}</span>
+								<Button
+									variant="ghost"
+									size="sm"
+									disabled={campsBusy}
+									onclick={() => handleRemoveCamp(campId)}
+								>
+									Remove
+								</Button>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</div>
+			{#if camps.filter((c) => !campsUser?.campIds.includes(c.id)).length > 0}
+				<div class="grid gap-2">
+					<Label for="add-camp-select">Add to camp</Label>
+					<div class="flex items-center gap-2">
+						<Select.Select type="single" bind:value={campsAddSelection}>
+							<Select.SelectTrigger id="add-camp-select" class="flex-1">
+								{camps.find((c) => c.id === campsAddSelection)?.name ?? "Select a camp"}
+							</Select.SelectTrigger>
+							<Select.SelectContent>
+								{#each camps.filter((c) => !campsUser?.campIds.includes(c.id)) as c (c.id)}
+									<Select.SelectItem value={c.id}>{c.name}</Select.SelectItem>
+								{/each}
+							</Select.SelectContent>
+						</Select.Select>
+						<Button onclick={handleAddCamp} disabled={!campsAddSelection || campsBusy}>
+							Add
+						</Button>
+					</div>
+				</div>
+			{/if}
+		</div>
+		<Dialog.DialogFooter>
+			<Button type="button" variant="outline" onclick={() => (campsDialogOpen = false)} disabled={campsBusy}>
+				Close
+			</Button>
+		</Dialog.DialogFooter>
+	</Dialog.DialogContent>
+</Dialog.Dialog>
+
+<!-- Edit User Dialog -->
+<Dialog.Dialog bind:open={editDialogOpen}>
+	<Dialog.DialogContent class="max-w-md" onInteractOutside={(e) => e.preventDefault()}>
+		<Dialog.DialogHeader>
+			<Dialog.DialogTitle>Edit User</Dialog.DialogTitle>
+			<Dialog.DialogDescription>
+				Update profile and role for <strong>{editingUser?.username ?? editingUser?.email}</strong>.
+			</Dialog.DialogDescription>
+		</Dialog.DialogHeader>
+		<form onsubmit={handleEditSave} class="grid gap-4">
+			{#if editError}
+				<div class="bg-destructive/10 text-destructive rounded-lg px-3 py-2 text-sm">
+					{editError}
+				</div>
+			{/if}
+			<div class="grid grid-cols-2 gap-3">
+				<div class="grid gap-2">
+					<Label for="edit-first-name">First Name</Label>
+					<Input id="edit-first-name" bind:value={editFirstName} disabled={editSaving} />
+				</div>
+				<div class="grid gap-2">
+					<Label for="edit-last-name">Last Name</Label>
+					<Input id="edit-last-name" bind:value={editLastName} disabled={editSaving} />
+				</div>
+			</div>
+			<div class="grid gap-2">
+				<Label for="edit-email">Email</Label>
+				<Input id="edit-email" type="email" bind:value={editEmail} required disabled={editSaving} />
+				<p class="text-muted-foreground text-xs">
+					Changing email will mark it unverified.
+				</p>
+			</div>
+			<div class="grid gap-2">
+				<Label>Role</Label>
+				<Select.Select type="single" bind:value={editRole}>
+					<Select.SelectTrigger class="w-full">
+						{editRole === "super_admin" ? "Super Admin" : "Admin"}
+					</Select.SelectTrigger>
+					<Select.SelectContent>
+						<Select.SelectItem value="admin">Admin</Select.SelectItem>
+						<Select.SelectItem value="super_admin">Super Admin</Select.SelectItem>
+					</Select.SelectContent>
+				</Select.Select>
+				<p class="text-muted-foreground text-xs">
+					Super admins are not assigned to a camp.
+				</p>
+			</div>
+			<Dialog.DialogFooter>
+				<Button type="button" variant="outline" onclick={() => (editDialogOpen = false)} disabled={editSaving}>Cancel</Button>
+				<Button type="submit" disabled={editSaving}>
+					{editSaving ? "Saving..." : "Save"}
+				</Button>
+			</Dialog.DialogFooter>
+		</form>
+	</Dialog.DialogContent>
+</Dialog.Dialog>

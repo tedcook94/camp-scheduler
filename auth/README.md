@@ -24,8 +24,28 @@ Camp Scheduler. Built on [BetterAuth](https://better-auth.com) with the
 - `/api/auth/*` — BetterAuth (sign-in, sign-up, session, organization, admin,
   jwt). See [BetterAuth docs](https://better-auth.com/docs).
 - `/internal/organizations` — service-to-service org create/delete (Go only).
-- `/internal/members` — service-to-service member add (Go only).
+- `/internal/members` — service-to-service member add/remove (Go only).
+- `/internal/users` — service-to-service user create/delete (Go only).
+- `/internal/users/:id/revoked-after` — returns the user's revocation
+  timestamp (Go only).
 - `/health`, `/ready` — liveness / readiness.
+
+## Token revocation
+
+The user table has a `revokedAfter` timestamp column (defaults to row
+creation). The Go server caches this per user (~30s TTL) and rejects any JWT
+whose `iat` is at or before the value. Bumping the column to `now()`
+invalidates all outstanding JWTs for that user within one cache TTL.
+
+The `/internal/members DELETE` handler bumps `revokedAfter` whenever a user
+is removed from a camp so the user can't keep acting on the removed camp via
+a JWT minted before the removal. Future "kick session" / "log out
+everywhere" features can use the same hook.
+
+The Go server fails open on transient unavailability of the revocation
+endpoint: a stale cache entry continues to be honored until the auth-server
+becomes reachable again. This trades a small additional revocation window
+for Go-side availability during auth-server restarts.
 
 ## Local development
 

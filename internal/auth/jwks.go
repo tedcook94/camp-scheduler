@@ -20,10 +20,12 @@ var ErrInvalidToken = errors.New("invalid or expired token")
 
 // JWKSAuthenticator validates JWTs issued by the BetterAuth auth-server using
 // EdDSA (Ed25519) signatures. Public keys are fetched from the JWKS endpoint
-// and cached; on a kid miss the cache is refreshed automatically.
+// and cached; on a kid miss the cache is refreshed automatically. An optional
+// RevocationChecker enforces per-user revocation timestamps.
 type JWKSAuthenticator struct {
-	jwksURL string
-	client  *http.Client
+	jwksURL    string
+	client     *http.Client
+	revocation *RevocationChecker
 
 	mu        sync.RWMutex
 	keys      map[string]ed25519.PublicKey
@@ -31,8 +33,9 @@ type JWKSAuthenticator struct {
 }
 
 type JWKSConfig struct {
-	JWKSURL string
-	Timeout time.Duration
+	JWKSURL    string
+	Timeout    time.Duration
+	Revocation *RevocationChecker
 }
 
 func NewJWKSAuthenticator(cfg JWKSConfig) *JWKSAuthenticator {
@@ -41,9 +44,10 @@ func NewJWKSAuthenticator(cfg JWKSConfig) *JWKSAuthenticator {
 		timeout = 5 * time.Second
 	}
 	return &JWKSAuthenticator{
-		jwksURL: cfg.JWKSURL,
-		client:  &http.Client{Timeout: timeout},
-		keys:    map[string]ed25519.PublicKey{},
+		jwksURL:    cfg.JWKSURL,
+		client:     &http.Client{Timeout: timeout},
+		revocation: cfg.Revocation,
+		keys:       map[string]ed25519.PublicKey{},
 	}
 }
 
@@ -61,6 +65,17 @@ func (a *JWKSAuthenticator) ValidateToken(ctx context.Context, tokenString strin
 	c, err := claimsFromMap(claims)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidToken, err)
+	}
+
+	if a.revocation != nil {
+		iat, err := claims.GetIssuedAt()
+		if err != nil || iat == nil {
+			// JWT without iat can't be revocation-checked; reject defensively.
+			return nil, ErrInvalidToken
+		}
+		if err := a.revocation.Check(ctx, c.UserID, iat.Time); err != nil {
+			return nil, err
+		}
 	}
 	return c, nil
 }

@@ -174,10 +174,13 @@ What it creates:
 - 4 counselor session history entries (from Session 1)
 - 36 campers with friend preferences, enrolled in both sessions
 
-> **Note:** The auth-server now owns user accounts. To create an admin user
-> for the demo camp, run `mise run seed:super-admin` (or sign up via the
-> auth-server) and use the BetterAuth admin UI to assign the user to the
-> demo camp's organization.
+> **Note:** When `AUTH_SERVER_URL` and `AUTH_SHARED_SECRET` are set
+> (which they are in the default `mise.toml`), `seed:demo` also provisions
+> the demo camp's organization on the auth-server and creates a demo admin
+> user assigned to it. The demo admin signs in with username `demo` and
+> password `demo1234`. Re-running `seed:demo` deletes and recreates that
+> user. If the auth-server env vars are not set, the auth-side
+> provisioning is skipped (the camp data still seeds).
 
 **Intentional constraint failure:** Session 2's activity schedule is deliberately
 unsolvable. Its Morning 2 time slot has both Swimming and Canoeing, which each

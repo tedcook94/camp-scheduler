@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"camp-scheduler/internal/admin"
 	"camp-scheduler/internal/config"
 	"camp-scheduler/internal/db"
 
@@ -15,8 +16,14 @@ import (
 )
 
 const (
-	demoCampIDStr = "00000000-0000-0000-0000-000000000000"
-	demoCampName  = "Demo Camp"
+	demoCampIDStr     = "00000000-0000-0000-0000-000000000000"
+	demoCampName      = "Demo Camp"
+	demoCampSlug      = "demo-camp"
+	demoAdminEmail    = "demo@example.com"
+	demoAdminUsername = "demo"
+	demoAdminPassword = "demo1234"
+	demoAdminFirst    = "Demo"
+	demoAdminLast     = "Admin"
 )
 
 func pgUUID(s string) pgtype.UUID {
@@ -83,7 +90,61 @@ func main() {
 	}
 
 	fmt.Println("Demo camp seeded successfully!")
-	fmt.Println("To create the demo admin user, run `pnpm seed:super-admin` in the auth/ directory.")
+
+	if cfg.Auth.ServerURL == "" || cfg.Auth.SharedSecret == "" {
+		fmt.Println("AUTH_SERVER_URL or AUTH_SHARED_SECRET not set; skipping auth-server provisioning.")
+		fmt.Println("Set both env vars to provision the demo organization and admin user.")
+		return
+	}
+
+	syncer := admin.NewOrgSyncer(admin.OrgSyncerConfig{
+		BaseURL: cfg.Auth.InternalURL(),
+		Secret:  cfg.Auth.SharedSecret,
+		Timeout: 10 * time.Second,
+	})
+
+	authCtx, authCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer authCancel()
+
+	fmt.Println("Cleaning up existing demo auth state...")
+	if err := syncer.DeleteUserByEmail(authCtx, demoAdminEmail); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: error deleting existing demo user: %v\n", err)
+	}
+	if err := syncer.DeleteOrg(authCtx, demoCampIDStr); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: error deleting existing demo org: %v\n", err)
+	}
+
+	fmt.Println("Syncing demo organization to auth-server...")
+	if err := syncer.CreateOrg(authCtx, demoCampIDStr, demoCampName, demoCampSlug); err != nil {
+		fmt.Fprintf(os.Stderr, "error syncing organization: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Creating demo admin user via auth-server...")
+	userID, err := syncer.CreateUser(authCtx, admin.CreateUserRequest{
+		Email:     demoAdminEmail,
+		Password:  demoAdminPassword,
+		Username:  demoAdminUsername,
+		FirstName: demoAdminFirst,
+		LastName:  demoAdminLast,
+		Role:      "user",
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error creating demo admin user: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Adding demo user (%s) to demo camp organization...\n", userID)
+	if err := syncer.AddMember(authCtx, userID, demoCampIDStr, "admin"); err != nil {
+		fmt.Fprintf(os.Stderr, "error adding member: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println()
+	fmt.Println("Demo admin credentials:")
+	fmt.Printf("  username: %s\n", demoAdminUsername)
+	fmt.Printf("  email:    %s\n", demoAdminEmail)
+	fmt.Printf("  password: %s\n", demoAdminPassword)
 }
 
 func deleteExisting(ctx context.Context, tx pgx.Tx, campID pgtype.UUID) error {
@@ -423,13 +484,14 @@ func configureSessions(ctx context.Context, q *db.Queries, campID pgtype.UUID, s
 	cabinDefs := []struct {
 		name     string
 		ageGroup string
+		gender   string
 	}{
-		{"Pine Lodge", "Bears"},
-		{"Cedar Lodge", "Bears"},
-		{"Maple Lodge", "Eagles"},
-		{"Birch Lodge", "Eagles"},
-		{"Oak Lodge", "Wolves"},
-		{"Elm Lodge", "Wolves"},
+		{"Pine Lodge", "Bears", "female"},
+		{"Cedar Lodge", "Bears", "male"},
+		{"Maple Lodge", "Eagles", "female"},
+		{"Birch Lodge", "Eagles", "male"},
+		{"Oak Lodge", "Wolves", "female"},
+		{"Elm Lodge", "Wolves", "male"},
 	}
 	for _, cd := range cabinDefs {
 		for _, sagMap := range []map[string]db.SessionAgeGroup{s1AGs, s2AGs} {
@@ -439,6 +501,7 @@ func configureSessions(ctx context.Context, q *db.Queries, campID pgtype.UUID, s
 				CabinID:            cabins[cd.name].ID,
 				GroupSize:          9,
 				RequiredCounselors: 2,
+				Gender:             cd.gender,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("error creating session age group cabin: %w", err)

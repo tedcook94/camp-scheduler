@@ -31,9 +31,11 @@ type ServerConfig struct {
 // than at config load, so test/CLI callers that don't need an authenticated
 // server (integration tests, seed scripts) can still load config.
 type AuthConfig struct {
-	ServerURL    string        `envconfig:"AUTH_SERVER_URL"`
-	SharedSecret string        `envconfig:"AUTH_SHARED_SECRET"`
-	JWKSTimeout  time.Duration `envconfig:"AUTH_JWKS_TIMEOUT" default:"5s"`
+	ServerURL           string        `envconfig:"AUTH_SERVER_URL"`
+	SharedSecret        string        `envconfig:"AUTH_SHARED_SECRET"`
+	JWKSTimeout         time.Duration `envconfig:"AUTH_JWKS_TIMEOUT" default:"5s"`
+	RevocationCacheTTL  time.Duration `envconfig:"AUTH_REVOCATION_CACHE_TTL" default:"30s"`
+	RevocationTimeout   time.Duration `envconfig:"AUTH_REVOCATION_TIMEOUT" default:"5s"`
 }
 
 // JWKSURL is the JWKS endpoint exposed by the auth-server.

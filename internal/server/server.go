@@ -79,9 +79,19 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, staticFS fs.FS, deps Dep
 
 	authenticator := deps.Authenticator
 	if authenticator == nil {
+		var revocation *auth.RevocationChecker
+		if cfg.Auth.ServerURL != "" && cfg.Auth.SharedSecret != "" {
+			revocation = auth.NewRevocationChecker(auth.RevocationConfig{
+				BaseURL:  cfg.Auth.InternalURL(),
+				Secret:   cfg.Auth.SharedSecret,
+				CacheTTL: cfg.Auth.RevocationCacheTTL,
+				Timeout:  cfg.Auth.RevocationTimeout,
+			})
+		}
 		jwks := auth.NewJWKSAuthenticator(auth.JWKSConfig{
-			JWKSURL: cfg.Auth.JWKSURL(),
-			Timeout: cfg.Auth.JWKSTimeout,
+			JWKSURL:    cfg.Auth.JWKSURL(),
+			Timeout:    cfg.Auth.JWKSTimeout,
+			Revocation: revocation,
 		})
 		jwks.Warmup(context.Background())
 		authenticator = jwks

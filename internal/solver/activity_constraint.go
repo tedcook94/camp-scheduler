@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func CheckActivityHardConstraints(snapshot ActivitySnapshot, assignment ActivityAssignment) []Violation {
+func CheckActivityHardConstraints(snapshot ActivitySnapshot, assignment CounselorActivityAssignment) []Violation {
 	var violations []Violation
 	violations = append(violations, checkMinimumCounselors(snapshot, assignment)...)
 	violations = append(violations, checkCounselorCertification(snapshot, assignment)...)
@@ -14,7 +14,7 @@ func CheckActivityHardConstraints(snapshot ActivitySnapshot, assignment Activity
 	return violations
 }
 
-func checkMinimumCounselors(snapshot ActivitySnapshot, assignment ActivityAssignment) []Violation {
+func checkMinimumCounselors(snapshot ActivitySnapshot, assignment CounselorActivityAssignment) []Violation {
 	var violations []Violation
 	for _, slot := range snapshot.Slots {
 		assigned := len(assignment.SlotCounselors[slot.ID])
@@ -31,7 +31,7 @@ func checkMinimumCounselors(snapshot ActivitySnapshot, assignment ActivityAssign
 	return violations
 }
 
-func checkCounselorCertification(snapshot ActivitySnapshot, assignment ActivityAssignment) []Violation {
+func checkCounselorCertification(snapshot ActivitySnapshot, assignment CounselorActivityAssignment) []Violation {
 	counselorsByID := indexActivityCounselors(snapshot)
 
 	var violations []Violation
@@ -56,7 +56,7 @@ func checkCounselorCertification(snapshot ActivitySnapshot, assignment ActivityA
 	return violations
 }
 
-func checkTimeConflict(snapshot ActivitySnapshot, assignment ActivityAssignment) []Violation {
+func checkTimeConflict(snapshot ActivitySnapshot, assignment CounselorActivityAssignment) []Violation {
 	slotsByID := indexActivitySlots(snapshot)
 	counselorsByID := indexActivityCounselors(snapshot)
 
@@ -108,7 +108,7 @@ func checkTimeConflict(snapshot ActivitySnapshot, assignment ActivityAssignment)
 	return violations
 }
 
-func checkActivityCapacity(snapshot ActivitySnapshot, assignment ActivityAssignment) []Violation {
+func checkActivityCapacity(snapshot ActivitySnapshot, assignment CounselorActivityAssignment) []Violation {
 	var violations []Violation
 	for _, slot := range snapshot.Slots {
 		assigned := len(assignment.SlotCounselors[slot.ID])

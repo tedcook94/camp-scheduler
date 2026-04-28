@@ -2,7 +2,7 @@ package solver
 
 import "sort"
 
-func SolveActivity(snapshot ActivitySnapshot, config ActivitySolverConfig) []ActivitySolution {
+func SolveActivity(snapshot ActivitySnapshot, config ActivitySolverConfig) []CounselorActivitySolution {
 	if config.MaxSolutions <= 0 || config.MaxIterations <= 0 {
 		return nil
 	}
@@ -75,7 +75,7 @@ type activitySearchState struct {
 	timeSlotOrder      []string
 	assignment         map[string][]string
 	counselorSlots     map[string][]string
-	solutions          []ActivitySolution
+	solutions          []CounselorActivitySolution
 	iterations         int
 }
 
@@ -223,7 +223,7 @@ func (s *activitySearchState) evaluateSolution() {
 	unassigned := computeActivityUnassignedCounselors(s.snapshot, assignment, s.eligibleByTimeSlot, s.timeSlotOrder, s.slotsByID)
 
 	if len(s.solutions) < s.config.MaxSolutions {
-		s.solutions = append(s.solutions, ActivitySolution{
+		s.solutions = append(s.solutions, CounselorActivitySolution{
 			Assignment:           assignment,
 			Score:                score,
 			UnassignedCounselors: unassigned,
@@ -238,7 +238,7 @@ func (s *activitySearchState) evaluateSolution() {
 		}
 	}
 	if score.Total > s.solutions[worstIdx].Score.Total {
-		s.solutions[worstIdx] = ActivitySolution{
+		s.solutions[worstIdx] = CounselorActivitySolution{
 			Assignment:           assignment,
 			Score:                score,
 			UnassignedCounselors: unassigned,
@@ -253,7 +253,7 @@ func (s *activitySearchState) evaluateSolution() {
 // flagged for it because the solver had no valid placement to make.
 func computeActivityUnassignedCounselors(
 	snapshot ActivitySnapshot,
-	assignment ActivityAssignment,
+	assignment CounselorActivityAssignment,
 	eligibleByTimeSlot map[string]map[string][]string,
 	timeSlotOrder []string,
 	slotsByID map[string]ActivitySlot,
@@ -291,7 +291,7 @@ func computeActivityUnassignedCounselors(
 	return result
 }
 
-func (s *activitySearchState) cloneAssignment() ActivityAssignment {
+func (s *activitySearchState) cloneAssignment() CounselorActivityAssignment {
 	clone := make(map[string][]string, len(s.assignment))
 	for slotID, counselorIDs := range s.assignment {
 		if len(counselorIDs) == 0 {
@@ -301,7 +301,7 @@ func (s *activitySearchState) cloneAssignment() ActivityAssignment {
 		copy(c, counselorIDs)
 		clone[slotID] = c
 	}
-	return ActivityAssignment{SlotCounselors: clone}
+	return CounselorActivityAssignment{SlotCounselors: clone}
 }
 
 func counselorHasCerts(c ActivityCounselor, slot ActivitySlot) bool {
@@ -370,11 +370,11 @@ func orderedTimeSlots(snapshot ActivitySnapshot) []string {
 // the highest remaining-capacity fraction (round-robin balancing).
 func fillRemainingActivity(
 	snapshot ActivitySnapshot,
-	assignment ActivityAssignment,
+	assignment CounselorActivityAssignment,
 	eligibleByTimeSlot map[string]map[string][]string,
 	timeSlotOrder []string,
 	slotsByID map[string]ActivitySlot,
-) ActivityAssignment {
+) CounselorActivityAssignment {
 	result := make(map[string][]string, len(assignment.SlotCounselors))
 	counts := make(map[string]int)
 	for slotID, counselorIDs := range assignment.SlotCounselors {
@@ -473,5 +473,5 @@ func fillRemainingActivity(
 		}
 	}
 
-	return ActivityAssignment{SlotCounselors: result}
+	return CounselorActivityAssignment{SlotCounselors: result}
 }

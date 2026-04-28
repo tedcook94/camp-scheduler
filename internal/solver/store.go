@@ -65,13 +65,13 @@ func storeUnassignedCounselors(ctx context.Context, qtx *db.Queries, campID, sol
 func storeAssignments(ctx context.Context, qtx *db.Queries, campID, solutionID pgtype.UUID, snapshot SessionSnapshot, solution Solution) error {
 	sagcByCabinID := make(map[string]string, len(snapshot.Cabins))
 	for _, c := range snapshot.Cabins {
-		sagcByCabinID[c.ID] = c.SessionAgeGroupCabinID
+		sagcByCabinID[c.ID] = c.SessionCabinID
 	}
 
 	for cabinID, counselorIDs := range solution.Assignment.CabinCounselors {
 		sagcID, ok := sagcByCabinID[cabinID]
 		if !ok || sagcID == "" {
-			return fmt.Errorf("error resolving session_age_group_cabin_id for cabin %s", cabinID)
+			return fmt.Errorf("error resolving session_cabin_id for cabin %s", cabinID)
 		}
 		sagcUUID, err := api.ParseUUID(sagcID)
 		if err != nil {
@@ -87,7 +87,7 @@ func storeAssignments(ctx context.Context, qtx *db.Queries, campID, solutionID p
 				CampID:                 campID,
 				SolutionID:             solutionID,
 				CounselorID:            counselorUUID,
-				SessionAgeGroupCabinID: sagcUUID,
+				SessionCabinID: sagcUUID,
 			})
 			if err != nil {
 				return fmt.Errorf("error creating assignment for counselor %s: %w", counselorID, err)

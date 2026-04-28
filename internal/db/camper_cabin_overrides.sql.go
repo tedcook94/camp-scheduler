@@ -12,16 +12,16 @@ import (
 )
 
 const createCamperCabinOverride = `-- name: CreateCamperCabinOverride :one
-INSERT INTO camper_cabin_overrides (camp_id, session_id, camper_id, session_age_group_cabin_id)
+INSERT INTO camper_cabin_overrides (camp_id, session_id, camper_id, session_cabin_id)
 VALUES ($1, $2, $3, $4)
-RETURNING id, camp_id, session_id, camper_id, session_age_group_cabin_id, created_at
+RETURNING id, camp_id, session_id, camper_id, session_cabin_id, created_at
 `
 
 type CreateCamperCabinOverrideParams struct {
-	CampID                 pgtype.UUID
-	SessionID              pgtype.UUID
-	CamperID               pgtype.UUID
-	SessionAgeGroupCabinID pgtype.UUID
+	CampID         pgtype.UUID
+	SessionID      pgtype.UUID
+	CamperID       pgtype.UUID
+	SessionCabinID pgtype.UUID
 }
 
 func (q *Queries) CreateCamperCabinOverride(ctx context.Context, arg CreateCamperCabinOverrideParams) (CamperCabinOverride, error) {
@@ -29,7 +29,7 @@ func (q *Queries) CreateCamperCabinOverride(ctx context.Context, arg CreateCampe
 		arg.CampID,
 		arg.SessionID,
 		arg.CamperID,
-		arg.SessionAgeGroupCabinID,
+		arg.SessionCabinID,
 	)
 	var i CamperCabinOverride
 	err := row.Scan(
@@ -37,7 +37,7 @@ func (q *Queries) CreateCamperCabinOverride(ctx context.Context, arg CreateCampe
 		&i.CampID,
 		&i.SessionID,
 		&i.CamperID,
-		&i.SessionAgeGroupCabinID,
+		&i.SessionCabinID,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -62,7 +62,7 @@ func (q *Queries) DeleteCamperCabinOverride(ctx context.Context, arg DeleteCampe
 }
 
 const getCamperCabinOverride = `-- name: GetCamperCabinOverride :one
-SELECT id, camp_id, session_id, camper_id, session_age_group_cabin_id, created_at
+SELECT id, camp_id, session_id, camper_id, session_cabin_id, created_at
 FROM camper_cabin_overrides
 WHERE id = $1 AND camp_id = $2
 `
@@ -80,14 +80,14 @@ func (q *Queries) GetCamperCabinOverride(ctx context.Context, arg GetCamperCabin
 		&i.CampID,
 		&i.SessionID,
 		&i.CamperID,
-		&i.SessionAgeGroupCabinID,
+		&i.SessionCabinID,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const listCamperCabinOverridesBySession = `-- name: ListCamperCabinOverridesBySession :many
-SELECT o.id, o.camp_id, o.session_id, o.camper_id, o.session_age_group_cabin_id, o.created_at,
+SELECT o.id, o.camp_id, o.session_id, o.camper_id, o.session_cabin_id, o.created_at,
        sagc.cabin_id AS cabin_id,
        cm.first_name AS camper_first_name,
        cm.last_name AS camper_last_name,
@@ -96,7 +96,7 @@ SELECT o.id, o.camp_id, o.session_id, o.camper_id, o.session_age_group_cabin_id,
        ag.age_group_name AS age_group_name
 FROM camper_cabin_overrides o
 JOIN campers cm ON cm.id = o.camper_id
-JOIN session_age_group_cabins sagc ON sagc.id = o.session_age_group_cabin_id
+JOIN session_cabins sagc ON sagc.id = o.session_cabin_id
 JOIN cabins cb ON cb.id = sagc.cabin_id
 JOIN session_age_groups sag ON sag.id = sagc.session_age_group_id
 JOIN age_groups ag ON ag.id = sag.age_group_id
@@ -110,18 +110,18 @@ type ListCamperCabinOverridesBySessionParams struct {
 }
 
 type ListCamperCabinOverridesBySessionRow struct {
-	ID                     pgtype.UUID
-	CampID                 pgtype.UUID
-	SessionID              pgtype.UUID
-	CamperID               pgtype.UUID
-	SessionAgeGroupCabinID pgtype.UUID
-	CreatedAt              pgtype.Timestamptz
-	CabinID                pgtype.UUID
-	CamperFirstName        string
-	CamperLastName         string
-	CamperName             string
-	CabinName              string
-	AgeGroupName           string
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	SessionID       pgtype.UUID
+	CamperID        pgtype.UUID
+	SessionCabinID  pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+	CabinID         pgtype.UUID
+	CamperFirstName string
+	CamperLastName  string
+	CamperName      string
+	CabinName       string
+	AgeGroupName    string
 }
 
 func (q *Queries) ListCamperCabinOverridesBySession(ctx context.Context, arg ListCamperCabinOverridesBySessionParams) ([]ListCamperCabinOverridesBySessionRow, error) {
@@ -138,7 +138,7 @@ func (q *Queries) ListCamperCabinOverridesBySession(ctx context.Context, arg Lis
 			&i.CampID,
 			&i.SessionID,
 			&i.CamperID,
-			&i.SessionAgeGroupCabinID,
+			&i.SessionCabinID,
 			&i.CreatedAt,
 			&i.CabinID,
 			&i.CamperFirstName,
@@ -158,7 +158,7 @@ func (q *Queries) ListCamperCabinOverridesBySession(ctx context.Context, arg Lis
 }
 
 const listCamperCabinOverridesForSolver = `-- name: ListCamperCabinOverridesForSolver :many
-SELECT o.camper_id, o.session_age_group_cabin_id
+SELECT o.camper_id, o.session_cabin_id
 FROM camper_cabin_overrides o
 WHERE o.session_id = $1 AND o.camp_id = $2
 `
@@ -169,8 +169,8 @@ type ListCamperCabinOverridesForSolverParams struct {
 }
 
 type ListCamperCabinOverridesForSolverRow struct {
-	CamperID               pgtype.UUID
-	SessionAgeGroupCabinID pgtype.UUID
+	CamperID       pgtype.UUID
+	SessionCabinID pgtype.UUID
 }
 
 func (q *Queries) ListCamperCabinOverridesForSolver(ctx context.Context, arg ListCamperCabinOverridesForSolverParams) ([]ListCamperCabinOverridesForSolverRow, error) {
@@ -182,7 +182,7 @@ func (q *Queries) ListCamperCabinOverridesForSolver(ctx context.Context, arg Lis
 	var items []ListCamperCabinOverridesForSolverRow
 	for rows.Next() {
 		var i ListCamperCabinOverridesForSolverRow
-		if err := rows.Scan(&i.CamperID, &i.SessionAgeGroupCabinID); err != nil {
+		if err := rows.Scan(&i.CamperID, &i.SessionCabinID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

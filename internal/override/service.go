@@ -56,7 +56,7 @@ func (svc *Service) ListBySession(ctx context.Context, campID, sessionID string)
 			CampID:                 api.UUIDToString(r.CampID),
 			SessionID:              api.UUIDToString(r.SessionID),
 			CounselorID:            api.UUIDToString(r.CounselorID),
-			SessionAgeGroupCabinID: api.UUIDToString(r.SessionAgeGroupCabinID),
+			SessionCabinID: api.UUIDToString(r.SessionCabinID),
 			CabinID:                api.UUIDToString(r.CabinID),
 			CounselorFirstName:     r.CounselorFirstName,
 			CounselorLastName:      r.CounselorLastName,
@@ -79,7 +79,7 @@ func (svc *Service) ListBySession(ctx context.Context, campID, sessionID string)
 			CampID:                 api.UUIDToString(r.CampID),
 			SessionID:              api.UUIDToString(r.SessionID),
 			CamperID:               api.UUIDToString(r.CamperID),
-			SessionAgeGroupCabinID: api.UUIDToString(r.SessionAgeGroupCabinID),
+			SessionCabinID: api.UUIDToString(r.SessionCabinID),
 			CabinID:                api.UUIDToString(r.CabinID),
 			CamperFirstName:        r.CamperFirstName,
 			CamperLastName:         r.CamperLastName,
@@ -130,7 +130,7 @@ func (svc *Service) CreateCounselorCabin(ctx context.Context, campID, sessionID 
 	if err != nil {
 		return resp, err
 	}
-	cabinUUID, err := api.ParseUUID(req.SessionAgeGroupCabinID)
+	cabinUUID, err := api.ParseUUID(req.SessionCabinID)
 	if err != nil {
 		return resp, err
 	}
@@ -150,7 +150,7 @@ func (svc *Service) CreateCounselorCabin(ctx context.Context, campID, sessionID 
 		CampID:                 campUUID,
 		SessionID:              sessionUUID,
 		CounselorID:            counselorUUID,
-		SessionAgeGroupCabinID: cabinUUID,
+		SessionCabinID: cabinUUID,
 	})
 	if err != nil {
 		return resp, fmt.Errorf("error creating counselor-cabin override: %w", err)
@@ -233,7 +233,7 @@ func (svc *Service) CreateCamperCabin(ctx context.Context, campID, sessionID str
 	if err != nil {
 		return resp, err
 	}
-	cabinUUID, err := api.ParseUUID(req.SessionAgeGroupCabinID)
+	cabinUUID, err := api.ParseUUID(req.SessionCabinID)
 	if err != nil {
 		return resp, err
 	}
@@ -253,7 +253,7 @@ func (svc *Service) CreateCamperCabin(ctx context.Context, campID, sessionID str
 		CampID:                 campUUID,
 		SessionID:              sessionUUID,
 		CamperID:               camperUUID,
-		SessionAgeGroupCabinID: cabinUUID,
+		SessionCabinID: cabinUUID,
 	})
 	if err != nil {
 		return resp, fmt.Errorf("error creating camper-cabin override: %w", err)
@@ -438,7 +438,7 @@ func (svc *Service) getCounselorCabin(ctx context.Context, campUUID, sessionUUID
 				CampID:                 api.UUIDToString(r.CampID),
 				SessionID:              api.UUIDToString(r.SessionID),
 				CounselorID:            api.UUIDToString(r.CounselorID),
-				SessionAgeGroupCabinID: api.UUIDToString(r.SessionAgeGroupCabinID),
+				SessionCabinID: api.UUIDToString(r.SessionCabinID),
 				CabinID:                api.UUIDToString(r.CabinID),
 				CounselorFirstName:     r.CounselorFirstName,
 				CounselorLastName:      r.CounselorLastName,
@@ -466,7 +466,7 @@ func (svc *Service) getCamperCabin(ctx context.Context, campUUID, sessionUUID, i
 				CampID:                 api.UUIDToString(r.CampID),
 				SessionID:              api.UUIDToString(r.SessionID),
 				CamperID:               api.UUIDToString(r.CamperID),
-				SessionAgeGroupCabinID: api.UUIDToString(r.SessionAgeGroupCabinID),
+				SessionCabinID: api.UUIDToString(r.SessionCabinID),
 				CabinID:                api.UUIDToString(r.CabinID),
 				CamperFirstName:        r.CamperFirstName,
 				CamperLastName:         r.CamperLastName,

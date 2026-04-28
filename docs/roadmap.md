@@ -35,7 +35,7 @@ schema (37 migrations). Key groups:
 - **Campers:** campers, camper_session_enrollments
 - **Activities:** activities, time_slots, counselor_certifications, session_time_slots, session_activities
 - **Session config:** session_age_groups, session_cabins, session_counselors (per-session counselor roster)
-- **Assignments:** assignment_runs, assignment_run_selected_solutions, counselor_cabin_solutions/assignments/explanations, camper_cabin_solutions/assignments/explanations, activity_solutions/assignments/explanations
+- **Assignments:** assignment_runs, assignment_run_selected_solutions, counselor_cabin_solutions/assignments/explanations, camper_cabin_solutions/assignments/explanations, counselor_activity_solutions/assignments/explanations
 
 ## Constraints
 

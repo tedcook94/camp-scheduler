@@ -54,7 +54,7 @@ func BuildCamperCabinSnapshot(ctx context.Context, queries *db.Queries, campID, 
 	}
 	sagcToCabin := make(map[string]string, len(cabins))
 	for _, c := range cabins {
-		sagcToCabin[c.SessionAgeGroupCabinID] = c.ID
+		sagcToCabin[c.SessionCabinID] = c.ID
 	}
 	overrides = remapOverrideValues(overrides, sagcToCabin)
 
@@ -86,7 +86,7 @@ func loadCamperCabinOverrides(ctx context.Context, queries *db.Queries, sessionI
 		if !enrolled[camperID] {
 			continue
 		}
-		overrides[camperID] = api.UUIDToString(r.SessionAgeGroupCabinID)
+		overrides[camperID] = api.UUIDToString(r.SessionCabinID)
 	}
 	return overrides, nil
 }
@@ -110,7 +110,7 @@ func loadCamperCabins(ctx context.Context, queries *db.Queries, sessionID, campI
 			Name:                   r.CabinName,
 			AgeGroupID:             api.UUIDToString(r.AgeGroupID),
 			AgeGroupName:           r.AgeGroupName,
-			SessionAgeGroupCabinID: api.UUIDToString(r.SessionAgeGroupCabinID),
+			SessionCabinID: api.UUIDToString(r.SessionCabinID),
 			Capacity:               int(r.GroupSize),
 			Gender:                 r.Gender,
 		})

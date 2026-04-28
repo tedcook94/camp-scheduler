@@ -29,9 +29,9 @@ func LoadCabinSolution(ctx context.Context, q *db.Queries, campID, runID, soluti
 	return loadCabinSolution(ctx, q, campUUID, runUUID, solutionID)
 }
 
-// LoadActivitySolution returns an activity solution detail (assignments,
+// LoadCounselorActivitySolution returns an activity solution detail (assignments,
 // explanations, unassigned counselors) by its ID.
-func LoadActivitySolution(ctx context.Context, q *db.Queries, campID, runID, solutionID string) (SolutionDetailResponse, error) {
+func LoadCounselorActivitySolution(ctx context.Context, q *db.Queries, campID, runID, solutionID string) (SolutionDetailResponse, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {
 		return SolutionDetailResponse{}, err
@@ -40,7 +40,7 @@ func LoadActivitySolution(ctx context.Context, q *db.Queries, campID, runID, sol
 	if err != nil {
 		return SolutionDetailResponse{}, err
 	}
-	return loadActivitySolution(ctx, q, campUUID, runUUID, solutionID)
+	return loadCounselorActivitySolution(ctx, q, campUUID, runUUID, solutionID)
 }
 
 func loadCabinSolution(ctx context.Context, q *db.Queries, campUUID, runUUID pgtype.UUID, solutionID string) (SolutionDetailResponse, error) {
@@ -177,13 +177,13 @@ func loadCabinSolution(ctx context.Context, q *db.Queries, campUUID, runUUID pgt
 	}, nil
 }
 
-func loadActivitySolution(ctx context.Context, q *db.Queries, campUUID, runUUID pgtype.UUID, solutionID string) (SolutionDetailResponse, error) {
+func loadCounselorActivitySolution(ctx context.Context, q *db.Queries, campUUID, runUUID pgtype.UUID, solutionID string) (SolutionDetailResponse, error) {
 	solUUID, err := api.ParseUUID(solutionID)
 	if err != nil {
 		return SolutionDetailResponse{}, err
 	}
 
-	sol, err := q.GetActivitySolution(ctx, db.GetActivitySolutionParams{
+	sol, err := q.GetCounselorActivitySolution(ctx, db.GetCounselorActivitySolutionParams{
 		ID:              solUUID,
 		CampID:          campUUID,
 		AssignmentRunID: runUUID,
@@ -195,7 +195,7 @@ func loadActivitySolution(ctx context.Context, q *db.Queries, campUUID, runUUID 
 		return SolutionDetailResponse{}, fmt.Errorf("error getting activity solution %s: %w", solutionID, err)
 	}
 
-	assignments, err := q.ListActivityAssignmentsBySolution(ctx, db.ListActivityAssignmentsBySolutionParams{
+	assignments, err := q.ListCounselorActivityAssignmentsBySolution(ctx, db.ListCounselorActivityAssignmentsBySolutionParams{
 		SolutionID: solUUID,
 		CampID:     campUUID,
 	})
@@ -203,7 +203,7 @@ func loadActivitySolution(ctx context.Context, q *db.Queries, campUUID, runUUID 
 		return SolutionDetailResponse{}, fmt.Errorf("error listing activity assignments for solution %s: %w", solutionID, err)
 	}
 
-	explanations, err := q.ListActivityExplanationsBySolution(ctx, db.ListActivityExplanationsBySolutionParams{
+	explanations, err := q.ListCounselorActivityExplanationsBySolution(ctx, db.ListCounselorActivityExplanationsBySolutionParams{
 		SolutionID: solUUID,
 		CampID:     campUUID,
 	})
@@ -266,7 +266,7 @@ func loadActivitySolution(ctx context.Context, q *db.Queries, campUUID, runUUID 
 	}
 
 	return SolutionDetailResponse{
-		SolutionSummaryResponse: toActivitySolutionSummaryResponse(sol),
+		SolutionSummaryResponse: toCounselorActivitySolutionSummaryResponse(sol),
 		Assignments:             assignmentResponses,
 		Explanations:            explanationResponses,
 		UnassignedCounselors:    unassignedResponses,

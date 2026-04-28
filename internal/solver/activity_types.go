@@ -36,7 +36,7 @@ type ActivitySnapshot struct {
 	Overrides map[string]map[string]string
 }
 
-type ActivityAssignment struct {
+type CounselorActivityAssignment struct {
 	SlotCounselors map[string][]string
 }
 
@@ -66,8 +66,8 @@ func DefaultActivitySolverConfig() ActivitySolverConfig {
 	}
 }
 
-type ActivitySolution struct {
-	Assignment           ActivityAssignment
+type CounselorActivitySolution struct {
+	Assignment           CounselorActivityAssignment
 	Score                ScoreResult
 	UnassignedCounselors []UnassignedCounselorSlots
 }
@@ -84,13 +84,13 @@ type UnassignedCounselorSlots struct {
 	MissingTimeSlotIDs []string
 }
 
-type ActivityExplanation struct {
-	Assignments            []ActivityAssignmentExplanation
+type CounselorActivityExplanation struct {
+	Assignments            []CounselorActivityAssignmentExplanation
 	UnmetPreferences       []ActivityUnmetPreference
 	IneligiblePreferences  []ActivityUnmetPreference
 }
 
-type ActivityAssignmentExplanation struct {
+type CounselorActivityAssignmentExplanation struct {
 	CounselorID string
 	SlotID      string
 	Reasons     []AssignmentReason

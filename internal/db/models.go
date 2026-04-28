@@ -15,40 +15,11 @@ type Activity struct {
 	Archived     bool
 }
 
-type ActivityAssignment struct {
-	ID                pgtype.UUID
-	CampID            pgtype.UUID
-	SolutionID        pgtype.UUID
-	CounselorID       pgtype.UUID
-	SessionActivityID pgtype.UUID
-}
-
 type ActivityCertification struct {
 	ID              pgtype.UUID
 	CampID          pgtype.UUID
 	ActivityID      pgtype.UUID
 	CertificationID pgtype.UUID
-}
-
-type ActivityExplanation struct {
-	ID                pgtype.UUID
-	CampID            pgtype.UUID
-	SolutionID        pgtype.UUID
-	CounselorID       pgtype.UUID
-	ExplanationType   string
-	ConstraintName    pgtype.Text
-	Message           string
-	Rank              pgtype.Int4
-	SessionActivityID pgtype.UUID
-}
-
-type ActivitySolution struct {
-	ID              pgtype.UUID
-	CampID          pgtype.UUID
-	AssignmentRunID pgtype.UUID
-	SolutionIndex   int32
-	Score           float64
-	ScoreBreakdown  []byte
 }
 
 type AgeGroup struct {
@@ -104,11 +75,11 @@ type Camper struct {
 }
 
 type CamperCabinAssignment struct {
-	ID                     pgtype.UUID
-	CampID                 pgtype.UUID
-	SolutionID             pgtype.UUID
-	CamperID               pgtype.UUID
-	SessionAgeGroupCabinID pgtype.UUID
+	ID             pgtype.UUID
+	CampID         pgtype.UUID
+	SolutionID     pgtype.UUID
+	CamperID       pgtype.UUID
+	SessionCabinID pgtype.UUID
 }
 
 type CamperCabinExplanation struct {
@@ -123,12 +94,12 @@ type CamperCabinExplanation struct {
 }
 
 type CamperCabinOverride struct {
-	ID                     pgtype.UUID
-	CampID                 pgtype.UUID
-	SessionID              pgtype.UUID
-	CamperID               pgtype.UUID
-	SessionAgeGroupCabinID pgtype.UUID
-	CreatedAt              pgtype.Timestamptz
+	ID             pgtype.UUID
+	CampID         pgtype.UUID
+	SessionID      pgtype.UUID
+	CamperID       pgtype.UUID
+	SessionCabinID pgtype.UUID
+	CreatedAt      pgtype.Timestamptz
 }
 
 type CamperCabinSolution struct {
@@ -174,6 +145,26 @@ type Counselor struct {
 	Archived        bool
 }
 
+type CounselorActivityAssignment struct {
+	ID                pgtype.UUID
+	CampID            pgtype.UUID
+	SolutionID        pgtype.UUID
+	CounselorID       pgtype.UUID
+	SessionActivityID pgtype.UUID
+}
+
+type CounselorActivityExplanation struct {
+	ID                pgtype.UUID
+	CampID            pgtype.UUID
+	SolutionID        pgtype.UUID
+	CounselorID       pgtype.UUID
+	ExplanationType   string
+	ConstraintName    pgtype.Text
+	Message           string
+	Rank              pgtype.Int4
+	SessionActivityID pgtype.UUID
+}
+
 type CounselorActivityOverride struct {
 	ID                pgtype.UUID
 	CampID            pgtype.UUID
@@ -190,6 +181,15 @@ type CounselorActivityPreference struct {
 	SessionID   pgtype.UUID
 	ActivityID  pgtype.UUID
 	Rank        int32
+}
+
+type CounselorActivitySolution struct {
+	ID              pgtype.UUID
+	CampID          pgtype.UUID
+	AssignmentRunID pgtype.UUID
+	SolutionIndex   int32
+	Score           float64
+	ScoreBreakdown  []byte
 }
 
 type CounselorActivityUnassigned struct {
@@ -216,11 +216,11 @@ type CounselorAgeGroupPreference struct {
 }
 
 type CounselorCabinAssignment struct {
-	ID                     pgtype.UUID
-	CampID                 pgtype.UUID
-	SolutionID             pgtype.UUID
-	CounselorID            pgtype.UUID
-	SessionAgeGroupCabinID pgtype.UUID
+	ID             pgtype.UUID
+	CampID         pgtype.UUID
+	SolutionID     pgtype.UUID
+	CounselorID    pgtype.UUID
+	SessionCabinID pgtype.UUID
 }
 
 type CounselorCabinExplanation struct {
@@ -235,12 +235,12 @@ type CounselorCabinExplanation struct {
 }
 
 type CounselorCabinOverride struct {
-	ID                     pgtype.UUID
-	CampID                 pgtype.UUID
-	SessionID              pgtype.UUID
-	CounselorID            pgtype.UUID
-	SessionAgeGroupCabinID pgtype.UUID
-	CreatedAt              pgtype.Timestamptz
+	ID             pgtype.UUID
+	CampID         pgtype.UUID
+	SessionID      pgtype.UUID
+	CounselorID    pgtype.UUID
+	SessionCabinID pgtype.UUID
+	CreatedAt      pgtype.Timestamptz
 }
 
 type CounselorCabinSolution struct {
@@ -318,7 +318,7 @@ type SessionAgeGroup struct {
 	AgeGroupID pgtype.UUID
 }
 
-type SessionAgeGroupCabin struct {
+type SessionCabin struct {
 	ID                 pgtype.UUID
 	CampID             pgtype.UUID
 	SessionAgeGroupID  pgtype.UUID

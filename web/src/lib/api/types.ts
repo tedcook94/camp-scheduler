@@ -511,7 +511,7 @@ export interface CounselorCabinOverride {
 	camp_id: string;
 	session_id: string;
 	counselor_id: string;
-	session_age_group_cabin_id: string;
+	session_cabin_id: string;
 	cabin_id: string;
 	counselor_first_name: string;
 	counselor_last_name: string;
@@ -525,7 +525,7 @@ export interface CamperCabinOverride {
 	camp_id: string;
 	session_id: string;
 	camper_id: string;
-	session_age_group_cabin_id: string;
+	session_cabin_id: string;
 	cabin_id: string;
 	camper_first_name: string;
 	camper_last_name: string;
@@ -556,12 +556,12 @@ export interface SessionOverrides {
 
 export interface CreateCounselorCabinOverrideRequest {
 	counselor_id: string;
-	session_age_group_cabin_id: string;
+	session_cabin_id: string;
 }
 
 export interface CreateCamperCabinOverrideRequest {
 	camper_id: string;
-	session_age_group_cabin_id: string;
+	session_cabin_id: string;
 }
 
 export interface CreateCounselorActivityOverrideRequest {

@@ -166,7 +166,7 @@
 		try {
 			const created = await overrideApi.createCounselorCabin(sessionId, {
 				counselor_id: newCounselorCabinCounselor,
-				session_age_group_cabin_id: newCounselorCabinSAGC,
+				session_cabin_id: newCounselorCabinSAGC,
 			});
 			overrides = {
 				...overrides,
@@ -191,7 +191,7 @@
 		try {
 			const created = await overrideApi.createCamperCabin(sessionId, {
 				camper_id: newCamperCabinCamper,
-				session_age_group_cabin_id: newCamperCabinSAGC,
+				session_cabin_id: newCamperCabinSAGC,
 			});
 			overrides = {
 				...overrides,

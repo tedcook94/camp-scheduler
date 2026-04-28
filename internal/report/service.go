@@ -175,7 +175,7 @@ func (svc *Service) GetActivityReport(ctx context.Context, campID, sessionID str
 		return nil, err
 	}
 
-	detail, err := assignment.LoadActivitySolution(ctx, svc.queries, campID, runID, solutionID)
+	detail, err := assignment.LoadCounselorActivitySolution(ctx, svc.queries, campID, runID, solutionID)
 	if err != nil {
 		return nil, fmt.Errorf("error loading activity solution: %w", err)
 	}

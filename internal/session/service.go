@@ -462,7 +462,7 @@ func (svc *Service) Copy(ctx context.Context, campID, sourceID string, req CopyS
 	var skippedAgeGroups, skippedCabins, skippedTimeSlots, skippedActivities, skippedCounselors int
 
 	// Copy session_age_groups, building a map from old SAG id to new SAG id
-	// so we can remap session_age_group_cabins below.
+	// so we can remap session_cabins below.
 	sourceSAGs, err := qtx.ListSessionAgeGroups(ctx, db.ListSessionAgeGroupsParams{
 		SessionID: sourceUUID,
 		CampID:    campUUID,
@@ -494,7 +494,7 @@ func (svc *Service) Copy(ctx context.Context, campID, sourceID string, req CopyS
 		sagIDMap[sag.ID] = newSAG.ID
 	}
 
-	sourceCabins, err := qtx.ListSessionAgeGroupCabinsBySession(ctx, db.ListSessionAgeGroupCabinsBySessionParams{
+	sourceCabins, err := qtx.ListSessionCabinsBySession(ctx, db.ListSessionCabinsBySessionParams{
 		SessionID: sourceUUID,
 		CampID:    campUUID,
 	})
@@ -519,7 +519,7 @@ func (svc *Service) Copy(ctx context.Context, campID, sourceID string, req CopyS
 			skippedCabins++
 			continue
 		}
-		if _, err := qtx.CreateSessionAgeGroupCabin(ctx, db.CreateSessionAgeGroupCabinParams{
+		if _, err := qtx.CreateSessionCabin(ctx, db.CreateSessionCabinParams{
 			CampID:             campUUID,
 			SessionAgeGroupID:  newSAGID,
 			CabinID:            sc.CabinID,

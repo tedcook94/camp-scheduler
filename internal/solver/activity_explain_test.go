@@ -44,8 +44,8 @@ func TestExplainActivityIneligibility(t *testing.T) {
 			CertificationNames: map[string]string{"cert-lifeguard": "Lifeguard"},
 		}
 		// Karen IS eligible for Arts (no certs needed) but not assigned.
-		solution := ActivitySolution{
-			Assignment: ActivityAssignment{SlotCounselors: map[string][]string{}},
+		solution := CounselorActivitySolution{
+			Assignment: CounselorActivityAssignment{SlotCounselors: map[string][]string{}},
 		}
 
 		exp := ExplainActivity(snapshot, solution)
@@ -79,8 +79,8 @@ func TestExplainActivityIneligibility(t *testing.T) {
 			},
 			CertificationNames: map[string]string{"cert-lifeguard": "Lifeguard"},
 		}
-		solution := ActivitySolution{
-			Assignment: ActivityAssignment{SlotCounselors: map[string][]string{}},
+		solution := CounselorActivitySolution{
+			Assignment: CounselorActivityAssignment{SlotCounselors: map[string][]string{}},
 		}
 
 		exp := ExplainActivity(snapshot, solution)
@@ -127,8 +127,8 @@ func TestExplainActivityIneligibility(t *testing.T) {
 				"cert-firstaid":  "First Aid",
 			},
 		}
-		solution := ActivitySolution{
-			Assignment: ActivityAssignment{SlotCounselors: map[string][]string{}},
+		solution := CounselorActivitySolution{
+			Assignment: CounselorActivityAssignment{SlotCounselors: map[string][]string{}},
 		}
 
 		exp := ExplainActivity(snapshot, solution)
@@ -171,8 +171,8 @@ func TestExplainActivityIneligibility(t *testing.T) {
 			},
 			CertificationNames: map[string]string{"cert-lifeguard": "Lifeguard"},
 		}
-		solution := ActivitySolution{
-			Assignment: ActivityAssignment{SlotCounselors: map[string][]string{}},
+		solution := CounselorActivitySolution{
+			Assignment: CounselorActivityAssignment{SlotCounselors: map[string][]string{}},
 		}
 
 		exp := ExplainActivity(snapshot, solution)
@@ -196,8 +196,8 @@ func TestExplainActivityIneligibility(t *testing.T) {
 			},
 			CertificationNames: map[string]string{"cert-lifeguard": "Lifeguard"},
 		}
-		solution := ActivitySolution{
-			Assignment: ActivityAssignment{SlotCounselors: map[string][]string{}},
+		solution := CounselorActivitySolution{
+			Assignment: CounselorActivityAssignment{SlotCounselors: map[string][]string{}},
 		}
 
 		exp := ExplainActivity(snapshot, solution)
@@ -241,8 +241,8 @@ func TestExplainActivityIneligibility(t *testing.T) {
 			},
 			CertificationNames: map[string]string{"cert-lifeguard": "Lifeguard"},
 		}
-		solution := ActivitySolution{
-			Assignment: ActivityAssignment{SlotCounselors: map[string][]string{}},
+		solution := CounselorActivitySolution{
+			Assignment: CounselorActivityAssignment{SlotCounselors: map[string][]string{}},
 		}
 
 		exp := ExplainActivity(snapshot, solution)
@@ -277,8 +277,8 @@ func TestExplainActivityIneligibility(t *testing.T) {
 			},
 			CertificationNames: map[string]string{},
 		}
-		solution := ActivitySolution{
-			Assignment: ActivityAssignment{SlotCounselors: map[string][]string{}},
+		solution := CounselorActivitySolution{
+			Assignment: CounselorActivityAssignment{SlotCounselors: map[string][]string{}},
 		}
 
 		exp := ExplainActivity(snapshot, solution)
@@ -337,8 +337,8 @@ func TestExplainActivityBestMetRank(t *testing.T) {
 			},
 		}
 		// Emily got her rank-1 (Swimming). Rank-2 should NOT be reported.
-		solution := ActivitySolution{
-			Assignment: ActivityAssignment{SlotCounselors: map[string][]string{
+		solution := CounselorActivitySolution{
+			Assignment: CounselorActivityAssignment{SlotCounselors: map[string][]string{
 				"slot-swim": {"c1"},
 			}},
 		}
@@ -366,8 +366,8 @@ func TestExplainActivityBestMetRank(t *testing.T) {
 			},
 		}
 		// Emily got her rank-2 (Hiking). Rank-1 (Swimming) is still a real miss.
-		solution := ActivitySolution{
-			Assignment: ActivityAssignment{SlotCounselors: map[string][]string{
+		solution := CounselorActivitySolution{
+			Assignment: CounselorActivityAssignment{SlotCounselors: map[string][]string{
 				"slot-hike": {"c1"},
 			}},
 		}
@@ -410,8 +410,8 @@ func TestExplainActivityBestMetRank(t *testing.T) {
 				},
 			},
 		}
-		solution := ActivitySolution{
-			Assignment: ActivityAssignment{SlotCounselors: map[string][]string{
+		solution := CounselorActivitySolution{
+			Assignment: CounselorActivityAssignment{SlotCounselors: map[string][]string{
 				"slot-arts": {"c1"},
 			}},
 		}

@@ -377,7 +377,7 @@ func (svc *Service) TriggerActivityRun(ctx context.Context, campID, sessionID st
 		return RunDetailResponse{}, ErrNoSolutions
 	}
 
-	runID, err := solver.StoreActivitySolutions(ctx, svc.pool, svc.marker, campID, sessionID, snapshot, solutions)
+	runID, err := solver.StoreCounselorActivitySolutions(ctx, svc.pool, svc.marker, campID, sessionID, snapshot, solutions)
 	if err != nil {
 		return RunDetailResponse{}, fmt.Errorf("error storing activity solutions: %w", err)
 	}
@@ -446,7 +446,7 @@ func (svc *Service) GetRun(ctx context.Context, campID, runID string) (RunDetail
 			return RunDetailResponse{}, err
 		}
 	case "activity_schedule":
-		solRows, err := svc.queries.ListActivitySolutionsByRun(ctx, db.ListActivitySolutionsByRunParams{
+		solRows, err := svc.queries.ListCounselorActivitySolutionsByRun(ctx, db.ListCounselorActivitySolutionsByRunParams{
 			AssignmentRunID: runUUID,
 			CampID:          campUUID,
 		})
@@ -455,7 +455,7 @@ func (svc *Service) GetRun(ctx context.Context, campID, runID string) (RunDetail
 		}
 		solutions = make([]SolutionSummaryResponse, len(solRows))
 		for i, s := range solRows {
-			solutions[i] = toActivitySolutionSummaryResponse(s)
+			solutions[i] = toCounselorActivitySolutionSummaryResponse(s)
 		}
 	default:
 		return RunDetailResponse{}, fmt.Errorf("unknown run_type %q for run %s", run.RunType, runID)
@@ -597,7 +597,7 @@ func (svc *Service) GetSolution(ctx context.Context, campID, runID, solutionID s
 	case solver.RunTypeCabin:
 		return svc.getCabinSolution(ctx, campUUID, runUUID, solutionID)
 	case "activity_schedule":
-		return svc.getActivitySolution(ctx, campUUID, runUUID, solutionID)
+		return svc.getCounselorActivitySolution(ctx, campUUID, runUUID, solutionID)
 	default:
 		return SolutionDetailResponse{}, fmt.Errorf("unknown run_type %q for run %s", run.RunType, runID)
 	}
@@ -654,7 +654,7 @@ func (svc *Service) SelectSolution(ctx context.Context, campID, runID, solutionI
 			return RunResponse{}, ErrSolutionNotFound
 		}
 	case "activity_schedule":
-		sol, err := svc.queries.GetActivitySolution(ctx, db.GetActivitySolutionParams{
+		sol, err := svc.queries.GetCounselorActivitySolution(ctx, db.GetCounselorActivitySolutionParams{
 			ID:              solUUID,
 			CampID:          campUUID,
 			AssignmentRunID: runUUID,
@@ -820,7 +820,7 @@ func toExplanationResponse(e db.ListCounselorCabinExplanationsBySolutionRow) Exp
 	}
 }
 
-func toActivitySolutionSummaryResponse(s db.ActivitySolution) SolutionSummaryResponse {
+func toCounselorActivitySolutionSummaryResponse(s db.CounselorActivitySolution) SolutionSummaryResponse {
 	return SolutionSummaryResponse{
 		ID:              api.UUIDToString(s.ID),
 		AssignmentRunID: api.UUIDToString(s.AssignmentRunID),
@@ -830,8 +830,8 @@ func toActivitySolutionSummaryResponse(s db.ActivitySolution) SolutionSummaryRes
 	}
 }
 
-func (svc *Service) getActivitySolution(ctx context.Context, campUUID, runUUID pgtype.UUID, solutionID string) (SolutionDetailResponse, error) {
-	return loadActivitySolution(ctx, svc.queries, campUUID, runUUID, solutionID)
+func (svc *Service) getCounselorActivitySolution(ctx context.Context, campUUID, runUUID pgtype.UUID, solutionID string) (SolutionDetailResponse, error) {
+	return loadCounselorActivitySolution(ctx, svc.queries, campUUID, runUUID, solutionID)
 }
 
 func toCabinUnassignedCounselorResponses(rows []db.ListCounselorCabinUnassignedBySolutionRow) []UnassignedCounselorResponse {

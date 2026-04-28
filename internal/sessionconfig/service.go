@@ -286,7 +286,7 @@ func (svc *Service) ListCabins(ctx context.Context, campID, sessionID string) ([
 		return nil, err
 	}
 
-	rows, err := svc.queries.ListSessionAgeGroupCabinsBySession(ctx, db.ListSessionAgeGroupCabinsBySessionParams{
+	rows, err := svc.queries.ListSessionCabinsBySession(ctx, db.ListSessionCabinsBySessionParams{
 		SessionID: sessionUUID,
 		CampID:    campUUID,
 	})
@@ -317,7 +317,7 @@ func (svc *Service) GetCabin(ctx context.Context, campID, sessionID, id string) 
 		return SessionCabinResponse{}, err
 	}
 
-	row, err := svc.queries.GetSessionAgeGroupCabin(ctx, db.GetSessionAgeGroupCabinParams{
+	row, err := svc.queries.GetSessionCabin(ctx, db.GetSessionCabinParams{
 		ID:        uid,
 		CampID:    campUUID,
 		SessionID: sessionUUID,
@@ -372,7 +372,7 @@ func (svc *Service) CreateCabin(ctx context.Context, campID, sessionID string, r
 		return SessionCabinResponse{}, err
 	}
 
-	row, err := qtx.CreateSessionAgeGroupCabin(ctx, db.CreateSessionAgeGroupCabinParams{
+	row, err := qtx.CreateSessionCabin(ctx, db.CreateSessionCabinParams{
 		CampID:             campUUID,
 		SessionAgeGroupID:  sessionAgeGroupUUID,
 		CabinID:            cabinUUID,
@@ -427,7 +427,7 @@ func (svc *Service) UpdateCabin(ctx context.Context, campID, sessionID, id strin
 		return SessionCabinResponse{}, err
 	}
 
-	row, err := qtx.UpdateSessionAgeGroupCabin(ctx, db.UpdateSessionAgeGroupCabinParams{
+	row, err := qtx.UpdateSessionCabin(ctx, db.UpdateSessionCabinParams{
 		ID:                 uid,
 		CampID:             campUUID,
 		SessionID:          sessionUUID,
@@ -474,7 +474,7 @@ func (svc *Service) DeleteCabin(ctx context.Context, campID, sessionID, id strin
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := svc.queries.WithTx(tx)
 
-	rows, err := qtx.DeleteSessionAgeGroupCabin(ctx, db.DeleteSessionAgeGroupCabinParams{
+	rows, err := qtx.DeleteSessionCabin(ctx, db.DeleteSessionCabinParams{
 		ID:        uid,
 		CampID:    campUUID,
 		SessionID: sessionUUID,
@@ -508,7 +508,7 @@ func toSessionAgeGroupResponse(r db.SessionAgeGroup) SessionAgeGroupResponse {
 	}
 }
 
-func toSessionCabinResponse(r db.SessionAgeGroupCabin, sessionID string) SessionCabinResponse {
+func toSessionCabinResponse(r db.SessionCabin, sessionID string) SessionCabinResponse {
 	return SessionCabinResponse{
 		ID:                 api.UUIDToString(r.ID),
 		CampID:             api.UUIDToString(r.CampID),

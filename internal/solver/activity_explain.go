@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func ExplainActivity(snapshot ActivitySnapshot, solution ActivitySolution) ActivityExplanation {
+func ExplainActivity(snapshot ActivitySnapshot, solution CounselorActivitySolution) CounselorActivityExplanation {
 	slotsByID := indexActivitySlots(snapshot)
 
 	reasonsByAssignment := buildActivityReasonMap(solution.Score.Breakdown)
@@ -19,7 +19,7 @@ func ExplainActivity(snapshot ActivitySnapshot, solution ActivitySolution) Activ
 		}
 	}
 
-	var assignments []ActivityAssignmentExplanation
+	var assignments []CounselorActivityAssignmentExplanation
 	for slotID, counselorIDs := range solution.Assignment.SlotCounselors {
 		for _, cID := range counselorIDs {
 			key := cID + "|" + slotID
@@ -28,7 +28,7 @@ func ExplainActivity(snapshot ActivitySnapshot, solution ActivitySolution) Activ
 				continue
 			}
 
-			assignments = append(assignments, ActivityAssignmentExplanation{
+			assignments = append(assignments, CounselorActivityAssignmentExplanation{
 				CounselorID: cID,
 				SlotID:      slotID,
 				Reasons:     reasons,
@@ -64,7 +64,7 @@ func ExplainActivity(snapshot ActivitySnapshot, solution ActivitySolution) Activ
 		return ineligible[i].Message < ineligible[j].Message
 	})
 
-	return ActivityExplanation{
+	return CounselorActivityExplanation{
 		Assignments:           assignments,
 		UnmetPreferences:      unmet,
 		IneligiblePreferences: ineligible,

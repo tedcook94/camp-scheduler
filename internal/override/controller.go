@@ -38,12 +38,12 @@ func (ctrl *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 
 type CreateCounselorCabinRequest struct {
 	CounselorID            string `json:"counselor_id" binding:"required"`
-	SessionAgeGroupCabinID string `json:"session_age_group_cabin_id" binding:"required"`
+	SessionCabinID string `json:"session_cabin_id" binding:"required"`
 }
 
 type CreateCamperCabinRequest struct {
 	CamperID               string `json:"camper_id" binding:"required"`
-	SessionAgeGroupCabinID string `json:"session_age_group_cabin_id" binding:"required"`
+	SessionCabinID string `json:"session_cabin_id" binding:"required"`
 }
 
 type CreateCounselorActivityRequest struct {
@@ -56,7 +56,7 @@ type CounselorCabinOverrideResponse struct {
 	CampID                 string `json:"camp_id"`
 	SessionID              string `json:"session_id"`
 	CounselorID            string `json:"counselor_id"`
-	SessionAgeGroupCabinID string `json:"session_age_group_cabin_id"`
+	SessionCabinID string `json:"session_cabin_id"`
 	CabinID                string `json:"cabin_id"`
 	CounselorFirstName     string `json:"counselor_first_name"`
 	CounselorLastName      string `json:"counselor_last_name"`
@@ -70,7 +70,7 @@ type CamperCabinOverrideResponse struct {
 	CampID                 string `json:"camp_id"`
 	SessionID              string `json:"session_id"`
 	CamperID               string `json:"camper_id"`
-	SessionAgeGroupCabinID string `json:"session_age_group_cabin_id"`
+	SessionCabinID string `json:"session_cabin_id"`
 	CabinID                string `json:"cabin_id"`
 	CamperFirstName        string `json:"camper_first_name"`
 	CamperLastName         string `json:"camper_last_name"`

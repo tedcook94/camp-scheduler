@@ -67,11 +67,11 @@ func BuildSnapshot(ctx context.Context, queries *db.Queries, campID, sessionID s
 		return SessionSnapshot{}, err
 	}
 
-	// Resolve override values from session_age_group_cabin_id (the persisted
+	// Resolve override values from session_cabin_id (the persisted
 	// FK target) to the cabins.id keys the solver uses internally.
 	sagcToCabin := make(map[string]string, len(cabins))
 	for _, c := range cabins {
-		sagcToCabin[c.SessionAgeGroupCabinID] = c.ID
+		sagcToCabin[c.SessionCabinID] = c.ID
 	}
 	overrides = remapOverrideValues(overrides, sagcToCabin)
 
@@ -99,7 +99,7 @@ func BuildSnapshot(ctx context.Context, queries *db.Queries, campID, sessionID s
 
 // remapOverrideValues replaces each override target value via the provided
 // map, dropping entries whose target is not present in the map. Used to
-// translate persisted session_age_group_cabin IDs to the cabins.id keys
+// translate persisted session_cabin IDs to the cabins.id keys
 // used by the cabin solvers, and to drop overrides whose target cabin has
 // been archived.
 func remapOverrideValues(overrides, valueMap map[string]string) map[string]string {
@@ -152,7 +152,7 @@ func loadCounselorCabinOverrides(ctx context.Context, queries *db.Queries, sessi
 		if !roster[counselorID] {
 			continue
 		}
-		overrides[counselorID] = api.UUIDToString(r.SessionAgeGroupCabinID)
+		overrides[counselorID] = api.UUIDToString(r.SessionCabinID)
 	}
 	return overrides, nil
 }
@@ -178,7 +178,7 @@ func loadCabins(ctx context.Context, queries *db.Queries, sessionID, campID pgty
 			Name:                   r.CabinName,
 			AgeGroupID:             api.UUIDToString(r.AgeGroupID),
 			AgeGroupName:           r.AgeGroupName,
-			SessionAgeGroupCabinID: api.UUIDToString(r.SessionAgeGroupCabinID),
+			SessionCabinID: api.UUIDToString(r.SessionCabinID),
 			RequiredCounselors:     int(r.RequiredCounselors),
 			Capacity:               int(r.GroupSize),
 			Gender:                 r.Gender,

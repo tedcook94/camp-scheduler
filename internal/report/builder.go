@@ -20,12 +20,12 @@ func buildCabinReport(
 	counselors map[string]db.Counselor,
 	campers map[string]db.Camper,
 ) *CabinReport {
-	type cabinKey = string // session_age_group_cabin_id is unique per cabin slot
+	type cabinKey = string // session_cabin_id is unique per cabin slot
 
 	groups := make(map[string]*CabinGroup, len(cabins))
 	order := make([]string, 0, len(cabins))
 	for _, c := range cabins {
-		key := api.UUIDToString(c.SessionAgeGroupCabinID)
+		key := api.UUIDToString(c.SessionCabinID)
 		// Capacity is total occupancy (counselors + campers).
 		groups[key] = &CabinGroup{
 			AgeGroupName:       c.AgeGroupName,

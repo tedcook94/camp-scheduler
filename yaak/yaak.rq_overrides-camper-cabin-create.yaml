@@ -14,6 +14,6 @@ headers: []
 authentication: {}
 authenticationType: null
 body:
-  text: '{"camper_id": "${[ test-camper-id ]}", "session_age_group_cabin_id": "${[ test-session-age-group-cabin-id ]}"}'
+  text: '{"camper_id": "${[ test-camper-id ]}", "session_cabin_id": "${[ test-session-age-group-cabin-id ]}"}'
 bodyType: application/json
 sortPriority: 3.0

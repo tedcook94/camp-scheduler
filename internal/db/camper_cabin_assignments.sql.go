@@ -12,16 +12,16 @@ import (
 )
 
 const createCamperCabinAssignment = `-- name: CreateCamperCabinAssignment :one
-INSERT INTO camper_cabin_assignments (camp_id, solution_id, camper_id, session_age_group_cabin_id)
+INSERT INTO camper_cabin_assignments (camp_id, solution_id, camper_id, session_cabin_id)
 VALUES ($1, $2, $3, $4)
-RETURNING id, camp_id, solution_id, camper_id, session_age_group_cabin_id
+RETURNING id, camp_id, solution_id, camper_id, session_cabin_id
 `
 
 type CreateCamperCabinAssignmentParams struct {
-	CampID                 pgtype.UUID
-	SolutionID             pgtype.UUID
-	CamperID               pgtype.UUID
-	SessionAgeGroupCabinID pgtype.UUID
+	CampID         pgtype.UUID
+	SolutionID     pgtype.UUID
+	CamperID       pgtype.UUID
+	SessionCabinID pgtype.UUID
 }
 
 func (q *Queries) CreateCamperCabinAssignment(ctx context.Context, arg CreateCamperCabinAssignmentParams) (CamperCabinAssignment, error) {
@@ -29,7 +29,7 @@ func (q *Queries) CreateCamperCabinAssignment(ctx context.Context, arg CreateCam
 		arg.CampID,
 		arg.SolutionID,
 		arg.CamperID,
-		arg.SessionAgeGroupCabinID,
+		arg.SessionCabinID,
 	)
 	var i CamperCabinAssignment
 	err := row.Scan(
@@ -37,7 +37,7 @@ func (q *Queries) CreateCamperCabinAssignment(ctx context.Context, arg CreateCam
 		&i.CampID,
 		&i.SolutionID,
 		&i.CamperID,
-		&i.SessionAgeGroupCabinID,
+		&i.SessionCabinID,
 	)
 	return i, err
 }
@@ -52,7 +52,7 @@ SELECT a.id, a.camp_id, a.solution_id, a.camper_id,
        ag.age_group_name AS age_group_name
 FROM camper_cabin_assignments a
 JOIN campers cm ON cm.id = a.camper_id
-JOIN session_age_group_cabins sagc ON sagc.id = a.session_age_group_cabin_id
+JOIN session_cabins sagc ON sagc.id = a.session_cabin_id
 JOIN cabins cb ON cb.id = sagc.cabin_id
 JOIN session_age_groups sag ON sag.id = sagc.session_age_group_id
 JOIN age_groups ag ON ag.id = sag.age_group_id

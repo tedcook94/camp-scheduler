@@ -15,7 +15,7 @@ import (
 
 const RunTypeActivitySchedule = "activity_schedule"
 
-func StoreActivitySolutions(ctx context.Context, pool *pgxpool.Pool, marker *staleness.Marker, campID, sessionID string, snapshot ActivitySnapshot, solutions []ActivitySolution) (string, error) {
+func StoreCounselorActivitySolutions(ctx context.Context, pool *pgxpool.Pool, marker *staleness.Marker, campID, sessionID string, snapshot ActivitySnapshot, solutions []CounselorActivitySolution) (string, error) {
 	campUUID, err := api.ParseUUID(campID)
 	if err != nil {
 		return "", err
@@ -58,7 +58,7 @@ func StoreActivitySolutions(ctx context.Context, pool *pgxpool.Pool, marker *sta
 	}
 
 	for i, solution := range solutions {
-		if err := storeActivitySolution(ctx, qtx, campUUID, run.ID, i, snapshot, solution); err != nil {
+		if err := storeCounselorActivitySolution(ctx, qtx, campUUID, run.ID, i, snapshot, solution); err != nil {
 			return "", fmt.Errorf("error storing activity solution %d: %w", i, err)
 		}
 	}
@@ -79,13 +79,13 @@ func StoreActivitySolutions(ctx context.Context, pool *pgxpool.Pool, marker *sta
 	return api.UUIDToString(run.ID), nil
 }
 
-func storeActivitySolution(ctx context.Context, qtx *db.Queries, campID, runID pgtype.UUID, index int, snapshot ActivitySnapshot, solution ActivitySolution) error {
+func storeCounselorActivitySolution(ctx context.Context, qtx *db.Queries, campID, runID pgtype.UUID, index int, snapshot ActivitySnapshot, solution CounselorActivitySolution) error {
 	breakdownJSON, err := json.Marshal(solution.Score.Breakdown)
 	if err != nil {
 		return fmt.Errorf("error marshaling score breakdown: %w", err)
 	}
 
-	sol, err := qtx.CreateActivitySolution(ctx, db.CreateActivitySolutionParams{
+	sol, err := qtx.CreateCounselorActivitySolution(ctx, db.CreateCounselorActivitySolutionParams{
 		CampID:          campID,
 		AssignmentRunID: runID,
 		SolutionIndex:   int32(index),
@@ -98,7 +98,7 @@ func storeActivitySolution(ctx context.Context, qtx *db.Queries, campID, runID p
 
 	explanation := ExplainActivity(snapshot, solution)
 
-	if err := storeActivityAssignments(ctx, qtx, campID, sol.ID, solution); err != nil {
+	if err := storeCounselorActivityAssignments(ctx, qtx, campID, sol.ID, solution); err != nil {
 		return err
 	}
 
@@ -106,7 +106,7 @@ func storeActivitySolution(ctx context.Context, qtx *db.Queries, campID, runID p
 		return err
 	}
 
-	if err := storeActivityExplanations(ctx, qtx, campID, sol.ID, explanation); err != nil {
+	if err := storeCounselorActivityExplanations(ctx, qtx, campID, sol.ID, explanation); err != nil {
 		return err
 	}
 
@@ -116,7 +116,7 @@ func storeActivitySolution(ctx context.Context, qtx *db.Queries, campID, runID p
 // storeActivityUnassignedCounselors persists per-counselor missing time
 // slots. ActivitySlot.TimeSlotID is the session_time_slot.id, so it's used
 // directly as the FK target.
-func storeActivityUnassignedCounselors(ctx context.Context, qtx *db.Queries, campID, solutionID pgtype.UUID, solution ActivitySolution) error {
+func storeActivityUnassignedCounselors(ctx context.Context, qtx *db.Queries, campID, solutionID pgtype.UUID, solution CounselorActivitySolution) error {
 	for _, uc := range solution.UnassignedCounselors {
 		counselorUUID, err := api.ParseUUID(uc.CounselorID)
 		if err != nil {
@@ -147,7 +147,7 @@ func storeActivityUnassignedCounselors(ctx context.Context, qtx *db.Queries, cam
 	return nil
 }
 
-func storeActivityAssignments(ctx context.Context, qtx *db.Queries, campID, solutionID pgtype.UUID, solution ActivitySolution) error {
+func storeCounselorActivityAssignments(ctx context.Context, qtx *db.Queries, campID, solutionID pgtype.UUID, solution CounselorActivitySolution) error {
 	for slotID, counselorIDs := range solution.Assignment.SlotCounselors {
 		slotUUID, err := api.ParseUUID(slotID)
 		if err != nil {
@@ -159,7 +159,7 @@ func storeActivityAssignments(ctx context.Context, qtx *db.Queries, campID, solu
 				return err
 			}
 
-			_, err = qtx.CreateActivityAssignment(ctx, db.CreateActivityAssignmentParams{
+			_, err = qtx.CreateCounselorActivityAssignment(ctx, db.CreateCounselorActivityAssignmentParams{
 				CampID:            campID,
 				SolutionID:        solutionID,
 				CounselorID:       counselorUUID,
@@ -173,7 +173,7 @@ func storeActivityAssignments(ctx context.Context, qtx *db.Queries, campID, solu
 	return nil
 }
 
-func storeActivityExplanations(ctx context.Context, qtx *db.Queries, campID, solutionID pgtype.UUID, explanation ActivityExplanation) error {
+func storeCounselorActivityExplanations(ctx context.Context, qtx *db.Queries, campID, solutionID pgtype.UUID, explanation CounselorActivityExplanation) error {
 	for _, ae := range explanation.Assignments {
 		counselorUUID, err := api.ParseUUID(ae.CounselorID)
 		if err != nil {
@@ -190,7 +190,7 @@ func storeActivityExplanations(ctx context.Context, qtx *db.Queries, campID, sol
 				slotUUID = parsed
 			}
 
-			_, err := qtx.CreateActivityExplanation(ctx, db.CreateActivityExplanationParams{
+			_, err := qtx.CreateCounselorActivityExplanation(ctx, db.CreateCounselorActivityExplanationParams{
 				CampID:            campID,
 				SolutionID:        solutionID,
 				CounselorID:       counselorUUID,
@@ -212,7 +212,7 @@ func storeActivityExplanations(ctx context.Context, qtx *db.Queries, campID, sol
 			return err
 		}
 
-		_, err = qtx.CreateActivityExplanation(ctx, db.CreateActivityExplanationParams{
+		_, err = qtx.CreateCounselorActivityExplanation(ctx, db.CreateCounselorActivityExplanationParams{
 			CampID:          campID,
 			SolutionID:      solutionID,
 			CounselorID:     counselorUUID,
@@ -232,7 +232,7 @@ func storeActivityExplanations(ctx context.Context, qtx *db.Queries, campID, sol
 			return err
 		}
 
-		_, err = qtx.CreateActivityExplanation(ctx, db.CreateActivityExplanationParams{
+		_, err = qtx.CreateCounselorActivityExplanation(ctx, db.CreateCounselorActivityExplanationParams{
 			CampID:          campID,
 			SolutionID:      solutionID,
 			CounselorID:     counselorUUID,

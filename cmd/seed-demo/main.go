@@ -150,9 +150,9 @@ func main() {
 func deleteExisting(ctx context.Context, tx pgx.Tx, campID pgtype.UUID) error {
 	tables := []string{
 		"assignment_run_selected_solutions",
-		"activity_explanations",
-		"activity_assignments",
-		"activity_solutions",
+		"counselor_activity_explanations",
+		"counselor_activity_assignments",
+		"counselor_activity_solutions",
 		"camper_cabin_explanations",
 		"camper_cabin_assignments",
 		"camper_cabin_solutions",
@@ -168,7 +168,7 @@ func deleteExisting(ctx context.Context, tx pgx.Tx, campID pgtype.UUID) error {
 		"counselor_session_history",
 		"counselor_certifications",
 		"session_activities",
-		"session_age_group_cabins",
+		"session_cabins",
 		"session_time_slots",
 		"session_age_groups",
 	}
@@ -495,7 +495,7 @@ func configureSessions(ctx context.Context, q *db.Queries, campID pgtype.UUID, s
 	}
 	for _, cd := range cabinDefs {
 		for _, sagMap := range []map[string]db.SessionAgeGroup{s1AGs, s2AGs} {
-			_, err := q.CreateSessionAgeGroupCabin(ctx, db.CreateSessionAgeGroupCabinParams{
+			_, err := q.CreateSessionCabin(ctx, db.CreateSessionCabinParams{
 				CampID:             campID,
 				SessionAgeGroupID:  sagMap[cd.ageGroup].ID,
 				CabinID:            cabins[cd.name].ID,

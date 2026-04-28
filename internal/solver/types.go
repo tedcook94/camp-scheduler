@@ -5,7 +5,7 @@ type Cabin struct {
 	Name                   string
 	AgeGroupID             string
 	AgeGroupName           string
-	SessionAgeGroupCabinID string
+	SessionCabinID string
 	RequiredCounselors     int
 	// Capacity is the total occupancy cap for the cabin: counselors + campers
 	// combined cannot exceed this number.
@@ -44,7 +44,7 @@ type SessionSnapshot struct {
 	UnmetCocounselorPreferences map[string]map[string]bool
 	// Overrides pin a counselor to a specific cabin. Keyed by counselor ID;
 	// the value is the cabins.id key used internally by the solver (already
-	// remapped from the persisted session_age_group_cabin_id during snapshot
+	// remapped from the persisted session_cabin_id during snapshot
 	// load). The solver must place these counselors in their pinned cabin
 	// and must not place them anywhere else.
 	Overrides map[string]string

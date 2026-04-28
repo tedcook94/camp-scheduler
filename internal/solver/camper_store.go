@@ -44,13 +44,13 @@ func storeCamperSolution(ctx context.Context, qtx *db.Queries, campID, runID pgt
 func storeCamperAssignments(ctx context.Context, qtx *db.Queries, campID, solutionID pgtype.UUID, snapshot CamperCabinSnapshot, solution CamperSolution) error {
 	sagcByCabinID := make(map[string]string, len(snapshot.Cabins))
 	for _, c := range snapshot.Cabins {
-		sagcByCabinID[c.ID] = c.SessionAgeGroupCabinID
+		sagcByCabinID[c.ID] = c.SessionCabinID
 	}
 
 	for cabinID, camperIDs := range solution.Assignment.CabinCampers {
 		sagcID, ok := sagcByCabinID[cabinID]
 		if !ok || sagcID == "" {
-			return fmt.Errorf("error resolving session_age_group_cabin_id for cabin %s", cabinID)
+			return fmt.Errorf("error resolving session_cabin_id for cabin %s", cabinID)
 		}
 		sagcUUID, err := api.ParseUUID(sagcID)
 		if err != nil {
@@ -66,7 +66,7 @@ func storeCamperAssignments(ctx context.Context, qtx *db.Queries, campID, soluti
 				CampID:                 campID,
 				SolutionID:             solutionID,
 				CamperID:               camperUUID,
-				SessionAgeGroupCabinID: sagcUUID,
+				SessionCabinID: sagcUUID,
 			})
 			if err != nil {
 				return fmt.Errorf("error creating camper assignment for camper %s: %w", camperID, err)

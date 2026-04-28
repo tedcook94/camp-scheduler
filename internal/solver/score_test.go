@@ -790,7 +790,7 @@ func TestRepeatedUnmetActivityBoost(t *testing.T) {
 		},
 	}
 
-	assignment := ActivityAssignment{
+	assignment := CounselorActivityAssignment{
 		SlotCounselors: map[string][]string{
 			"s1": {"co1", "co2"},
 		},

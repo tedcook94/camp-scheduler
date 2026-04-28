@@ -1,9 +1,9 @@
--- name: CreateActivityAssignment :one
-INSERT INTO activity_assignments (camp_id, solution_id, counselor_id, session_activity_id)
+-- name: CreateCounselorActivityAssignment :one
+INSERT INTO counselor_activity_assignments (camp_id, solution_id, counselor_id, session_activity_id)
 VALUES ($1, $2, $3, $4)
 RETURNING id, camp_id, solution_id, counselor_id, session_activity_id;
 
--- name: ListActivityAssignmentsBySolution :many
+-- name: ListCounselorActivityAssignmentsBySolution :many
 SELECT a.id, a.camp_id, a.solution_id, a.counselor_id, a.session_activity_id,
        co.first_name AS counselor_first_name,
        co.last_name AS counselor_last_name,
@@ -11,7 +11,7 @@ SELECT a.id, a.camp_id, a.solution_id, a.counselor_id, a.session_activity_id,
        act.activity_name AS activity_name,
        ts.time_slot_name AS time_slot_name,
        sts.sort_order AS sort_order
-FROM activity_assignments a
+FROM counselor_activity_assignments a
 JOIN counselors co ON co.id = a.counselor_id
 JOIN session_activities sa ON sa.id = a.session_activity_id
 JOIN activities act ON act.id = sa.activity_id

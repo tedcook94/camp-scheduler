@@ -222,7 +222,7 @@ func validateCounselorActivity(ctx context.Context, q *db.Queries, campID, sessi
 }
 
 // findSessionCabin returns the row from ListSessionCabinsWithCapacity matching
-// the given session_age_group_cabin id. Returns BadInput if not in this session.
+// the given session_cabin id. Returns BadInput if not in this session.
 func findSessionCabin(ctx context.Context, q *db.Queries, campID, sessionID, sagcID pgtype.UUID) (db.ListSessionCabinsWithCapacityRow, error) {
 	rows, err := q.ListSessionCabinsWithCapacity(ctx, db.ListSessionCabinsWithCapacityParams{
 		SessionID: sessionID,
@@ -232,14 +232,14 @@ func findSessionCabin(ctx context.Context, q *db.Queries, campID, sessionID, sag
 		return db.ListSessionCabinsWithCapacityRow{}, fmt.Errorf("error loading session cabins: %w", err)
 	}
 	for _, r := range rows {
-		if r.SessionAgeGroupCabinID == sagcID {
+		if r.SessionCabinID == sagcID {
 			return r, nil
 		}
 	}
 	return db.ListSessionCabinsWithCapacityRow{}, api.BadInput("cabin does not belong to this session")
 }
 
-// loadCabinOverrideCounts returns per-(session_age_group_cabin) counts of
+// loadCabinOverrideCounts returns per-(session_cabin) counts of
 // existing counselor and camper overrides for the session.
 func loadCabinOverrideCounts(ctx context.Context, q *db.Queries, campID, sessionID pgtype.UUID) (map[pgtype.UUID]int, map[pgtype.UUID]int, error) {
 	counselorRows, err := q.ListCounselorCabinOverridesForSolver(ctx, db.ListCounselorCabinOverridesForSolverParams{
@@ -259,10 +259,10 @@ func loadCabinOverrideCounts(ctx context.Context, q *db.Queries, campID, session
 	counselorCounts := map[pgtype.UUID]int{}
 	camperCounts := map[pgtype.UUID]int{}
 	for _, r := range counselorRows {
-		counselorCounts[r.SessionAgeGroupCabinID]++
+		counselorCounts[r.SessionCabinID]++
 	}
 	for _, r := range camperRows {
-		camperCounts[r.SessionAgeGroupCabinID]++
+		camperCounts[r.SessionCabinID]++
 	}
 	return counselorCounts, camperCounts, nil
 }

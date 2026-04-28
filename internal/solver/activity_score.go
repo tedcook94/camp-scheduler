@@ -5,7 +5,7 @@ import (
 	"sort"
 )
 
-func ScoreActivitySoftConstraints(snapshot ActivitySnapshot, assignment ActivityAssignment, weights ActivityWeights) ScoreResult {
+func ScoreActivitySoftConstraints(snapshot ActivitySnapshot, assignment CounselorActivityAssignment, weights ActivityWeights) ScoreResult {
 	var result ScoreResult
 
 	components := scoreActivityPreference(snapshot, assignment, weights)
@@ -31,7 +31,7 @@ func ScoreActivitySoftConstraints(snapshot ActivitySnapshot, assignment Activity
 	return result
 }
 
-func scoreActivityPreference(snapshot ActivitySnapshot, assignment ActivityAssignment, weights ActivityWeights) []ScoreComponent {
+func scoreActivityPreference(snapshot ActivitySnapshot, assignment CounselorActivityAssignment, weights ActivityWeights) []ScoreComponent {
 	if weights.ActivityPreference == 0 {
 		return nil
 	}

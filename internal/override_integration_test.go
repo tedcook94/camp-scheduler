@@ -30,8 +30,8 @@ type overrideCabinFixture struct {
 	sessionID     string
 	pineCabinID   string // cabins.id for Pine
 	oakCabinID    string // cabins.id for Oak
-	pineSAGCID    string // session_age_group_cabins.id for Pine in this session
-	oakSAGCID     string // session_age_group_cabins.id for Oak in this session
+	pineSAGCID    string // session_cabins.id for Pine in this session
+	oakSAGCID     string // session_cabins.id for Oak in this session
 	juniorsAGID   string
 	sagJuniorsID  string
 	counselorIDs  map[string]string // name -> counselors.id
@@ -135,7 +135,7 @@ func testCounselorCabinOverridePins(t *testing.T) {
 	// Pin Alice to Oak.
 	mustPost(t, apiURL(ts, "/sessions/"+f.sessionID+"/overrides/counselor-cabin"), map[string]any{
 		"counselor_id":               f.counselorIDs["Alice"],
-		"session_age_group_cabin_id": f.oakSAGCID,
+		"session_cabin_id": f.oakSAGCID,
 	}, f.token)
 
 	run := mustPost(t, apiURL(ts, "/sessions/"+f.sessionID+"/assignment-runs"),
@@ -164,7 +164,7 @@ func testCamperCabinOverridePins(t *testing.T) {
 	// Pin Kai to Oak.
 	mustPost(t, apiURL(ts, "/sessions/"+f.sessionID+"/overrides/camper-cabin"), map[string]any{
 		"camper_id":                  f.camperIDs["Kai"],
-		"session_age_group_cabin_id": f.oakSAGCID,
+		"session_cabin_id": f.oakSAGCID,
 	}, f.token)
 
 	run := mustPost(t, apiURL(ts, "/sessions/"+f.sessionID+"/assignment-runs"),
@@ -367,7 +367,7 @@ func testCounselorCabinOverrideGenderMismatch(t *testing.T) {
 	doRawRequest(t, http.MethodPost, apiURL(ts, "/sessions/"+f.sessionID+"/overrides/counselor-cabin"),
 		map[string]any{
 			"counselor_id":               str(male, "id"),
-			"session_age_group_cabin_id": f.oakSAGCID,
+			"session_cabin_id": f.oakSAGCID,
 		}, http.StatusUnprocessableEntity, f.token)
 }
 
@@ -383,7 +383,7 @@ func testOverrideMutationMarksRunStale(t *testing.T) {
 
 	mustPost(t, apiURL(ts, "/sessions/"+f.sessionID+"/overrides/counselor-cabin"), map[string]any{
 		"counselor_id":               f.counselorIDs["Alice"],
-		"session_age_group_cabin_id": f.pineSAGCID,
+		"session_cabin_id": f.pineSAGCID,
 	}, f.token)
 
 	after := mustGet(t, apiURL(ts, "/assignment-runs/"+runID), f.token)
@@ -397,7 +397,7 @@ func testTriggerRejectsStaleOverride(t *testing.T) {
 
 	mustPost(t, apiURL(ts, "/sessions/"+f.sessionID+"/overrides/counselor-cabin"), map[string]any{
 		"counselor_id":               f.counselorIDs["Alice"],
-		"session_age_group_cabin_id": f.pineSAGCID,
+		"session_cabin_id": f.pineSAGCID,
 	}, f.token)
 
 	// Archive Alice — her override now references an off-roster counselor.
@@ -460,7 +460,7 @@ func testSessionCabinGenderOverridesDefault(t *testing.T) {
 	// Pin succeeds against per-session male gender.
 	mustPost(t, apiURL(ts, "/sessions/"+sessionID+"/overrides/counselor-cabin"), map[string]any{
 		"counselor_id":               str(mike, "id"),
-		"session_age_group_cabin_id": str(pineSAGC, "id"),
+		"session_cabin_id": str(pineSAGC, "id"),
 	}, token)
 
 	// Run completes — solver respects per-session male gender.

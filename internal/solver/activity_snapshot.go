@@ -249,7 +249,7 @@ func loadPreviouslyUnmetActivityPreferences(ctx context.Context, queries *db.Que
 		return nil, nil
 	}
 
-	solutionID, err := queries.GetSelectedActivitySolutionBySession(ctx, db.GetSelectedActivitySolutionBySessionParams{
+	solutionID, err := queries.GetSelectedCounselorActivitySolutionBySession(ctx, db.GetSelectedCounselorActivitySolutionBySessionParams{
 		SessionID: session.PreviousSession,
 		CampID:    campID,
 	})
@@ -269,7 +269,7 @@ func loadPreviouslyUnmetActivityPreferences(ctx context.Context, queries *db.Que
 		return nil, nil
 	}
 
-	assignments, err := queries.ListActivityAssignmentsBySolution(ctx, db.ListActivityAssignmentsBySolutionParams{
+	assignments, err := queries.ListCounselorActivityAssignmentsBySolution(ctx, db.ListCounselorActivityAssignmentsBySolutionParams{
 		SolutionID: solutionID,
 		CampID:     campID,
 	})

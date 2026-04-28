@@ -49,12 +49,18 @@ func (c AuthConfig) InternalURL() string {
 }
 
 type DatabaseConfig struct {
-	Host     string        `envconfig:"DATABASE_HOST" required:"true"`
-	Port     uint          `envconfig:"DATABASE_PORT" required:"true"`
-	User     string        `envconfig:"DATABASE_USER" required:"true"`
+	// URL takes precedence over the discrete Host/User/etc. fields when set.
+	// In normal operation it's APP_DATABASE_URL (the runtime URL using the
+	// `app_user` role whose search_path is fixed to the `app` schema). The
+	// discrete fields remain available as a fallback for callers that
+	// configure the database piecemeal.
+	URL      string        `envconfig:"APP_DATABASE_URL"`
+	Host     string        `envconfig:"DATABASE_HOST"`
+	Port     uint          `envconfig:"DATABASE_PORT"`
+	User     string        `envconfig:"DATABASE_USER"`
 	Password string        `envconfig:"DATABASE_PASSWORD"`
-	SSLMode  string        `envconfig:"DATABASE_SSL_MODE" required:"true"`
-	Name     string        `envconfig:"DATABASE_NAME" required:"true"`
+	SSLMode  string        `envconfig:"DATABASE_SSL_MODE"`
+	Name     string        `envconfig:"DATABASE_NAME"`
 	Timeout  time.Duration `envconfig:"DATABASE_TIMEOUT" default:"10s"`
 }
 
@@ -65,6 +71,9 @@ func Load() (Config, error) {
 }
 
 func (c DatabaseConfig) DSN() string {
+	if c.URL != "" {
+		return c.URL
+	}
 	u := &url.URL{
 		Scheme: "postgres",
 		User:   url.UserPassword(c.User, c.Password),

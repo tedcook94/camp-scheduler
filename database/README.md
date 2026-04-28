@@ -44,10 +44,13 @@ mise run dev       # Reinitializes everything from scratch
 ## Migrations
 
 Migrations are managed with [golang-migrate](https://github.com/golang-migrate/migrate).
-Migration files live in `database/migrations/`.
+Migration files for the application schema live in `database/migrations/app/`.
 
-The database connection URLs are constructed from the environment variables
-defined in `mise.toml`.
+Each migration stream tracks its own version in a `schema_migrations` table
+inside its own schema (`app.schema_migrations`). The `search_path` URL query
+parameter on the migrate connection ensures that table is created in the
+correct schema and that unqualified identifiers in migration files resolve
+without per-statement qualification.
 
 ```sh
 # Run all pending migrations on the dev database

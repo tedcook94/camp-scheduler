@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "build": "tsc -p tsconfig.json",
-    "migrate": "tsx scripts/migrate.ts",
+    "generate-migration": "tsx scripts/generate-migration.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

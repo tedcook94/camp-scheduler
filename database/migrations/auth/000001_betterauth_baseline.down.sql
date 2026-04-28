@@ -1,0 +1,3 @@
+-- TODO: BetterAuth does not generate reverse migrations.
+-- Hand-edit if a real rollback is required; otherwise reset the auth
+-- schema by running `DROP SCHEMA auth CASCADE` and reapplying from 1.

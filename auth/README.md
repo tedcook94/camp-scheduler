@@ -52,9 +52,23 @@ for Go-side availability during auth-server restarts.
 ```sh
 cd auth
 pnpm install
-pnpm migrate    # apply BetterAuth schema
 pnpm dev        # http://localhost:9101
 ```
+
+Schema changes are managed by the unified golang-migrate stream
+(`mise run migrate:auth`). When you change `auth.ts` plugins or fields,
+regenerate the migration:
+
+```sh
+mise run auth:migration <name>   # writes database/migrations/auth/NNNNNN_<name>.up.sql
+mise run migrate:auth            # apply
+```
+
+The generator (`scripts/generate-migration.ts`) connects to a throwaway
+Postgres database with the privileged role, asks BetterAuth's Kysely adapter
+to compile the full schema, and writes the resulting SQL wrapped in a
+transaction with `SET LOCAL search_path = auth, public;` so it always lands
+in the `auth` schema.
 
 Environment variables (provided by `mise.toml` at the repo root):
 
@@ -65,7 +79,8 @@ Environment variables (provided by `mise.toml` at the repo root):
 | `AUTH_TRUSTED_ORIGINS` | comma-separated CORS allowlist |
 | `BETTER_AUTH_SECRET` | BetterAuth signing/encryption secret (32+ chars) |
 | `AUTH_SHARED_SECRET` | bearer secret accepted on `/internal/*` |
-| `DATABASE_URL` | shared Postgres URL |
+| `AUTH_DATABASE_URL` | runtime Postgres URL (uses `auth_user` role, search_path = auth, public) |
+| `DATABASE_URL` | privileged Postgres URL (used by the migration generator only) |
 
 ## JWT claim shape
 

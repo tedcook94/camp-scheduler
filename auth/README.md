@@ -70,6 +70,11 @@ to compile the full schema, and writes the resulting SQL wrapped in a
 transaction with `SET LOCAL search_path = auth, public;` so it always lands
 in the `auth` schema.
 
+The server refuses to start if the live `auth` schema doesn't match the
+current BetterAuth config (see `assertSchemaUpToDate` in `src/server.ts`).
+This catches the common mistake of changing `auth.ts` without regenerating
++ applying the corresponding migration.
+
 Environment variables (provided by `mise.toml` at the repo root):
 
 | Var | Purpose |

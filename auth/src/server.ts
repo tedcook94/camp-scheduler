@@ -1,8 +1,32 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
+import { getMigrations } from "better-auth/db/migration";
 import { auth } from "./auth.js";
 import { env, pool } from "./env.js";
 import { internalRouter } from "./internal.js";
+
+// Fail-fast on BetterAuth schema drift. The auth schema is owned by
+// golang-migrate; if the BetterAuth config has gained a field/table the
+// migrations don't yet reflect, runtime queries will fail in subtle ways.
+// Refuse to start instead, prompting `mise run auth:migration` + apply.
+async function assertSchemaUpToDate() {
+  const { toBeAdded, toBeCreated } = await getMigrations(auth.options);
+  if (toBeAdded.length === 0 && toBeCreated.length === 0) {
+    return;
+  }
+  const summary = [...toBeCreated, ...toBeAdded]
+    .map((t) => `  ${t.table}: ${Object.keys(t.fields).join(", ")}`)
+    .join("\n");
+  console.error(
+    "auth schema is out of date. regenerate and apply migrations:\n" +
+      "  mise run auth:migration <name>\n" +
+      "  mise run migrate:auth\n\npending changes:\n" +
+      summary,
+  );
+  process.exit(1);
+}
+
+await assertSchemaUpToDate();
 
 const app = new Hono();
 

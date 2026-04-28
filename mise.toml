@@ -18,8 +18,6 @@ DATABASE_SSL_MODE = "disable"
 DATABASE_NAME = "camp_scheduler"
 DATABASE_TIMEOUT = "10s"
 
-# Auth server (BetterAuth) — separate Node service that mints JWTs the Go
-# server validates via JWKS.
 AUTH_PORT = "9101"
 AUTH_BASE_URL = "http://localhost:9101"
 AUTH_SERVER_URL = "http://localhost:9101"
@@ -27,11 +25,12 @@ AUTH_SHARED_SECRET = "local-dev-shared-secret-change-me"
 AUTH_TRUSTED_ORIGINS = "http://localhost:5173"
 BETTER_AUTH_SECRET = "local-dev-better-auth-secret-must-be-at-least-32-chars"
 
-# Constructed URLs for golang-migrate
 DATABASE_URL = "postgres://{{env.DATABASE_USER}}:{{env.DATABASE_PASSWORD}}@{{env.DATABASE_HOST}}:{{env.DATABASE_PORT}}/{{env.DATABASE_NAME}}?sslmode={{env.DATABASE_SSL_MODE}}"
 DATABASE_URL_TEST = "postgres://{{env.DATABASE_USER}}:{{env.DATABASE_PASSWORD}}@{{env.DATABASE_HOST}}:{{env.DATABASE_PORT}}/{{env.DATABASE_NAME}}_test?sslmode={{env.DATABASE_SSL_MODE}}"
-
-# Override any of these values in mise.local.toml (gitignored) for personal preferences.
+APP_DATABASE_URL = "postgres://app_user:p@ss123@{{env.DATABASE_HOST}}:{{env.DATABASE_PORT}}/{{env.DATABASE_NAME}}?sslmode={{env.DATABASE_SSL_MODE}}"
+APP_DATABASE_URL_TEST = "postgres://app_user:p@ss123@{{env.DATABASE_HOST}}:{{env.DATABASE_PORT}}/{{env.DATABASE_NAME}}_test?sslmode={{env.DATABASE_SSL_MODE}}"
+AUTH_DATABASE_URL = "postgres://auth_user:p@ss123@{{env.DATABASE_HOST}}:{{env.DATABASE_PORT}}/{{env.DATABASE_NAME}}?sslmode={{env.DATABASE_SSL_MODE}}"
+AUTH_DATABASE_URL_TEST = "postgres://auth_user:p@ss123@{{env.DATABASE_HOST}}:{{env.DATABASE_PORT}}/{{env.DATABASE_NAME}}_test?sslmode={{env.DATABASE_SSL_MODE}}"
 
 [tasks.dev]
 description = "Start Postgres, BetterAuth auth-server, Go server, and frontend dev server"

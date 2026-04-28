@@ -4,10 +4,24 @@
 
 The local PostgreSQL database runs in a Docker container managed by Docker
 Compose. On first start, the container automatically runs `local-setup.sql` to
-create the `camp_scheduler` user and both the dev and test databases.
+provision roles, schemas, and both the dev and test databases.
 
 `mise run dev` handles everything automatically: it starts Postgres, runs all
-pending migrations on both databases, and starts the Go server with hot-reload.
+pending migrations, and starts the Go server with hot-reload.
+
+## Schemas and roles
+
+Tables live in two schemas, owned by separate runtime roles:
+
+| Schema | Owner          | Runtime role | Used by                     |
+| ------ | -------------- | ------------ | --------------------------- |
+| `app`  | `camp_scheduler` | `app_user`  | Go server (sqlc queries)    |
+| `auth` | `camp_scheduler` | `auth_user` | BetterAuth auth-server      |
+
+Each runtime role has `search_path` fixed to its schema (plus `public`), so
+unqualified identifiers in queries resolve to the right schema without
+per-query qualification. The privileged `camp_scheduler` role is reserved for
+schema migrations and admin/seed CLI tools.
 
 ## First-Time Setup
 

@@ -1,7 +1,58 @@
 CREATE USER camp_scheduler PASSWORD 'p@ss123';
-CREATE DATABASE camp_scheduler WITH OWNER camp_scheduler;
+ALTER ROLE camp_scheduler SUPERUSER;
+
+CREATE USER app_user  PASSWORD 'p@ss123';
+CREATE USER auth_user PASSWORD 'p@ss123';
+
+CREATE DATABASE camp_scheduler      WITH OWNER camp_scheduler;
 CREATE DATABASE camp_scheduler_test WITH OWNER camp_scheduler;
 
 \connect camp_scheduler
 
-ALTER ROLE camp_scheduler SUPERUSER;
+CREATE SCHEMA IF NOT EXISTS app  AUTHORIZATION camp_scheduler;
+CREATE SCHEMA IF NOT EXISTS auth AUTHORIZATION camp_scheduler;
+
+GRANT USAGE ON SCHEMA app  TO app_user;
+GRANT USAGE ON SCHEMA auth TO auth_user;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES    IN SCHEMA app  TO app_user;
+GRANT USAGE,  SELECT, UPDATE         ON ALL SEQUENCES IN SCHEMA app  TO app_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES    IN SCHEMA auth TO auth_user;
+GRANT USAGE,  SELECT, UPDATE         ON ALL SEQUENCES IN SCHEMA auth TO auth_user;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE camp_scheduler IN SCHEMA app
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;
+ALTER DEFAULT PRIVILEGES FOR ROLE camp_scheduler IN SCHEMA app
+    GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO app_user;
+ALTER DEFAULT PRIVILEGES FOR ROLE camp_scheduler IN SCHEMA auth
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO auth_user;
+ALTER DEFAULT PRIVILEGES FOR ROLE camp_scheduler IN SCHEMA auth
+    GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO auth_user;
+
+ALTER ROLE app_user  IN DATABASE camp_scheduler SET search_path = app,  public;
+ALTER ROLE auth_user IN DATABASE camp_scheduler SET search_path = auth, public;
+
+\connect camp_scheduler_test
+
+CREATE SCHEMA IF NOT EXISTS app  AUTHORIZATION camp_scheduler;
+CREATE SCHEMA IF NOT EXISTS auth AUTHORIZATION camp_scheduler;
+
+GRANT USAGE ON SCHEMA app  TO app_user;
+GRANT USAGE ON SCHEMA auth TO auth_user;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES    IN SCHEMA app  TO app_user;
+GRANT USAGE,  SELECT, UPDATE         ON ALL SEQUENCES IN SCHEMA app  TO app_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES    IN SCHEMA auth TO auth_user;
+GRANT USAGE,  SELECT, UPDATE         ON ALL SEQUENCES IN SCHEMA auth TO auth_user;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE camp_scheduler IN SCHEMA app
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;
+ALTER DEFAULT PRIVILEGES FOR ROLE camp_scheduler IN SCHEMA app
+    GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO app_user;
+ALTER DEFAULT PRIVILEGES FOR ROLE camp_scheduler IN SCHEMA auth
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO auth_user;
+ALTER DEFAULT PRIVILEGES FOR ROLE camp_scheduler IN SCHEMA auth
+    GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO auth_user;
+
+ALTER ROLE app_user  IN DATABASE camp_scheduler_test SET search_path = app,  public;
+ALTER ROLE auth_user IN DATABASE camp_scheduler_test SET search_path = auth, public;

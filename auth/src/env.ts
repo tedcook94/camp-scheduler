@@ -21,7 +21,10 @@ export const env = {
     .filter(Boolean),
   betterAuthSecret: required("BETTER_AUTH_SECRET"),
   serviceSecret: required("AUTH_SHARED_SECRET"),
-  databaseUrl: required("DATABASE_URL"),
+  // Runtime URL for the BetterAuth auth-server. Connects as the restricted
+  // `auth_user` role whose search_path is fixed to `auth, public` by the
+  // database bootstrap, so unqualified identifiers resolve in the auth schema.
+  databaseUrl: required("AUTH_DATABASE_URL"),
 };
 
 export const pool = new Pool({ connectionString: env.databaseUrl });

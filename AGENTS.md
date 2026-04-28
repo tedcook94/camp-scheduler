@@ -27,7 +27,10 @@ a constraint satisfaction solver. See `README.md` for a high-level overview and
   `app_user` role) and `auth` (owned by the BetterAuth service via `auth_user`).
   Each role's `search_path` is fixed to its schema, so application SQL stays
   unqualified. Migrations are split into `database/migrations/{app,auth}/`
-  with separate per-schema tracking tables.
+  with separate per-schema tracking tables, both applied by golang-migrate.
+  Auth migrations are generated from the live BetterAuth config by
+  `auth/scripts/generate-migration.ts` (run via `mise run auth:migration`) — do
+  not hand-edit them; change `auth/src/auth.ts` and regenerate.
 
 ## Code Style
 

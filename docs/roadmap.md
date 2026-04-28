@@ -171,3 +171,10 @@ viable configurations and understand trade-offs.
 - [ ] OAuth logins
 - [ ] External system integration (Campminder, etc.)
 - [ ] LLM conversational layer (MCP) for "why was X assigned to Y?" queries
+
+### Phase 5: Refactors & Improvements
+
+- [x] Split database schemas
+- [ ] Use session cabins in solver
+- [ ] Move Go project to `server` directory
+- [ ] Clean up tests

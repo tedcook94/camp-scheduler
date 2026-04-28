@@ -23,6 +23,11 @@ a constraint satisfaction solver. See `README.md` for a high-level overview and
   the Go server is JWT-only and never holds user credentials.
 - Project structure: `cmd/server/` (entrypoint), `internal/` (Go app code),
   `auth/` (BetterAuth TypeScript service), `database/` (migrations, sqlc queries)
+- Postgres uses two schemas: `app` (owned and queried by the Go server via the
+  `app_user` role) and `auth` (owned by the BetterAuth service via `auth_user`).
+  Each role's `search_path` is fixed to its schema, so application SQL stays
+  unqualified. Migrations are split into `database/migrations/{app,auth}/`
+  with separate per-schema tracking tables.
 
 ## Code Style
 

@@ -332,8 +332,8 @@ func initDB(cfg config.Config) (*pgxpool.Pool, error) {
 	}
 
 	slog.
-		With("host", cfg.Database.Host).
-		With("name", cfg.Database.Name).
+		With("host", poolCfg.ConnConfig.Host).
+		With("name", poolCfg.ConnConfig.Database).
 		Info("connected to database")
 	return pool, nil
 }

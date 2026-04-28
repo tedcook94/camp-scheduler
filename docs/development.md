@@ -121,19 +121,24 @@ variables:
 | `LOG_LEVEL`           | `info`            | Log level (debug/info/warn/error) |
 | `DATABASE_HOST`       | `localhost`        | Postgres host              |
 | `DATABASE_PORT`       | `5432`            | Postgres port              |
-| `DATABASE_USER`       | `camp_scheduler`  | Postgres user              |
-| `DATABASE_PASSWORD`   | `p@ss123`         | Postgres password          |
+| `DATABASE_USER`       | `camp_scheduler`  | Privileged Postgres role (migrations, admin/seed CLIs) |
+| `DATABASE_PASSWORD`   | `p@ss123`         | Password for `camp_scheduler` |
 | `DATABASE_NAME`       | `camp_scheduler`  | Database name              |
 | `DATABASE_SSL_MODE`   | `disable`         | Postgres SSL mode          |
 | `DATABASE_TIMEOUT`    | `10s`             | Connection timeout         |
+| `APP_DATABASE_URL`    | (constructed)     | Runtime URL for the Go server (uses `app_user` role, search_path = app, public) |
+| `AUTH_DATABASE_URL`   | (constructed)     | Runtime URL for the BetterAuth auth-server (uses `auth_user` role, search_path = auth, public) |
+| `APP_MIGRATE_URL`     | (constructed)     | golang-migrate URL for the `app` schema migrations (privileged + `search_path=app`) |
+| `AUTH_MIGRATE_URL`    | (constructed)     | golang-migrate URL for the `auth` schema migrations (privileged + `search_path=auth`) |
 | `AUTH_PORT`           | `9101`            | Auth-server listen port    |
 | `AUTH_BASE_URL`       | `http://localhost:9101` | Public URL the auth-server is reachable at |
 | `AUTH_SERVER_URL`     | `http://localhost:9101` | URL the Go server uses to reach the auth-server (JWKS + `/internal/*`) |
 | `AUTH_SHARED_SECRET`  | (dev value)       | Shared bearer token for Go ↔ auth-server `/internal/*` calls |
 | `BETTER_AUTH_SECRET`  | (dev value)       | BetterAuth signing secret for cookies/CSRF (min 32 chars) |
 
-`DATABASE_URL` and `DATABASE_URL_TEST` are automatically constructed from the
-above variables via mise templates.
+`DATABASE_URL`, `DATABASE_URL_TEST`, and the `APP_*` / `AUTH_*` URL variants
+are automatically constructed from the discrete `DATABASE_*` variables via
+mise templates. See `mise.toml` for the exact composition.
 
 ## Database
 

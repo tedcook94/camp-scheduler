@@ -27,6 +27,10 @@ BETTER_AUTH_SECRET = "local-dev-better-auth-secret-must-be-at-least-32-chars"
 
 DATABASE_URL = "postgres://{{env.DATABASE_USER}}:{{env.DATABASE_PASSWORD}}@{{env.DATABASE_HOST}}:{{env.DATABASE_PORT}}/{{env.DATABASE_NAME}}?sslmode={{env.DATABASE_SSL_MODE}}"
 DATABASE_URL_TEST = "postgres://{{env.DATABASE_USER}}:{{env.DATABASE_PASSWORD}}@{{env.DATABASE_HOST}}:{{env.DATABASE_PORT}}/{{env.DATABASE_NAME}}_test?sslmode={{env.DATABASE_SSL_MODE}}"
+APP_MIGRATE_URL = "postgres://{{env.DATABASE_USER}}:{{env.DATABASE_PASSWORD}}@{{env.DATABASE_HOST}}:{{env.DATABASE_PORT}}/{{env.DATABASE_NAME}}?sslmode={{env.DATABASE_SSL_MODE}}&search_path=app"
+APP_MIGRATE_URL_TEST = "postgres://{{env.DATABASE_USER}}:{{env.DATABASE_PASSWORD}}@{{env.DATABASE_HOST}}:{{env.DATABASE_PORT}}/{{env.DATABASE_NAME}}_test?sslmode={{env.DATABASE_SSL_MODE}}&search_path=app"
+AUTH_MIGRATE_URL = "postgres://{{env.DATABASE_USER}}:{{env.DATABASE_PASSWORD}}@{{env.DATABASE_HOST}}:{{env.DATABASE_PORT}}/{{env.DATABASE_NAME}}?sslmode={{env.DATABASE_SSL_MODE}}&search_path=auth"
+AUTH_MIGRATE_URL_TEST = "postgres://{{env.DATABASE_USER}}:{{env.DATABASE_PASSWORD}}@{{env.DATABASE_HOST}}:{{env.DATABASE_PORT}}/{{env.DATABASE_NAME}}_test?sslmode={{env.DATABASE_SSL_MODE}}&search_path=auth"
 APP_DATABASE_URL = "postgres://app_user:p@ss123@{{env.DATABASE_HOST}}:{{env.DATABASE_PORT}}/{{env.DATABASE_NAME}}?sslmode={{env.DATABASE_SSL_MODE}}"
 APP_DATABASE_URL_TEST = "postgres://app_user:p@ss123@{{env.DATABASE_HOST}}:{{env.DATABASE_PORT}}/{{env.DATABASE_NAME}}_test?sslmode={{env.DATABASE_SSL_MODE}}"
 AUTH_DATABASE_URL = "postgres://auth_user:p@ss123@{{env.DATABASE_HOST}}:{{env.DATABASE_PORT}}/{{env.DATABASE_NAME}}?sslmode={{env.DATABASE_SSL_MODE}}"
@@ -104,37 +108,37 @@ description = "Generate Go code from SQL queries"
 run = "sqlc generate"
 
 [tasks.migrate]
-description = "Run migrations on the dev database"
+description = "Run app-schema migrations on the dev database"
 usage = 'flag "--version <version>" help="Migrate to a specific version (omit to run all up)"'
 run = """
 #!/usr/bin/env bash
 if [ -n "${usage_version:-}" ]; then
-  migrate -database "$DATABASE_URL" -path database/migrations goto "$usage_version"
+  migrate -database "$APP_MIGRATE_URL" -path database/migrations/app goto "$usage_version"
 else
-  migrate -database "$DATABASE_URL" -path database/migrations up
+  migrate -database "$APP_MIGRATE_URL" -path database/migrations/app up
 fi
 """
 
 [tasks."migrate:test"]
-description = "Run migrations on the test database"
+description = "Run app-schema migrations on the test database"
 usage = 'flag "--version <version>" help="Migrate to a specific version (omit to run all up)"'
 run = """
 #!/usr/bin/env bash
 if [ -n "${usage_version:-}" ]; then
-  migrate -database "$DATABASE_URL_TEST" -path database/migrations goto "$usage_version"
+  migrate -database "$APP_MIGRATE_URL_TEST" -path database/migrations/app goto "$usage_version"
 else
-  migrate -database "$DATABASE_URL_TEST" -path database/migrations up
+  migrate -database "$APP_MIGRATE_URL_TEST" -path database/migrations/app up
 fi
 """
 
 [tasks."migrate:all"]
-description = "Run migrations on both dev and test databases"
+description = "Run app-schema migrations on both dev and test databases"
 depends = ["migrate", "migrate:test"]
 
 [tasks.migration]
-description = "Create a new migration file"
+description = "Create a new app-schema migration file"
 usage = 'arg "<name>" help="Name of the migration"'
-run = "migrate create -ext sql -dir database/migrations -seq \"${usage_name:?}\""
+run = "migrate create -ext sql -dir database/migrations/app -seq \"${usage_name:?}\""
 
 [tasks."auth:install"]
 description = "Install auth-server dependencies"

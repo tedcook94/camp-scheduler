@@ -62,16 +62,18 @@ Override any value locally with `mise.local.toml` (gitignored).
 | `mise run server`   | Run Go server standalone (assumes Postgres is running) |
 | `mise run auth:install` | Install auth-server dependencies                |
 | `mise run auth:dev`     | Run auth-server with hot-reload (port 9101)     |
-| `mise run auth:migrate` | Apply BetterAuth schema migrations              |
+| `mise run auth:migration <name>` | Generate a new auth-schema migration from the live BetterAuth config |
 | `mise run build`    | Build frontend + server binary to `bin/server`       |
 | `mise run test`     | Run unit tests                                       |
 | `mise run test:integration` | Run integration tests (auto-starts Postgres) |
 | `mise run sqlc`     | Regenerate Go code from SQL queries                  |
-| `mise run migrate`  | Run pending migrations on the dev database           |
-| `mise run migrate -- --version N` | Migrate dev database to version N     |
-| `mise run migrate:test` | Run pending migrations on the test database      |
-| `mise run migrate:all`  | Run migrations on both dev and test databases    |
-| `mise run migration <name>` | Create a new migration file                  |
+| `mise run migrate`  | Run pending app-schema migrations on the dev database |
+| `mise run migrate -- --version N` | Migrate dev app schema to version N    |
+| `mise run migrate:test` | Run pending app-schema migrations on the test database |
+| `mise run migrate:auth` | Run pending auth-schema migrations on the dev database |
+| `mise run migrate:auth:test` | Run pending auth-schema migrations on the test database |
+| `mise run migrate:all`  | Run all migrations (app + auth) on both dev and test |
+| `mise run migration <name>` | Create a new app-schema migration file       |
 | `mise run db:reset` | Destroy local databases and volumes                  |
 | `mise run seed:super-admin` | Create a super-admin user (interactive)        |
 | `mise run seed:demo` | Seed demo camp data (idempotent: deletes and recreates) |

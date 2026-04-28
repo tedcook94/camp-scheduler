@@ -55,7 +55,6 @@ cleanup() {
 trap cleanup EXIT
 docker compose up -d --wait postgres
 mise run migrate:all
-mise run auth:migrate
 (cd auth && pnpm dev) &
 AUTH_PID=$!
 air &
@@ -132,13 +131,43 @@ fi
 """
 
 [tasks."migrate:all"]
-description = "Run app-schema migrations on both dev and test databases"
-depends = ["migrate", "migrate:test"]
+description = "Run app- and auth-schema migrations on both dev and test databases"
+depends = ["migrate", "migrate:test", "migrate:auth", "migrate:auth:test"]
+
+[tasks."migrate:auth"]
+description = "Run auth-schema (BetterAuth) migrations on the dev database"
+usage = 'flag "--version <version>" help="Migrate to a specific version (omit to run all up)"'
+run = """
+#!/usr/bin/env bash
+if [ -n "${usage_version:-}" ]; then
+  migrate -database "$AUTH_MIGRATE_URL" -path database/migrations/auth goto "$usage_version"
+else
+  migrate -database "$AUTH_MIGRATE_URL" -path database/migrations/auth up
+fi
+"""
+
+[tasks."migrate:auth:test"]
+description = "Run auth-schema (BetterAuth) migrations on the test database"
+usage = 'flag "--version <version>" help="Migrate to a specific version (omit to run all up)"'
+run = """
+#!/usr/bin/env bash
+if [ -n "${usage_version:-}" ]; then
+  migrate -database "$AUTH_MIGRATE_URL_TEST" -path database/migrations/auth goto "$usage_version"
+else
+  migrate -database "$AUTH_MIGRATE_URL_TEST" -path database/migrations/auth up
+fi
+"""
 
 [tasks.migration]
 description = "Create a new app-schema migration file"
 usage = 'arg "<name>" help="Name of the migration"'
 run = "migrate create -ext sql -dir database/migrations/app -seq \"${usage_name:?}\""
+
+[tasks."auth:migration"]
+description = "Generate a new auth-schema (BetterAuth) migration from the live config"
+usage = 'arg "<name>" help="Name of the migration (snake_case)"'
+dir = "auth"
+run = "pnpm generate-migration \"${usage_name:?}\""
 
 [tasks."auth:install"]
 description = "Install auth-server dependencies"
@@ -149,11 +178,6 @@ run = "pnpm install"
 description = "Run the BetterAuth auth-server with hot-reload"
 dir = "auth"
 run = "pnpm dev"
-
-[tasks."auth:migrate"]
-description = "Apply BetterAuth schema migrations"
-dir = "auth"
-run = "pnpm migrate"
 
 [tasks."seed:super-admin"]
 description = "Create a super-admin user (interactive)"
